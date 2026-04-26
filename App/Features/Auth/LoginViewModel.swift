@@ -7,23 +7,32 @@
 //   1. Generate a 32-byte `codeVerifier` (base64url) and the matching
 //      `codeChallenge` = base64url(SHA-256(codeVerifier)).
 //   2. Open `ASWebAuthenticationSession` to the registration URL with
-//      `codeChallenge` + a label hint as query items. We pass NO
-//      `callbackURLScheme` so the callback comes back as a Universal
-//      Link to `manage.polaris.express/expresscan/register/callback`,
-//      delivered via `SceneDelegate.scene(_:continue:)`.
-//   3. The SceneDelegate posts a NotificationCenter notification with
-//      the `code` query parameter. We observe it here, stash the code
-//      + the matching `codeVerifier` (so RegistrationViewModel can
-//      consume them), and emit `deliveredCode` for the SwiftUI view.
+//      `codeChallenge` + a label hint as query items. The session is
+//      configured with `callbackURLScheme: "expresscan"`; the web
+//      admin's POST handler 302s the in-session browser to
+//      `expresscan://register/callback?code=…`, AuthServices matches
+//      the scheme, dismisses the auth UI, and hands us the URL via
+//      the completion handler.
+//   3. We extract the `code` query parameter from the callback URL,
+//      stash it together with the matching `codeVerifier`, and emit
+//      `deliveredCode` for the SwiftUI view to consume via
+//      `RegistrationViewModel`.
+//
+//  Why custom scheme and not the iOS 17.4+ `.https(host:path:)`
+//  Callback API: the modern API was tried first but failed silently on
+//  iOS 26 — `session.start()` returned true, no UI presented, and the
+//  completion handler never fired despite a confirmed-correct AASA at
+//  the origin and on Apple's CDN. Until that is root-caused, the
+//  custom-scheme path is reliable across iOS versions and avoids the
+//  AASA-validation hot-path entirely.
+//
+//  The `observeUniversalLink()` notification observer below remains as
+//  a belt-and-braces path for stale HTTPS callback links that arrive
+//  via `.onOpenURL` outside an active auth session.
 //
 //  Spec:
-//    - `60-security.md` § 1: Universal Links + PKCE (NO custom URL
-//      scheme).
+//    - `60-security.md` § 1: PKCE for the registration handshake.
 //    - `50-ios.md` § "Universal Links + PKCE registration".
-//
-//  E-app-wire glues this to `RegistrationViewModel` end-to-end. The
-//  skeleton here just delivers the code; the registration POST lives
-//  in RegistrationViewModel.
 //
 
 import Foundation
@@ -50,7 +59,13 @@ public final class LoginViewModel: NSObject {
     /// `RegistrationViewModel` along with the `code`.
     public private(set) var lastVerifier: String?
 
+    @ObservationIgnored
     private var session: ASWebAuthenticationSession?
+    /// `@ObservationIgnored` so the `@Observable` macro doesn't wrap
+    /// the storage in observation machinery. iOS 26 + Swift 6.3 support
+    /// `isolated deinit`, so we no longer need `nonisolated(unsafe)`
+    /// to keep the observer reachable from cleanup.
+    @ObservationIgnored
     private var notificationObserver: NSObjectProtocol?
 
     public override init() {
@@ -58,7 +73,7 @@ public final class LoginViewModel: NSObject {
         observeUniversalLink()
     }
 
-    deinit {
+    isolated deinit {
         if let notificationObserver {
             NotificationCenter.default.removeObserver(notificationObserver)
         }
@@ -69,13 +84,17 @@ public final class LoginViewModel: NSObject {
     /// Kicks off the PKCE handshake. Idempotent — calling it twice
     /// while the session is up does nothing.
     public func start(deviceLabel: String = UIDevice.current.name) {
-        guard !isPresenting else { return }
+        guard !isPresenting else {
+            authLog.debug("LoginViewModel.start: ignored, session already presenting")
+            return
+        }
         error = nil
         deliveredCode = nil
 
         let verifier = Self.generateCodeVerifier()
         let challenge = Self.computeChallenge(verifier: verifier)
         self.lastVerifier = verifier
+        authLog.debug("LoginViewModel.start: opening auth session, label.len=\(deviceLabel.count, privacy: .public), verifier.len=\(verifier.count, privacy: .public)")
         // The verifier is read by `WelcomeView.onChange(of:deliveredCode)`
         // and handed to the `RootCoordinator.didReceiveOneTimeCode(_,
         // codeVerifier:)` transition — explicit DI, no globals.
@@ -92,19 +111,19 @@ public final class LoginViewModel: NSObject {
             return
         }
 
-        // `callbackURLScheme: nil` means the callback is delivered via
-        // Universal Link (SceneDelegate.scene(_:continue:)), not a
-        // custom URL scheme. Per `60-security.md` § 1 — REQUIRED.
+        // The server's POST handler 302s the in-session web view to
+        // `expresscan://register/callback?code=…`. AuthServices matches
+        // the redirect's scheme against the session's `callbackURLScheme`
+        // and — when they match — dismisses the auth UI and delivers
+        // the URL to the completion handler. Works reliably across iOS
+        // versions and skips the AASA-validation hot-path that the iOS
+        // 17.4+ `.https(host:path:)` Callback exposed us to.
         let session = ASWebAuthenticationSession(
             url: url,
-            callbackURLScheme: nil
-        ) { [weak self] _, error in
-            // We expect this completion handler to fire with
-            // (nil, .canceledLogin) on cancel; on a successful UL
-            // callback, iOS delivers via the Scene path BEFORE this
-            // closure is invoked, so we may also see (nil, nil).
+            callbackURLScheme: BuildConfig.callbackURLScheme
+        ) { [weak self] callbackURL, error in
             Task { @MainActor in
-                self?.handleSessionCompletion(error: error)
+                self?.handleSessionCompletion(callbackURL: callbackURL, error: error)
             }
         }
 
@@ -118,6 +137,7 @@ public final class LoginViewModel: NSObject {
         self.isPresenting = true
 
         if !session.start() {
+            authLog.error("LoginViewModel.start: session.start() returned false")
             self.isPresenting = false
             self.session = nil
             self.error = .sessionStartFailed
@@ -139,10 +159,17 @@ public final class LoginViewModel: NSObject {
 
     // MARK: - Internals
 
-    private func handleSessionCompletion(error: Error?) {
+    private func handleSessionCompletion(callbackURL: URL?, error: Error?) {
         // Always release the session reference.
         session = nil
         isPresenting = false
+
+        // Successful HTTPS-callback match — extract the one-time code.
+        if let callbackURL, error == nil {
+            authLog.debug("LoginViewModel: session completed with callback URL")
+            extractCode(from: callbackURL)
+            return
+        }
 
         guard let error else { return }
 
@@ -151,16 +178,64 @@ public final class LoginViewModel: NSObject {
         if let authErr = error as? ASWebAuthenticationSessionError {
             switch authErr.code {
             case .canceledLogin:
+                authLog.debug("LoginViewModel: session canceled by user")
                 self.error = .canceled
             case .presentationContextNotProvided,
                  .presentationContextInvalid:
+                authLog.error("LoginViewModel: presentation-context error \(authErr.code.rawValue, privacy: .public)")
                 self.error = .presentation
             @unknown default:
+                authLog.error("LoginViewModel: unknown ASWebAuthenticationSessionError code \(authErr.code.rawValue, privacy: .public)")
                 self.error = .unknown
             }
         } else {
+            authLog.error("LoginViewModel: session error \(String(describing: error), privacy: .public)")
             self.error = .unknown
         }
+    }
+
+    /// Reads the `?code=…` query item from the callback URL and routes
+    /// it through the same channel as the SwiftUI `.onOpenURL` /
+    /// `.onContinueUserActivity` handler in `RootView` would. This way
+    /// downstream observers (the active `LoginViewModel` instance and
+    /// any backup handlers) react identically regardless of how the
+    /// URL was delivered.
+    private func extractCode(from url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            authLog.error("LoginViewModel.extractCode: failed to parse URL")
+            self.error = .unknown
+            return
+        }
+
+        // Two valid shapes:
+        //  - Custom-scheme callback delivered by ASWebAuthenticationSession
+        //    after the server's 302 inside the auth view:
+        //    `expresscan://register/callback?code=…`.
+        //  - HTTPS Universal Link (legacy / belt-and-braces) delivered
+        //    via `RootView.onOpenURL` if a stale link is tapped from
+        //    elsewhere: `https://manage.polaris.express/expresscan/
+        //    register/callback?code=…`.
+        let isCustomScheme = components.scheme == BuildConfig.callbackURLScheme
+        let isUniversalLink = components.scheme == "https"
+            && components.host == BuildConfig.universalLinkHost
+            && components.path == BuildConfig.registrationCallbackPath
+        guard isCustomScheme || isUniversalLink else {
+            authLog.error("LoginViewModel.extractCode: callback URL did not match expected pattern (scheme=\(components.scheme ?? "nil", privacy: .public))")
+            self.error = .unknown
+            return
+        }
+
+        guard
+            let code = components.queryItems?.first(where: { $0.name == "code" })?.value,
+            !code.isEmpty
+        else {
+            authLog.error("LoginViewModel.extractCode: callback URL missing code query item")
+            self.error = .unknown
+            return
+        }
+
+        authLog.debug("LoginViewModel.extractCode: received one-time code, len=\(code.count, privacy: .public)")
+        self.deliveredCode = code
     }
 
     private func observeUniversalLink() {
@@ -221,13 +296,36 @@ extension LoginViewModel: ASWebAuthenticationPresentationContextProviding {
     ) -> ASPresentationAnchor {
         // We MUST return a UIWindow. The first foreground active scene's
         // window is the only viable answer in a SwiftUI app where we
-        // don't own the UIWindow ourselves.
-        // This callback is invoked on the main thread by AuthServices.
+        // don't own the UIWindow ourselves. This callback is invoked
+        // on the main thread by AuthServices.
         return MainActor.assumeIsolated {
-            let scene = UIApplication.shared.connectedScenes
+            // Prefer the foreground scene's keyWindow; fall back to any
+            // connected window scene. AuthServices invokes this only
+            // while the app is in the foreground, so the third branch
+            // (no scenes) is unreachable in practice — we return *some*
+            // anchor anyway so the type signature is satisfied.
+            let scenes = UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
-                .first(where: { $0.activationState == .foregroundActive })
-            return scene?.keyWindow ?? ASPresentationAnchor()
+            if let foregroundKey = scenes
+                .first(where: { $0.activationState == .foregroundActive })?
+                .keyWindow {
+                return foregroundKey
+            }
+            // The first connected scene is the only sensible fallback.
+            // If we somehow have zero scenes, the app is in a broken
+            // state and AuthServices can't present anyway — we
+            // construct a window for whichever scene exists, falling
+            // back to the implicit-foreground scene.
+            let scene = scenes.first ?? UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first
+            if let scene {
+                return scene.keyWindow ?? UIWindow(windowScene: scene)
+            }
+            // Truly unreachable in practice; hit only if iOS hands us
+            // an `ASWebAuthenticationSession` callback before any
+            // window scene has connected.
+            preconditionFailure("No connected window scenes for AuthServices anchor")
         }
     }
 }
