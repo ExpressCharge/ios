@@ -1,0 +1,77 @@
+{
+  "$schema": "https://expresscan.local/schemas/design-tokens-v1.json",
+  "version": "1.0.0",
+  "source": "expressync (frontend) — Wave 1 D1-refactor",
+  "notes": [
+    "Generated for the iOS team (E-pkg + E-app-skel agents).",
+    "OKLCH triplets are canonical; sRGB hex equivalents are approximations for asset-catalog Color Sets.",
+    "Each color token has explicit light/dark variants; iOS asset catalogs should set both Any/Dark appearances.",
+    "Spacing/radius are unitless points (iOS pt = CSS px parity at @1x)."
+  ],
+  "colors": {
+    "primaryCyan": {
+      "light": "oklch(0.55 0.20 220)",
+      "dark": "oklch(0.75 0.15 200)",
+      "hex": { "light": "#1A8FA8", "dark": "#5DC4D9" }
+    },
+    "voltGreen": {
+      "light": "oklch(0.60 0.22 145)",
+      "dark": "oklch(0.75 0.22 145)",
+      "hex": { "light": "#3A9A52", "dark": "#6ACA7A" }
+    },
+    "warningAmber": {
+      "light": "oklch(0.75 0.18 85)",
+      "dark": "oklch(0.85 0.18 85)",
+      "hex": { "light": "#D9A35F", "dark": "#E8B96B" }
+    },
+    "destructiveRose": {
+      "light": "oklch(0.50 0.24 25)",
+      "dark": "oklch(0.55 0.20 25)",
+      "hex": { "light": "#B83838", "dark": "#C75252" }
+    },
+    "accentTeal": {
+      "light": "oklch(0.60 0.13 196)",
+      "dark": "oklch(0.72 0.14 196)",
+      "hex": { "light": "#2A9588", "dark": "#3CB1A2" }
+    },
+    "background": {
+      "light": "oklch(0.98 0.005 220)",
+      "dark": "oklch(0.12 0.02 240)",
+      "hex": { "light": "#F5FAFB", "dark": "#181C26" }
+    },
+    "card": {
+      "light": "oklch(1.00 0.000 0)",
+      "dark": "oklch(0.15 0.02 240)",
+      "hex": { "light": "#FFFFFF", "dark": "#22262E" }
+    },
+    "borderSubtle": {
+      "light": "oklch(0.88 0.025 220)",
+      "dark": "oklch(0.28 0.03 240)",
+      "hex": { "light": "#D8E0E5", "dark": "#3A4250" }
+    }
+  },
+  "deviceStatusHalo": {
+    "online": "oklch(0.72 0.14 196)",
+    "offline": "oklch(0.65 0.22 25)",
+    "scanning": "oklch(0.80 0.15 200)"
+  },
+  "typography": {
+    "stack": "system",
+    "monoStack": "ui-monospace, SFMono-Regular, Menlo, Monaco"
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "base": 16,
+    "lg": 24,
+    "xl": 32
+  },
+  "radius": {
+    "sm": 6,
+    "md": 8,
+    "lg": 10,
+    "xl": 14,
+    "pill": 999
+  }
+}
