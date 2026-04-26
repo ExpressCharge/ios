@@ -42,6 +42,20 @@ final class SceneDelegate: NSObject, UIWindowSceneDelegate {
         handle(userActivity: userActivity)
     }
 
+    // MARK: - Foreground / background lifecycle
+
+    /// Cancel the heartbeat task when we go inactive — saves battery
+    /// + keeps SSE TCP connection draining naturally on the next
+    /// background tick.
+    func sceneDidEnterBackground(_ scene: UIScene) {
+        AppEnvironment.shared.pushService?.coordinator?.handleEnterBackground()
+    }
+
+    /// Re-arm the heartbeat + drain any pending offline scan results.
+    func sceneWillEnterForeground(_ scene: UIScene) {
+        AppEnvironment.shared.pushService?.coordinator?.handleEnterForeground()
+    }
+
     // MARK: - Routing
 
     /// Extracts the `code` query item from a registration-callback UL.

@@ -80,6 +80,11 @@ public final class AppEnvironment: @unchecked Sendable {
     public let authStore: AuthStore
     public let api: APIClient
 
+    /// Set by `RootCoordinator.bootstrap(...)` once the SwiftUI
+    /// hierarchy is up. The `AppDelegate` then forwards APNs payloads
+    /// + token uploads through this reference.
+    @MainActor public weak var pushService: PushService?
+
     private init() {
         let auth = AuthStore()
         self.authStore = auth

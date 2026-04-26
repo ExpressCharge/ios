@@ -23,8 +23,15 @@ public struct RegistrationView: View {
     /// view to do anything useful — we never construct it without one.
     public let oneTimeCode: String
 
-    public init(oneTimeCode: String) {
+    /// PKCE verifier matching the challenge that was passed to the web
+    /// flow. Carried through from `WelcomeView` via `RootCoordinator`'s
+    /// `.registering(oneTimeCode:codeVerifier:)` route — explicit DI,
+    /// no process singletons.
+    public let codeVerifier: String
+
+    public init(oneTimeCode: String, codeVerifier: String) {
         self.oneTimeCode = oneTimeCode
+        self.codeVerifier = codeVerifier
     }
 
     public var body: some View {
@@ -39,23 +46,16 @@ public struct RegistrationView: View {
         }
         .task {
             if viewModel == nil {
-                // The verifier should have been emitted by LoginViewModel
-                // — we look it up via NotificationCenter? No — the cleaner
-                // path is to ask the LoginViewModel. But LoginViewModel
-                // is owned by WelcomeView; we don't have it here.
-                //
-                // The skeleton uses an in-memory cache: when LoginViewModel
-                // delivers a code, it ALSO posts the verifier into a
-                // process-wide `PKCEVerifierStore` so RegistrationView can
-                // pick it up. E-app-wire replaces this with explicit
-                // dependency injection.
-                let verifier = PKCEVerifierStore.shared.takeLatest() ?? ""
                 self.viewModel = RegistrationViewModel(
                     environment: app,
                     oneTimeCode: oneTimeCode,
-                    codeVerifier: verifier
+                    codeVerifier: codeVerifier
                 )
                 self.viewModel?.startObservingApnsToken()
+                // Best-effort: wait briefly for an APNs token before
+                // submitting. RegistrationViewModel.submit() reads the
+                // last token observed at call-time.
+                self.viewModel?.startWaitingForApnsToken()
             }
         }
         .onDisappear {
@@ -200,26 +200,3 @@ private struct ErrorBanner: View {
     }
 }
 
-/// Process-wide cache of the most recent PKCE verifier so
-/// `RegistrationView` can pair the Universal-Link `code` with the
-/// matching verifier without prop-drilling.
-///
-/// E-app-wire replaces this with explicit DI through the
-/// RootCoordinator. Marked `@MainActor` because both producers
-/// (LoginViewModel) and consumers (RegistrationView) are main-isolated.
-@MainActor
-public final class PKCEVerifierStore {
-    public static let shared = PKCEVerifierStore()
-    private var verifier: String?
-
-    private init() {}
-
-    public func store(_ value: String) {
-        verifier = value
-    }
-
-    public func takeLatest() -> String? {
-        defer { verifier = nil }
-        return verifier
-    }
-}

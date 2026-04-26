@@ -71,11 +71,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // base64 because it's shorter and the contract documents it as
         // "<base64>".)
         let token = deviceToken.base64EncodedString()
+        // RegistrationViewModel still observes this notification so it
+        // can stash the token for the in-flight register call.
         NotificationCenter.default.post(
             name: AppNotifications.apnsTokenReceived,
             object: nil,
             userInfo: ["token": token]
         )
+        // Once the device is registered, also push the new token to
+        // the backend so existing registrations stay reachable.
+        Task { @MainActor in
+            await AppEnvironment.shared.pushService?.uploadToken(token)
+        }
     }
 
     func application(
@@ -91,18 +98,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     /// Silent / data push delivery hook. We only receive real ALERT
     /// pushes, but iOS still calls this for any payload that arrives
-    /// while the app is foregrounded. E-app-wire will route to
-    /// `ScanCoordinator`; for now we forward via NotificationCenter.
+    /// while the app is foregrounded. Routed through `PushService` to
+    /// the `ScanCoordinator`.
     func application(
         _ application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        NotificationCenter.default.post(
-            name: AppNotifications.scanRequestPushReceived,
-            object: nil,
-            userInfo: ["payload": userInfo]
-        )
+        AppEnvironment.shared.pushService?.handleRemoteNotification(userInfo)
         // No background work to do — we don't fetch in the background
         // (per `50-ios.md` § "Heartbeat" — we explicitly don't use
         // BGAppRefreshTask). Returning `.noData` is correct.
@@ -129,19 +132,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
 extension AppDelegate: UNUserNotificationCenterDelegate {
 
-    /// Foreground delivery: show the banner + emit the payload to
-    /// observers. E-app-wire will plug `ScanCoordinator` into this.
+    /// Foreground delivery: show the banner + route the payload
+    /// through PushService to the live ScanCoordinator.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         let payload = notification.request.content.userInfo
-        NotificationCenter.default.post(
-            name: AppNotifications.scanRequestPushReceived,
-            object: nil,
-            userInfo: ["payload": payload]
-        )
+        AppEnvironment.shared.pushService?.handleRemoteNotification(payload)
         // Show banner + sound (no list, no badge). The user is
         // already in the app — they can act on the in-UI prompt.
         completionHandler([.banner, .sound])
@@ -154,11 +153,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let payload = response.notification.request.content.userInfo
-        NotificationCenter.default.post(
-            name: AppNotifications.scanRequestPushReceived,
-            object: nil,
-            userInfo: ["payload": payload]
-        )
+        AppEnvironment.shared.pushService?.handleRemoteNotification(payload)
         completionHandler()
     }
 }
