@@ -177,18 +177,44 @@ quick succession don't re-prompt. This is a deliberate UX/security trade-off.
 
 ### Universal Links + PKCE registration
 
-Custom URL scheme is **NOT used**. The web auth callback is a Universal Link
-(`https://manage.example.com/expresscan/register/callback?code=…`).
+The web auth callback is a custom-scheme URL
+(`expresscan://register/callback?code=…`) matched by
+`ASWebAuthenticationSession`'s `callbackURLScheme`. The HTTPS Universal Link
+target (`https://manage.example.com/expresscan/register/callback?code=…`)
+is still claimed in the AASA manifest as a belt-and-braces path — the iOS app
+accepts either shape — but the production flow uses the custom scheme because
+that's what works reliably.
+
+> ⚠️ Universal Links **do not** fire from inside `ASWebAuthenticationSession`'s
+> sandboxed web view — Apple deliberately suppresses them. Dismissal is driven
+> exclusively by the session's `callbackURLScheme` (or, on iOS 17.4+, the
+> `Callback` value). Earlier drafts of this doc claimed Associated Domains
+> drove the dismissal; they did not.
+>
+> The iOS 17.4+ `.https(host:path:)` Callback was tried first — on iOS 26 it
+> failed silently (`session.start()` returned true, no UI presented, completion
+> handler never fired) despite a confirmed-correct AASA. Falling back to a
+> custom scheme avoids the AASA-validation hot path entirely.
 
 Flow:
-1. `RegistrationViewModel.startRegistration()`:
+1. `LoginViewModel.start()`:
    - Generate `codeVerifier` (32 random bytes, base64url).
    - Compute `codeChallenge = SHA256(codeVerifier)` (base64url).
-   - Open `ASWebAuthenticationSession(url: registerURL, callbackURLScheme: nil)`. Without a `callbackURLScheme`, the callback is delivered via Universal Link to `SceneDelegate`.
-2. User logs in; the web page redirects to the Universal Link.
-3. `SceneDelegate.scene(_:continue:)` receives the `NSUserActivity`. Extract the `code` query param.
-4. POST `/api/devices/register` with `{oneTimeCode: code, codeVerifier, ...}`.
-5. On success, store `deviceId/Token/Secret` in Keychain, register for APNs, POST `/api/devices/{id}/push-token`.
+   - Open `ASWebAuthenticationSession(url: registerURL, callbackURLScheme: "expresscan")`.
+2. User signs in (or reuses the existing admin cookie session); the server's POST handler 302s the in-session web view to `expresscan://register/callback?code=…`.
+3. AuthServices matches the scheme, dismisses the auth view, and invokes the completion handler with the URL. `LoginViewModel.extractCode(from:)` pulls out the `?code=…` query item and emits `deliveredCode`.
+4. `RootCoordinator` transitions to `.registering(code, verifier)`, showing `RegistrationView`.
+5. `RegistrationViewModel.submit()` POSTs `/api/devices/register` with `{oneTimeCode, codeVerifier, …}`.
+6. On success, store `deviceId/Token/Secret` in Keychain, register for APNs, POST `/api/devices/{id}/push-token` from the priming step.
+
+The custom scheme is **not** registered in `Info.plist` `CFBundleURLTypes` —
+Apple does not require that for the auth-session path, and skipping registration
+keeps stray `expresscan://` URLs from elsewhere from dispatching to the app.
+
+The belt-and-braces `.onOpenURL` / `.onContinueUserActivity` path in `RootView`
+only fires when the OS hands a stale HTTPS callback link to the app outside an
+active auth session (e.g., the user taps an old email link); it should not fire
+during the normal flow.
 
 ### SSE client
 

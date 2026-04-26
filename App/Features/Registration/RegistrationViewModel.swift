@@ -64,7 +64,10 @@ public final class RegistrationViewModel {
     // MARK: - Submit
 
     public func submit() async {
-        guard !isSubmitting else { return }
+        guard !isSubmitting else {
+            authLog.debug("RegistrationViewModel.submit: ignored, already in flight")
+            return
+        }
         isSubmitting = true
         error = nil
         defer { isSubmitting = false }
@@ -75,6 +78,7 @@ public final class RegistrationViewModel {
         // already in `pendingApnsToken`. The bounded wait keeps the
         // submit responsive on declined-permission paths.
         let pushToken = await waitForApnsToken(timeout: 5.0) ?? ""
+        authLog.debug("RegistrationViewModel.submit: posting /api/devices/register, label.len=\(self.label.count, privacy: .public), pushToken.empty=\(pushToken.isEmpty, privacy: .public)")
 
         let request = DeviceRegistrationRequest(
             oneTimeCode: oneTimeCode,
@@ -98,6 +102,7 @@ public final class RegistrationViewModel {
 
         do {
             let response: DeviceRegistrationResponse = try await environment.api.request(endpoint)
+            authLog.debug("RegistrationViewModel.submit: registration succeeded, deviceId=\(response.deviceId, privacy: .public)")
 
             // Persist the three secrets. `storeCredentials` applies
             // the per-item Keychain accessibility classes from
@@ -114,9 +119,14 @@ public final class RegistrationViewModel {
 
             didSucceed = true
         } catch let api as APIError {
+            authLog.error("RegistrationViewModel.submit: API error \(String(describing: api), privacy: .public)")
             error = mapAPIError(api)
-        } catch {
+        } catch let kc as KeychainError {
+            authLog.error("RegistrationViewModel.submit: keychain error \(String(describing: kc), privacy: .public)")
             self.error = .keychain
+        } catch {
+            authLog.error("RegistrationViewModel.submit: unexpected error \(String(describing: error), privacy: .public)")
+            self.error = .other
         }
     }
 

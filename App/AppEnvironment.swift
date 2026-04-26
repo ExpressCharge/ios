@@ -17,23 +17,34 @@
 
 import Foundation
 import SwiftUI
+import os
 
 import AuthCore
 import Networking
+
+/// App-wide loggers, scoped by category. Use these instead of `print`
+/// for any state transition or failure path. The `subsystem` matches
+/// our App ID so OSLogStore queries (and the QA Console.app filter)
+/// pick up everything in one place.
+public let scanLog = Logger(subsystem: "gg.vlad.expresscan", category: "scan")
+public let netLog = Logger(subsystem: "gg.vlad.expresscan", category: "network")
+public let nfcLog = Logger(subsystem: "gg.vlad.expresscan", category: "nfc")
+public let authLog = Logger(subsystem: "gg.vlad.expresscan", category: "auth")
 
 /// Per-build constants that can't be discovered at runtime. Single
 /// source of truth for the API base URL and APNs environment. The
 /// xcodegen `project.yml` flips `APNS_SANDBOX` / `APNS_PRODUCTION`
 /// active compilation conditions per-config.
 public enum BuildConfig {
-    /// HTTPS base URL of the expresync backend. Compile-time switch
-    /// based on the active scheme's API_BASE_URL build setting.
+    /// HTTPS base URL of the expresscharge backend. The Fresh monolith
+    /// serves both the admin web UI (`/admin/*`, `/expresscan/*`) and
+    /// the iOS-facing API (`/api/devices/*`) from the SAME host —
+    /// `manage.example.com`. There is no separate `api.` subdomain.
+    /// (See `expresscharge/.env.example` `ADMIN_BASE_URL` line and the
+    /// register-route test fixture which posts to
+    /// `https://manage.example.com/api/devices/register`.)
     public static var apiBaseURL: URL {
-        #if APNS_PRODUCTION
-        return URL(string: "https://api.example.com")!
-        #else
-        return URL(string: "https://dev.api.example.com")!
-        #endif
+        URL(string: "https://manage.example.com")!
     }
 
     /// The APNs environment a freshly-minted push token should be
@@ -47,11 +58,23 @@ public enum BuildConfig {
     }
 
     /// Universal Link host for the registration callback. Used when
-    /// matching incoming `NSUserActivity` URLs in the SceneDelegate.
+    /// matching incoming `NSUserActivity` URLs in the SceneDelegate
+    /// (the belt-and-braces path for stale callbacks tapped outside
+    /// an active auth session).
     public static let universalLinkHost = "manage.example.com"
 
     /// Path prefix on the universal-link host that we react to.
     public static let registrationCallbackPath = "/expresscan/register/callback"
+
+    /// Custom URL scheme that `ASWebAuthenticationSession` is registered
+    /// to intercept. The web admin's POST handler 302s the in-session
+    /// browser to `expresscan://register/callback?code=…`; iOS sees the
+    /// scheme match the session's `callbackURLScheme`, dismisses the
+    /// auth view, and delivers the URL to the completion handler. Not
+    /// registered in `Info.plist` `CFBundleURLTypes` — Apple does not
+    /// require that for the auth-session path, and skipping it avoids
+    /// dispatching stray `expresscan://` URLs from elsewhere.
+    public static let callbackURLScheme = "expresscan"
 
     /// Web-side login starting point for the PKCE-protected
     /// registration flow. Always lives on the production host because

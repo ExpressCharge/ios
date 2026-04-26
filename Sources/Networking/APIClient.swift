@@ -16,12 +16,18 @@
 //
 
 import Foundation
+import os
 
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
 
 import Models
+
+/// Module-private logger. Mirrors the App target's `netLog` subsystem so
+/// requests + responses land in the same Console.app stream as the app's
+/// own networking events.
+private let netLog = Logger(subsystem: "gg.vlad.expresscan", category: "network")
 
 // MARK: - HTTP transport abstraction
 
@@ -40,7 +46,10 @@ public actor APIClient {
 
     // MARK: Configuration
 
-    public let baseURL: URL
+    /// The API host. `nonisolated` so actor-external callers (e.g.
+    /// `EventStreamReconnector` building an SSE URL) can read it
+    /// without crossing the actor's executor.
+    public nonisolated let baseURL: URL
     private let transport: HTTPTransport
     private let tokenSource: @Sendable () async -> String?
     private let encoder: JSONEncoder
@@ -92,6 +101,10 @@ public actor APIClient {
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
+            // Surface the underlying DecodingError before flattening to
+            // APIError.decode — without this, response-shape drift is
+            // invisible to anyone reading the console.
+            netLog.error("APIClient.request: decode failed for \(endpoint.path, privacy: .public): \(String(describing: error), privacy: .public)")
             throw APIError.decode
         }
     }
@@ -113,12 +126,16 @@ public actor APIClient {
         do {
             (data, response) = try await transport.data(for: urlRequest)
         } catch {
+            netLog.error("APIClient.rawRequest: transport failed for \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public): \(String(describing: error), privacy: .public)")
             throw APIError.network
         }
 
         guard let http = response as? HTTPURLResponse else {
+            netLog.error("APIClient.rawRequest: non-HTTP response for \(endpoint.path, privacy: .public)")
             throw APIError.network
         }
+
+        netLog.debug("APIClient.rawRequest: \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public) → \(http.statusCode, privacy: .public)")
 
         switch http.statusCode {
         case 200..<300:
