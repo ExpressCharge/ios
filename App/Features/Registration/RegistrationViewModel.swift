@@ -69,10 +69,12 @@ public final class RegistrationViewModel {
         error = nil
         defer { isSubmitting = false }
 
-        // We wait briefly for an APNs token if the AppDelegate has
-        // already posted one; otherwise we send empty + patch later.
-        // E-app-wire promotes this to a real wait-for-permission flow.
-        let pushToken = pendingApnsToken ?? ""
+        // Block briefly waiting for the APNs token if it hasn't
+        // arrived yet — the priming flow asks for permission ahead of
+        // submit() in the canonical user path, so the token is usually
+        // already in `pendingApnsToken`. The bounded wait keeps the
+        // submit responsive on declined-permission paths.
+        let pushToken = await waitForApnsToken(timeout: 5.0) ?? ""
 
         let request = DeviceRegistrationRequest(
             oneTimeCode: oneTimeCode,
@@ -144,6 +146,35 @@ public final class RegistrationViewModel {
             NotificationCenter.default.removeObserver(apnsObserver)
             self.apnsObserver = nil
         }
+    }
+
+    /// Triggers an `application.registerForRemoteNotifications()` so the
+    /// AppDelegate can deliver a token shortly. Idempotent.
+    public func startWaitingForApnsToken() {
+        // Prompt the system to deliver a token. Calling this when
+        // notifications haven't been authorized yet is a no-op (no
+        // token will be delivered) — that's fine; we then send an
+        // empty `pushToken` and follow up with PUT /push-token after
+        // priming.
+        UIApplication.shared.registerForRemoteNotifications()
+    }
+
+    /// Polls `pendingApnsToken` for up to `timeout` seconds, returning
+    /// the token if it arrives in time. Polling interval is 100 ms,
+    /// which is cheap and keeps the dependency profile low (no
+    /// per-call AsyncSequence machinery).
+    private func waitForApnsToken(timeout: TimeInterval) async -> String? {
+        if let token = pendingApnsToken, !token.isEmpty {
+            return token
+        }
+        let start = Date()
+        while Date().timeIntervalSince(start) < timeout {
+            if let token = pendingApnsToken, !token.isEmpty {
+                return token
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return pendingApnsToken
     }
 
     // MARK: - Helpers

@@ -21,7 +21,8 @@ import AuthCore
 /// for readability.
 public enum RootRoute: Equatable {
     /// We have valid credentials in the Keychain → show the home
-    /// screen. E-app-wire wires this into the live `ScanCoordinator`.
+    /// screen. The live `ScanCoordinator` is owned by `RootCoordinator`
+    /// and is shared across this branch's lifetime.
     case ready
     /// Fresh install or post-sign-out → show welcome.
     case welcome
@@ -29,7 +30,9 @@ public enum RootRoute: Equatable {
     /// awaiting the Universal Link callback.
     case loggingIn
     /// UL callback fired with a `code` → show the registration form.
-    case registering(oneTimeCode: String)
+    /// `codeVerifier` is the PKCE verifier matching the challenge sent
+    /// to the web flow; held in memory only.
+    case registering(oneTimeCode: String, codeVerifier: String)
     /// Registration succeeded, ask for notification permission.
     case priming
     /// Loading the keychain on first launch (very brief).
@@ -38,6 +41,10 @@ public enum RootRoute: Equatable {
 
 /// `@Observable`-style app router. Lifted out of `RootView` so child
 /// views can grab it via `@Environment` instead of prop-drilling.
+///
+/// Also owns the long-lived `ScanCoordinator` and `PushService`
+/// instances — they're created the first time we transition into
+/// `.ready` and reused for the lifetime of the signed-in session.
 @MainActor
 @Observable
 public final class RootCoordinator {
@@ -45,13 +52,54 @@ public final class RootCoordinator {
     public var route: RootRoute = .launching
     public weak var environment: AppEnvironment?
 
+    /// Live for the duration of a signed-in session. `nil` when the
+    /// user is unauthenticated (welcome/login/registering/priming).
+    public private(set) var scan: ScanCoordinator?
+    /// Live for the duration of the app process (after `bootstrap`).
+    public private(set) var push: PushService?
+
     public init() {}
 
     /// Loads credentials and transitions to `.ready` or `.welcome`.
     public func bootstrap(environment: AppEnvironment) async {
         self.environment = environment
+
+        // PushService is constructed eagerly so the AppDelegate can
+        // forward APNs token registrations even before sign-in.
+        if push == nil {
+            let service = PushService(environment: environment)
+            push = service
+            environment.pushService = service
+        }
+
         let hasCreds = await environment.authStore.hasValidCredentials()
-        self.route = hasCreds ? .ready : .welcome
+        if hasCreds {
+            ensureScanCoordinator(environment: environment)
+            self.route = .ready
+            scan?.startConnecting()
+        } else {
+            self.route = .welcome
+        }
+    }
+
+    /// Lazy-create or return the existing `ScanCoordinator`. Called on
+    /// every `.ready` transition (registration, foreground, sign-in).
+    @discardableResult
+    public func ensureScanCoordinator(environment: AppEnvironment) -> ScanCoordinator {
+        if let existing = scan { return existing }
+        let coordinator = ScanCoordinator(environment: environment)
+        coordinator.attach(router: self)
+        scan = coordinator
+        // Hook the push service to the coordinator now that we have one.
+        push?.coordinator = coordinator
+        return coordinator
+    }
+
+    /// Tear down the `ScanCoordinator` on sign-out.
+    private func teardownScanCoordinator() {
+        scan?.stopConnecting()
+        scan = nil
+        push?.coordinator = nil
     }
 
     // MARK: - Transitions
@@ -64,8 +112,8 @@ public final class RootCoordinator {
         route = .welcome
     }
 
-    public func didReceiveOneTimeCode(_ code: String) {
-        route = .registering(oneTimeCode: code)
+    public func didReceiveOneTimeCode(_ code: String, codeVerifier: String) {
+        route = .registering(oneTimeCode: code, codeVerifier: codeVerifier)
     }
 
     public func didCompleteRegistration() {
@@ -73,10 +121,15 @@ public final class RootCoordinator {
     }
 
     public func didFinishPriming() {
+        if let env = environment {
+            ensureScanCoordinator(environment: env)
+            scan?.startConnecting()
+        }
         route = .ready
     }
 
     public func didSignOut() {
+        teardownScanCoordinator()
         route = .welcome
     }
 }
@@ -104,8 +157,11 @@ public struct RootView: View {
                 // its own modal — the underlying view stays Welcome.
                 WelcomeView(showingLoginActivity: true)
                     .environment(coordinator)
-            case .registering(let code):
-                RegistrationView(oneTimeCode: code)
+            case .registering(let code, let verifier):
+                RegistrationView(
+                    oneTimeCode: code,
+                    codeVerifier: verifier
+                )
                     .environment(coordinator)
             case .priming:
                 NotificationPrimingView()

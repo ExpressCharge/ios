@@ -76,9 +76,9 @@ public final class LoginViewModel: NSObject {
         let verifier = Self.generateCodeVerifier()
         let challenge = Self.computeChallenge(verifier: verifier)
         self.lastVerifier = verifier
-        // Store the verifier for the registration step that follows
-        // the Universal-Link callback. See PKCEVerifierStore comments.
-        PKCEVerifierStore.shared.store(verifier)
+        // The verifier is read by `WelcomeView.onChange(of:deliveredCode)`
+        // and handed to the `RootCoordinator.didReceiveOneTimeCode(_,
+        // codeVerifier:)` transition — explicit DI, no globals.
 
         var components = URLComponents(url: BuildConfig.registrationStartURL, resolvingAgainstBaseURL: false)!
         var items = components.queryItems ?? []

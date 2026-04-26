@@ -102,7 +102,9 @@ public struct WelcomeView: View {
             // The Universal Link callback (SceneDelegate) is the actual
             // delivery channel; the LoginViewModel observes it.
             if let code = newCode, !code.isEmpty {
-                coordinator.didReceiveOneTimeCode(code)
+                let verifier = loginViewModel.lastVerifier ?? ""
+                coordinator.didReceiveOneTimeCode(code, codeVerifier: verifier)
+                loginViewModel.acknowledgeCode()
             }
         }
         .onChange(of: loginViewModel.isPresenting) { _, presenting in

@@ -29,35 +29,20 @@ public struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(RootCoordinator.self) private var coordinator
 
-    @State private var deviceLabel: String = UIDevice.current.name
+    @State private var viewModel: SettingsViewModel?
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
     @State private var isShowingSignOutConfirm: Bool = false
-    @State private var isSigningOut: Bool = false
+    @State private var isShowingDiagnostics: Bool = false
 
     public init() {}
 
     public var body: some View {
         NavigationStack {
-            Form {
-                deviceSection
-                notificationsSection
-                accountSection
-                aboutSection
-
-                Section {
-                    Button(role: .destructive) {
-                        isShowingSignOutConfirm = true
-                    } label: {
-                        if isSigningOut {
-                            HStack {
-                                ProgressView()
-                                Text("Signing out…")
-                            }
-                        } else {
-                            Text("Sign out")
-                        }
-                    }
-                    .disabled(isSigningOut)
+            Group {
+                if let vm = viewModel {
+                    formContent(vm)
+                } else {
+                    ProgressView().controlSize(.large)
                 }
             }
             .navigationTitle("Settings")
@@ -67,28 +52,83 @@ public struct SettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .task { await refreshNotificationStatus() }
-            .confirmationDialog(
-                "Sign out and deregister this device?",
-                isPresented: $isShowingSignOutConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("Sign out", role: .destructive, action: handleSignOut)
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This iPhone will stop receiving scan requests. You'll need to sign in again to use ExpresScan.")
+            .task {
+                if viewModel == nil {
+                    let vm = SettingsViewModel(environment: app, router: coordinator)
+                    self.viewModel = vm
+                    await vm.refreshAccount()
+                }
+                await refreshNotificationStatus()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func formContent(_ vm: SettingsViewModel) -> some View {
+        @Bindable var vm = vm
+
+        Form {
+            deviceSection(vm: vm)
+            notificationsSection
+            accountSection(vm: vm)
+            diagnosticsSection
+            aboutSection
+
+            Section {
+                Button(role: .destructive) {
+                    isShowingSignOutConfirm = true
+                } label: {
+                    if vm.isSigningOut {
+                        HStack {
+                            ProgressView()
+                            Text("Signing out…")
+                        }
+                    } else {
+                        Text("Sign out")
+                    }
+                }
+                .disabled(vm.isSigningOut)
+                if let err = vm.signOutError {
+                    Text(err).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .confirmationDialog(
+            "Sign out and deregister this device?",
+            isPresented: $isShowingSignOutConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Sign out", role: .destructive) {
+                Task {
+                    await vm.signOut()
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This iPhone will stop receiving scan requests. You'll need to sign in again to use ExpresScan.")
+        }
+        .sheet(isPresented: $isShowingDiagnostics) {
+            DiagnosticsSheet()
+                .environment(coordinator)
         }
     }
 
     // MARK: - Sections
 
-    private var deviceSection: some View {
-        Section("Device") {
-            // The label edit lands in E-app-wire — we PUT against the
-            // admin-rename endpoint via owner-cookie or an
-            // owner-rename endpoint. Skeleton: read-only.
-            LabeledContent("Name", value: deviceLabel)
+    private func deviceSection(vm: SettingsViewModel) -> some View {
+        @Bindable var vm = vm
+        return Section("Device") {
+            // The owner-side rename endpoint isn't exposed in v1 — the
+            // admin POST /api/admin/devices/{id}/rename needs a cookie
+            // session. We persist the user's preferred label locally
+            // and surface the limitation honestly.
+            TextField("Device name", text: $vm.label, prompt: Text(UIDevice.current.name))
+                .submitLabel(.done)
+                .onSubmit { vm.commitLocalRename() }
+            Text("Saved on this iPhone. Admins still see the label you registered with.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             LabeledContent("Model", value: UIDevice.current.model)
             LabeledContent("iOS", value: UIDevice.current.systemVersion)
             LabeledContent("App", value: BuildConfig.appVersion)
@@ -114,11 +154,38 @@ public struct SettingsView: View {
         }
     }
 
-    private var accountSection: some View {
+    private func accountSection(vm: SettingsViewModel) -> some View {
         Section("Account") {
-            // E-app-wire fills these from `GET /api/devices/me`.
-            LabeledContent("Signed in as", value: "—")
+            if vm.meIsLoading {
+                HStack { ProgressView(); Text("Loading…") }
+            } else if let me = vm.me {
+                LabeledContent(
+                    "Signed in as",
+                    value: me.ownerDisplayName ?? me.ownerUserId ?? "—"
+                )
+                LabeledContent("Device ID", value: me.deviceId)
+                if let registered = me.registeredAtIso {
+                    LabeledContent("Registered", value: registered)
+                }
+            } else if let err = vm.meError {
+                Text(err).font(.caption).foregroundStyle(.secondary)
+                Button("Retry") {
+                    Task { await vm.refreshAccount() }
+                }
+            } else {
+                LabeledContent("Signed in as", value: "—")
+            }
             LabeledContent("Bearer token", value: "Stored securely")
+        }
+    }
+
+    private var diagnosticsSection: some View {
+        Section("Connection") {
+            Button {
+                isShowingDiagnostics = true
+            } label: {
+                Label("Diagnostics", systemImage: "wrench.and.screwdriver")
+            }
         }
     }
 
@@ -140,23 +207,6 @@ public struct SettingsView: View {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         await MainActor.run {
             self.notificationStatus = settings.authorizationStatus
-        }
-    }
-
-    private func handleSignOut() {
-        guard !isSigningOut else { return }
-        isSigningOut = true
-        Task {
-            // E-app-wire: also POST DELETE /api/devices/{deviceId}
-            // BEFORE clearing Keychain so the server-side device row
-            // is removed. If the network call fails (offline), we
-            // still clear local state.
-            try? await app.authStore.deleteAll()
-            await MainActor.run {
-                self.isSigningOut = false
-                coordinator.didSignOut()
-                dismiss()
-            }
         }
     }
 }

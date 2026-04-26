@@ -1,0 +1,511 @@
+//
+//  ScanCoordinator.swift
+//  ExpresScan
+//
+//  Single owner of the Scan feature's state machine. Wires together:
+//
+//   - `EventStreamReconnector` for the SSE link to the backend.
+//   - `PushService` for APNs-delivered scan requests (out-of-process arrival
+//     path).
+//   - `NFCService` for the actual `NFCTagReaderSession` invocation.
+//   - `HeartbeatService` for the 60-second keep-alive POST.
+//   - `ScanResultQueue` for offline scan-result retries.
+//
+//  The coordinator is `@MainActor`-isolated so SwiftUI can read its
+//  `state` directly without crossing actor boundaries. Background work
+//  (SSE byte parsing, APNs delegate callbacks, NFC delegate callbacks)
+//  marshals back here via `Task { @MainActor in … }`.
+//
+//  Spec:
+//    - `50-ios.md` § "State machine"
+//    - `50-ios.md` § "Scan flow"
+//    - `50-ios.md` § "Push handling"
+//    - `60-security.md` § 6 (HMAC nonce)
+//
+
+import Foundation
+import Observation
+
+import AuthCore
+import Crypto
+import Models
+import Networking
+
+/// Source attribution for an incoming `ScanRequest` — used for
+/// debouncing (push + SSE both deliver the same request) and for
+/// diagnostics.
+public enum ScanRequestSource: String, Sendable, Equatable {
+    case push
+    case sse
+}
+
+/// Connection-status flavour of `ScanState` for the home screen pill.
+/// Distinct from `ScanState` — multiple `ScanState` cases share the same
+/// pill ("Online" covers both `.readyToScan` and `.scanRequested`).
+public enum ConnectionStatus: Equatable, Sendable {
+    case offline
+    case connecting
+    case online
+    /// SSE dropped, reconnect attempt scheduled.
+    case reconnecting
+}
+
+@MainActor
+@Observable
+public final class ScanCoordinator {
+
+    // MARK: - Public, observable state
+
+    /// Single source of truth for the Scan feature.
+    public private(set) var state: ScanState = .idle
+
+    /// Live SSE/push connection status. Independent of `state` so the
+    /// pill can show "Reconnecting" while we still display a stale
+    /// `.scanRequested` card.
+    public private(set) var connectionStatus: ConnectionStatus = .offline
+
+    /// Time the active `.scanRequested` was armed locally — used by the
+    /// `ScanActiveView` countdown ring driver.
+    public private(set) var armedAt: Date?
+
+    /// Last heartbeat success time, surfaced in the diagnostics sheet.
+    public private(set) var lastHeartbeatAt: Date?
+
+    /// Number of reconnect attempts the underlying reconnector has made
+    /// in the lifetime of this coordinator (resets on `startConnecting`).
+    public private(set) var reconnectCount: Int = 0
+
+    /// Number of pending scan-result POST bodies queued for retry. The
+    /// home screen surfaces this as a "(N pending)" badge.
+    public private(set) var pendingScanResultCount: Int = 0
+
+    /// Optional toast surfaced from `handleTokenRevoked()` etc. Cleared
+    /// after the UI displays it.
+    public private(set) var transientToast: String?
+
+    // MARK: - Dependencies (constructor-injected)
+
+    private let environment: AppEnvironment
+    private let nfc: NFCService
+    private let heartbeat: HeartbeatService
+    private let queue: ScanResultQueue
+    /// Closure injected so unit tests can swap in a stub. In production
+    /// this is `EventStreamReconnector(env:)`.
+    private let makeReconnector: @MainActor () -> EventStreamReconnector
+    /// Closure for `URLSession`-based clock — overridable in tests.
+    private let now: @Sendable () -> Date
+
+    private var streamTask: Task<Void, Never>?
+    private var reconnector: EventStreamReconnector?
+    /// Recent in-memory dedup record for `(pairingCode, expiresAt)` —
+    /// covers the 90 s TTL window. Mirrored to UserDefaults so a
+    /// background-tap-relaunch doesn't re-arm the same pairing.
+    private var recentPairings: [String: Date] = [:]
+    private var coordinatorRouter: RootCoordinator?
+
+    /// Coalesce window: 90 s, matching the backend pairing TTL.
+    static let pairingCoalesceWindow: TimeInterval = 90
+
+    private static let pairingCacheKey = "ExpresScan.RecentPairingsV1"
+
+    public init(
+        environment: AppEnvironment,
+        nfc: NFCService = .init(),
+        heartbeat: HeartbeatService? = nil,
+        queue: ScanResultQueue? = nil,
+        reconnectorFactory: (@MainActor () -> EventStreamReconnector)? = nil,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        self.environment = environment
+        self.nfc = nfc
+        self.heartbeat = heartbeat ?? HeartbeatService(api: environment.api)
+        self.queue = queue ?? ScanResultQueue(api: environment.api)
+        self.makeReconnector = reconnectorFactory ?? { @MainActor [environment] in
+            EventStreamReconnector(environment: environment)
+        }
+        self.now = now
+        loadRecentPairings()
+    }
+
+    /// Bind the parent router so `handleTokenRevoked()` can navigate
+    /// back to `.welcome`. Set once after construction in `RootView`.
+    public func attach(router: RootCoordinator) {
+        self.coordinatorRouter = router
+    }
+
+    // MARK: - Lifecycle
+
+    /// Open the SSE stream and start heartbeats. Idempotent — calling
+    /// it again while a stream is already running is a no-op.
+    public func startConnecting() {
+        guard streamTask == nil else { return }
+
+        state = .connecting
+        connectionStatus = .connecting
+        reconnectCount = 0
+
+        let reconnector = makeReconnector()
+        self.reconnector = reconnector
+        let stream = reconnector.events()
+
+        streamTask = Task { [weak self] in
+            do {
+                for try await event in stream {
+                    guard let self else { return }
+                    await self.handleSSEEvent(event)
+                }
+            } catch is CancellationError {
+                // Caller cancelled — done.
+            } catch {
+                guard let self else { return }
+                await self.handleStreamFatal(error: error)
+            }
+        }
+
+        Task { [heartbeat, environment] in
+            await heartbeat.start(
+                deviceTokenAvailable: { [environment] in
+                    (try? await environment.authStore.loadDeviceToken()) != nil
+                },
+                onSuccess: { [weak self] in
+                    Task { @MainActor in self?.lastHeartbeatAt = Date() }
+                }
+            )
+        }
+
+        Task { [queue, weak self] in
+            // Drain any persisted offline scan results.
+            let pending = await queue.drain { [weak self] count in
+                Task { @MainActor in self?.pendingScanResultCount = count }
+            }
+            Task { @MainActor in self?.pendingScanResultCount = pending }
+        }
+    }
+
+    /// Cancel the SSE stream and stop heartbeats. Called on
+    /// backgrounding (`UIScene.willDeactivate`) or sign-out.
+    public func stopConnecting() {
+        streamTask?.cancel()
+        streamTask = nil
+        Task { [heartbeat] in await heartbeat.stop() }
+        reconnector = nil
+        connectionStatus = .offline
+        if case .connecting = state { state = .idle }
+        if case .readyToScan = state { state = .idle }
+    }
+
+    // MARK: - Incoming scan requests (push + SSE)
+
+    /// Coalesces an incoming scan request from either delivery channel.
+    /// First arrival wins; subsequent arrivals for the same `pairingCode`
+    /// inside the 90 s window are ignored.
+    public func handleIncomingScanRequest(
+        _ request: ScanRequest,
+        source: ScanRequestSource
+    ) {
+        // Sweep stale entries first (cheap; map is at most ~10 entries).
+        let cutoff = now().addingTimeInterval(-Self.pairingCoalesceWindow)
+        recentPairings = recentPairings.filter { $0.value > cutoff }
+
+        if recentPairings[request.pairingCode] != nil {
+            return // Coalesced: already handled within the window.
+        }
+        recentPairings[request.pairingCode] = now()
+        persistRecentPairings()
+
+        // Drop if the request has already expired on arrival.
+        let nowMs = Int64(now().timeIntervalSince1970 * 1000)
+        if request.expiresAtEpochMs <= nowMs {
+            state = .error(.pairingExpired)
+            return
+        }
+
+        armedAt = now()
+        state = .scanRequested(request)
+    }
+
+    /// Called by the user tapping "Tap to scan" on `ScanActiveView`.
+    /// Drives the NFC session, signs the result, and POSTs.
+    public func beginScan() {
+        guard case .scanRequested(let request) = state else { return }
+
+        state = .scanning(request)
+
+        Task { [weak self] in
+            await self?.runScan(for: request)
+        }
+    }
+
+    /// Manual cancel from the active screen — returns to ready without
+    /// surfacing an error.
+    public func cancelActiveScan() {
+        guard case .scanRequested = state else { return }
+        state = .readyToScan
+        armedAt = nil
+    }
+
+    /// Manually dismiss a `.success` or `.error` screen back to ready.
+    /// Per the HIG audit there is NO auto-return.
+    public func dismissResult() {
+        switch state {
+        case .success, .error:
+            state = connectionStatus == .online ? .readyToScan : .offline
+        default:
+            break
+        }
+        armedAt = nil
+    }
+
+    // MARK: - Submit pipeline
+
+    private func runScan(for request: ScanRequest) async {
+        do {
+            let scan = try await nfc.scan(
+                timeoutSeconds: 60,
+                alertMessage: "Hold your card to the top of your iPhone."
+            )
+            await submitScan(idTag: scan.idTag, pairingCode: request.pairingCode)
+        } catch let nfcError as NFCError {
+            await MainActor.run {
+                switch nfcError {
+                case .timeout:
+                    state = .error(.timeout)
+                case .mifareClassicUnsupported, .unsupportedTag:
+                    state = .error(.unsupportedCard)
+                case .userCanceled:
+                    state = .readyToScan
+                case .systemUnavailable, .underlying:
+                    state = .error(.network)
+                }
+                armedAt = nil
+            }
+        } catch {
+            await MainActor.run {
+                state = .error(.network)
+                armedAt = nil
+            }
+        }
+    }
+
+    /// Public for the diagnostics "Test scan" button + tests.
+    public func submitScan(idTag: String, pairingCode: String) async {
+        // Load the secret + deviceId. `loadCredentials()` triggers the
+        // biometric prompt for the secret on a real device.
+        let credentials: Credentials
+        do {
+            guard let creds = try await environment.authStore.loadCredentials() else {
+                await MainActor.run {
+                    state = .error(.tokenRevoked)
+                }
+                return
+            }
+            credentials = creds
+        } catch {
+            await MainActor.run { state = .error(.tokenRevoked) }
+            return
+        }
+
+        let signer: ScanResultSigner
+        do {
+            signer = try ScanResultSigner(
+                deviceSecretBase64URL: credentials.deviceSecret
+            )
+        } catch {
+            await MainActor.run { state = .error(.server(code: "signer_init")) }
+            return
+        }
+
+        let ts = Int64(now().timeIntervalSince1970)
+        let nonce = signer.sign(
+            idTag: idTag,
+            pairingCode: pairingCode,
+            deviceId: credentials.deviceId,
+            ts: ts
+        )
+
+        let body = ScanResultRequest(
+            idTag: idTag,
+            pairingCode: pairingCode,
+            ts: ts,
+            nonce: nonce
+        )
+        let endpoint = Endpoint.with(
+            path: "/api/devices/scan-result",
+            method: .post,
+            requiresAuth: true,
+            body: body
+        )
+
+        do {
+            let result: EnrichedScanResult = try await environment.api.request(endpoint)
+            await MainActor.run {
+                state = .success(result)
+                armedAt = nil
+            }
+        } catch APIError.network {
+            // Persist to the offline queue and surface a soft toast.
+            await queue.enqueue(body: body)
+            let count = await queue.count()
+            await MainActor.run {
+                state = .error(.network)
+                pendingScanResultCount = count
+                armedAt = nil
+            }
+        } catch APIError.unauthorized, APIError.invalidNonce {
+            await handleTokenRevoked()
+        } catch APIError.gone, APIError.rateLimited {
+            await MainActor.run {
+                state = .error(.pairingExpired)
+                armedAt = nil
+            }
+        } catch APIError.clockSkew {
+            await MainActor.run {
+                state = .error(.server(code: "clock_skew"))
+                armedAt = nil
+            }
+        } catch let api as APIError {
+            await MainActor.run {
+                if case .server(_, let code) = api {
+                    state = .error(.server(code: code))
+                } else {
+                    state = .error(.server(code: nil))
+                }
+                armedAt = nil
+            }
+        } catch {
+            await MainActor.run {
+                state = .error(.network)
+                armedAt = nil
+            }
+        }
+    }
+
+    // MARK: - Token revoke handling
+
+    /// Wipes the keychain and routes back to `.welcome`. Surfaces a
+    /// toast so the user knows why they were signed out.
+    public func handleTokenRevoked() async {
+        try? await environment.authStore.deleteAll()
+        await MainActor.run {
+            self.transientToast = "Signed out by an admin."
+            self.state = .error(.tokenRevoked)
+            self.stopConnecting()
+            self.coordinatorRouter?.didSignOut()
+        }
+    }
+
+    /// Clears the transient toast after the UI displays it.
+    public func clearToast() { transientToast = nil }
+
+    // MARK: - SSE event handling
+
+    private func handleSSEEvent(_ event: SSEEvent) async {
+        switch event.event {
+        case "connected":
+            connectionStatus = .online
+            if case .connecting = state { state = .readyToScan }
+            if case .offline = state { state = .readyToScan }
+
+        case "scan.requested":
+            guard let data = event.data.data(using: .utf8) else { return }
+            do {
+                let request = try JSONDecoder().decode(ScanRequest.self, from: data)
+                handleIncomingScanRequest(request, source: .sse)
+            } catch {
+                // Malformed scan request — log + swallow.
+            }
+
+        case "device.session.replaced":
+            // Another device session took over; the SSE will close
+            // shortly. Show "offline" until the user foregrounds again
+            // (in which case startConnecting kicks back off).
+            connectionStatus = .offline
+            state = .offline
+
+        case "device.token.revoked":
+            await handleTokenRevoked()
+
+        default:
+            // Unknown event types are ignored per SSE spec.
+            break
+        }
+    }
+
+    private func handleStreamFatal(error: Error) async {
+        if case EventStreamError.unauthorized = error {
+            await handleTokenRevoked()
+            return
+        }
+        if case EventStreamError.gone = error {
+            await handleTokenRevoked()
+            return
+        }
+        // The reconnector itself does the loop; if we got here it
+        // surfaced a non-recoverable cancellation.
+        connectionStatus = .offline
+        if case .scanRequested = state { return } // keep card visible
+        state = .offline
+    }
+
+    // MARK: - Backgrounding hooks
+
+    /// Called from `SceneDelegate.sceneDidEnterBackground` (E-app-wire
+    /// will plug this in). Cancels the heartbeat task; SSE is left
+    /// running until iOS suspends us.
+    public func handleEnterBackground() {
+        Task { [heartbeat] in await heartbeat.stop() }
+    }
+
+    /// Called from `SceneDelegate.sceneWillEnterForeground`. Re-arms
+    /// the heartbeat + drains any queued scan results.
+    public func handleEnterForeground() {
+        Task { [heartbeat, environment] in
+            await heartbeat.start(
+                deviceTokenAvailable: { [environment] in
+                    (try? await environment.authStore.loadDeviceToken()) != nil
+                },
+                onSuccess: { [weak self] in
+                    Task { @MainActor in self?.lastHeartbeatAt = Date() }
+                }
+            )
+        }
+        Task { [queue, weak self] in
+            let count = await queue.drain { [weak self] count in
+                Task { @MainActor in self?.pendingScanResultCount = count }
+            }
+            Task { @MainActor in self?.pendingScanResultCount = count }
+        }
+    }
+
+    // MARK: - Persistence helpers
+
+    private func loadRecentPairings() {
+        let defaults = UserDefaults.standard
+        guard
+            let raw = defaults.dictionary(forKey: Self.pairingCacheKey) as? [String: Double]
+        else {
+            return
+        }
+        let cutoff = now().addingTimeInterval(-Self.pairingCoalesceWindow)
+        recentPairings = raw
+            .compactMapValues { Date(timeIntervalSince1970: $0) }
+            .filter { $0.value > cutoff }
+    }
+
+    private func persistRecentPairings() {
+        let serialised = recentPairings.mapValues { $0.timeIntervalSince1970 }
+        UserDefaults.standard.set(serialised, forKey: Self.pairingCacheKey)
+    }
+}
+
+// MARK: - Reconnect-count plumbing
+
+extension ScanCoordinator {
+    /// Called from `EventStreamReconnector` whenever it schedules a
+    /// retry. Wave-3 wireframes show a "Reconnecting…" pill in this
+    /// state.
+    public func noteReconnectAttempt() {
+        reconnectCount += 1
+        connectionStatus = .reconnecting
+    }
+}
