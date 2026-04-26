@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Required-reasons-API entries per Apple's Privacy Manifest spec.
+         Background: Apple now requires apps to declare WHY they call
+         certain APIs that, in aggregate, can fingerprint a user. We touch
+         exactly one of those: UserDefaults (for `processedPairingCodes`
+         coalescing mirror, see `50-ios.md` § "State machine").
+
+         Reason CA92.1: "Access info from same app, per documentation." -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- We do not track users, sell data, or use third-party SDKs. -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- Data collection declaration. We collect the bare minimum to
+         operate the service:
+            - Device ID (linked, not for tracking, app functionality)
+            - User ID (push token resolves to a user, linked, not for tracking)
+            - Other User Content (NFC card UID; user content, linked,
+              not for tracking)
+         All three are App Functionality. No location, health, financial. -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeDeviceID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeUserID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

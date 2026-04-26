@@ -1,0 +1,191 @@
+//
+//  RegistrationViewModel.swift
+//  ExpresScan
+//
+//  POSTs `/api/devices/register` with the one-time `code`, the
+//  matching PKCE `codeVerifier`, the user-chosen device label, and a
+//  bag of device metadata. On success: stash the issued credentials in
+//  the keychain, request APNs registration, and tell the
+//  RootCoordinator to advance to notification priming.
+//
+//  Spec:
+//    - `20-contracts.md` § "Endpoint detail: POST /api/devices/register".
+//    - `60-security.md` § 1 (Universal Links + PKCE).
+//
+//  E-app-wire wires the actual `apnsToken` capture; right now we wait
+//  briefly for an APNs token (best-effort) and otherwise send an empty
+//  string — the backend tolerates it and `PUT /api/devices/{id}/push-token`
+//  fills it in later.
+//
+
+import Foundation
+import Observation
+import UIKit
+
+import AuthCore
+import Models
+import Networking
+
+@MainActor
+@Observable
+public final class RegistrationViewModel {
+
+    /// User-editable label, defaults to `UIDevice.current.name`.
+    public var label: String
+
+    /// Set while the network call is in flight.
+    public private(set) var isSubmitting: Bool = false
+    /// Last error to display, cleared on each `submit()`.
+    public private(set) var error: RegistrationError?
+    /// Set true exactly once on success — RegistrationView observes
+    /// this and triggers the coordinator transition.
+    public private(set) var didSucceed: Bool = false
+
+    /// One-time code from the Universal Link. Constant for the
+    /// lifetime of this VM.
+    public let oneTimeCode: String
+    /// PKCE verifier matching the `codeChallenge` we sent.
+    public let codeVerifier: String
+
+    private let environment: AppEnvironment
+
+    public init(
+        environment: AppEnvironment,
+        oneTimeCode: String,
+        codeVerifier: String,
+        defaultLabel: String = UIDevice.current.name
+    ) {
+        self.environment = environment
+        self.oneTimeCode = oneTimeCode
+        self.codeVerifier = codeVerifier
+        self.label = defaultLabel
+    }
+
+    // MARK: - Submit
+
+    public func submit() async {
+        guard !isSubmitting else { return }
+        isSubmitting = true
+        error = nil
+        defer { isSubmitting = false }
+
+        // We wait briefly for an APNs token if the AppDelegate has
+        // already posted one; otherwise we send empty + patch later.
+        // E-app-wire promotes this to a real wait-for-permission flow.
+        let pushToken = pendingApnsToken ?? ""
+
+        let request = DeviceRegistrationRequest(
+            oneTimeCode: oneTimeCode,
+            codeVerifier: codeVerifier,
+            label: label.trimmingCharacters(in: .whitespacesAndNewlines),
+            platform: "ios",
+            model: deviceModelIdentifier(),
+            osVersion: UIDevice.current.systemVersion,
+            appVersion: Self.shortVersion,
+            pushToken: pushToken,
+            apnsEnvironment: BuildConfig.apnsEnvironment == "production" ? .production : .sandbox,
+            requestedCapabilities: [.tap]
+        )
+
+        let endpoint = Endpoint.with(
+            path: "/api/devices/register",
+            method: .post,
+            requiresAuth: false,
+            body: request
+        )
+
+        do {
+            let response: DeviceRegistrationResponse = try await environment.api.request(endpoint)
+
+            // Persist the three secrets. `storeCredentials` applies
+            // the per-item Keychain accessibility classes from
+            // `60-security.md` § 2.
+            try await environment.authStore.storeCredentials(
+                deviceId: response.deviceId,
+                deviceToken: response.deviceToken,
+                deviceSecret: response.deviceSecret
+            )
+
+            // Trigger APNs registration so we have a token to upload
+            // via PUT /push-token in the priming step.
+            UIApplication.shared.registerForRemoteNotifications()
+
+            didSucceed = true
+        } catch let api as APIError {
+            error = mapAPIError(api)
+        } catch {
+            self.error = .keychain
+        }
+    }
+
+    // MARK: - APNs token observation
+
+    private var pendingApnsToken: String?
+    private var apnsObserver: NSObjectProtocol?
+
+    /// Begins listening for an APNs token; mostly useful when the user
+    /// granted permission BEFORE clicking Register. The skeleton just
+    /// captures the value; E-app-wire decides what to do with it.
+    public func startObservingApnsToken() {
+        apnsObserver = NotificationCenter.default.addObserver(
+            forName: AppNotifications.apnsTokenReceived,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let token = note.userInfo?["token"] as? String
+            Task { @MainActor in
+                self?.pendingApnsToken = token
+            }
+        }
+    }
+
+    public func stopObservingApnsToken() {
+        if let apnsObserver {
+            NotificationCenter.default.removeObserver(apnsObserver)
+            self.apnsObserver = nil
+        }
+    }
+
+    // MARK: - Helpers
+
+    private static var shortVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+    }
+
+    /// Hardware identifier (e.g. `"iPhone16,2"`). UIDevice.model is
+    /// the marketing name; we want the model identifier for the
+    /// admin device list. Falls back to `model` when the syscall is
+    /// unavailable (e.g. catalyst / preview).
+    private func deviceModelIdentifier() -> String {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let mirror = Mirror(reflecting: systemInfo.machine)
+        let identifier = mirror.children.reduce(into: "") { acc, element in
+            if let value = element.value as? Int8, value != 0 {
+                acc.append(Character(UnicodeScalar(UInt8(value))))
+            }
+        }
+        return identifier.isEmpty ? UIDevice.current.model : identifier
+    }
+
+    private func mapAPIError(_ api: APIError) -> RegistrationError {
+        switch api {
+        case .gone: return .codeExpired
+        case .unauthorized: return .unauthorized
+        case .rateLimited: return .rateLimited
+        case .network: return .network
+        case .server(_, let code): return .server(code: code)
+        default: return .other
+        }
+    }
+}
+
+public enum RegistrationError: Error, Equatable, Sendable {
+    case codeExpired
+    case unauthorized
+    case rateLimited
+    case network
+    case keychain
+    case server(code: String?)
+    case other
+}
