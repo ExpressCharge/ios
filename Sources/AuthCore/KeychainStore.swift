@@ -58,16 +58,29 @@ public struct KeychainStore: Sendable {
 
     // MARK: - CRUD
 
+    /// Common keys we put on every query so iOS and macOS behave the
+    /// same way:
+    ///
+    ///  - `kSecUseDataProtectionKeychain: true` opts macOS into the
+    ///    iOS-style data-protection keychain. Without it, accessibility
+    ///    classes are silently ignored, sync attributes diverge, and
+    ///    `SecItemDelete` returns success after deleting only the first
+    ///    match (which broke `deleteAll()` on a unit-test host).
+    private var baseQuery: [CFString: Any] {
+        [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecUseDataProtectionKeychain: true,
+        ]
+    }
+
     /// Reads the value stored for `account`, or `nil` if there is none.
     /// Throws on an unexpected `OSStatus`.
     public func get(account: String) throws -> Data? {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-            kSecReturnData: true,
-            kSecMatchLimit: kSecMatchLimitOne,
-        ]
+        var query = baseQuery
+        query[kSecAttrAccount] = account
+        query[kSecReturnData] = true
+        query[kSecMatchLimit] = kSecMatchLimitOne
         // `kSecUseAuthenticationContext` etc. are caller's concern;
         // we don't suppress the system biometric prompt here.
 
@@ -121,13 +134,10 @@ public struct KeychainStore: Sendable {
         }
 
         // Try insert first; on duplicate, update.
-        var addQuery: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-            kSecValueData: value,
-            kSecAttrSynchronizable: false,
-        ]
+        var addQuery = baseQuery
+        addQuery[kSecAttrAccount] = account
+        addQuery[kSecValueData] = value
+        addQuery[kSecAttrSynchronizable] = false
         if let access {
             addQuery[kSecAttrAccessControl] = access
         } else {
@@ -142,11 +152,8 @@ public struct KeychainStore: Sendable {
             // Update path: only `kSecValueData` is mutable here. The
             // accessibility / access-control attrs are sticky from the
             // original insert.
-            let findQuery: [CFString: Any] = [
-                kSecClass: kSecClassGenericPassword,
-                kSecAttrService: service,
-                kSecAttrAccount: account,
-            ]
+            var findQuery = baseQuery
+            findQuery[kSecAttrAccount] = account
             let attrs: [CFString: Any] = [
                 kSecValueData: value,
             ]
@@ -164,11 +171,8 @@ public struct KeychainStore: Sendable {
 
     /// Deletes the entry for `account`. Missing entries are not an error.
     public func delete(account: String) throws {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-        ]
+        var query = baseQuery
+        query[kSecAttrAccount] = account
         let status = SecItemDelete(query as CFDictionary)
         switch status {
         case errSecSuccess, errSecItemNotFound:
@@ -180,11 +184,11 @@ public struct KeychainStore: Sendable {
 
     /// Deletes every entry under this service. Used by `AuthStore.deleteAll()`.
     public func deleteAll() throws {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-        ]
-        let status = SecItemDelete(query as CFDictionary)
+        // With `kSecUseDataProtectionKeychain: true` (folded into
+        // `baseQuery`), this deletes every matching item in one call.
+        // Without it, macOS's legacy keychain only deletes the first
+        // match per call, leaving siblings behind.
+        let status = SecItemDelete(baseQuery as CFDictionary)
         switch status {
         case errSecSuccess, errSecItemNotFound:
             return

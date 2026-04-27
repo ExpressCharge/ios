@@ -74,7 +74,10 @@ public actor ScanResultQueue {
             let data = try encoder.encode(body)
             try data.write(to: url, options: .atomic)
         } catch {
-            // We can't do much here — the disk write failed. Drop.
+            // Disk write failed — the user's offline scan is lost.
+            // Surfacing this on screen would be alarming; the diagnostics
+            // sheet picks it up via the queue count instead.
+            scanLog.error("Failed to enqueue offline scan result: \(error.localizedDescription, privacy: .public)")
         }
     }
 

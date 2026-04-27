@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.3
 //
 // ExpresScan — pure-Swift libraries (Wave 1 / Track E-pkg).
 //
@@ -17,7 +17,7 @@ let package = Package(
     name: "ExpresScanCore",
     platforms: [
         .macOS(.v13),
-        .iOS(.v17),
+        .iOS(.v26),
     ],
     products: [
         .library(name: "Models", targets: ["Models"]),

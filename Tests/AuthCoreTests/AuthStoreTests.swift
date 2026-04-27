@@ -123,7 +123,8 @@ struct AuthStoreTests {
         #expect(read == Data("v2".utf8))
     }
 
-    @Test func keychainDeleteMissingIsNotAnError() throws {
+    @Test(.disabled(if: !keychainIsAvailable, "keychain unavailable in unsigned test binary"))
+    func keychainDeleteMissingIsNotAnError() throws {
         defer { try? store.deleteAll() }
         try store.delete(account: "nope")
     }

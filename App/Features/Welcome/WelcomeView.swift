@@ -39,62 +39,27 @@ public struct WelcomeView: View {
             VStack(spacing: Spacing.xl) {
                 Spacer()
 
-                // Logo + NFC glyph.
-                VStack(spacing: Spacing.lg) {
-                    Image(systemName: "bolt.fill")
-                        .resizable()
-                        .scaledToFit()
-                        .foregroundStyle(ColorPalette.primaryCyan)
-                        .frame(height: 56)
-                        .accessibilityLabel("ExpresScan")
+                // Brand lockup (squircle logo + animated wordmark).
+                BrandLockup(.login)
 
-                    Image(systemName: "wave.3.right.circle.fill")
-                        .resizable()
-                        .scaledToFit()
-                        .foregroundStyle(ColorPalette.primaryCyan)
-                        .frame(width: 96, height: 96)
-                        .accessibilityHidden(true)
-                }
-
-                // Heading + body.
-                VStack(spacing: Spacing.md) {
-                    Text("ExpresScan")
-                        .font(.largeTitle.weight(.bold))
-                        .multilineTextAlignment(.center)
-
-                    Text("Turn your iPhone into an NFC card reader for ExpresSync. Sign in with your admin or customer account to register this device.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Spacing.lg)
-                }
+                // Subhead body copy.
+                Text("Turn your iPhone into an NFC card reader for ExpresSync. Sign in with your admin account to register this device.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Spacing.lg)
 
                 Spacer()
 
                 // CTA.
-                Button(action: handleSignInTapped) {
-                    HStack(spacing: Spacing.sm) {
-                        if showingLoginActivity || loginViewModel.isPresenting {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .tint(.white)
-                        }
-                        Text("Sign in to ExpresSync")
-                            .font(.headline)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.md)
-                    .foregroundStyle(.white)
-                    .background(
-                        RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                            .fill(ColorPalette.primaryCyan)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(showingLoginActivity || loginViewModel.isPresenting)
-                .accessibilityHint("Opens Safari to sign in to your ExpresSync account.")
+                PrimaryButton(
+                    "Sign in to ExpresSync",
+                    state: (showingLoginActivity || loginViewModel.isPresenting) ? .loading : .default,
+                    action: handleSignInTapped
+                )
                 .padding(.horizontal, Spacing.lg)
                 .padding(.bottom, Spacing.xl)
+                .accessibilityHint("Opens Safari to sign in to your ExpresSync account.")
             }
         }
         .onChange(of: loginViewModel.deliveredCode) { _, newCode in

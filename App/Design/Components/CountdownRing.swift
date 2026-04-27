@@ -9,9 +9,6 @@
 //
 //  Spec: `50-ios.md` § "UX details" → "Scan request".
 //
-//  Skeleton view: takes a `progress` 0…1 directly. E-app-wire feeds the
-//  TimelineView-driven percentage from `ScanCoordinator`.
-//
 
 import SwiftUI
 
@@ -20,26 +17,32 @@ public struct CountdownRing: View {
     /// 0 = empty, 1 = full. Clamped on read.
     public let progress: Double
     public let lineWidth: CGFloat
-    public let tint: Color
+    public let tone: StatusPill.Tone
+    public let animationEnabled: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         progress: Double,
         lineWidth: CGFloat = 6,
-        tint: Color = ColorPalette.primaryCyan
+        tone: StatusPill.Tone = .info,
+        animationEnabled: Bool = true
     ) {
         self.progress = progress
         self.lineWidth = lineWidth
-        self.tint = tint
+        self.tone = tone
+        self.animationEnabled = animationEnabled
     }
 
     public var body: some View {
         let clamped = min(max(progress, 0), 1)
+        let tint = tone.fillColor
+        // Subtler "breathing" background — 0.08 vs the older 0.15 —
+        // so the active trim reads first.
         ZStack {
             Circle()
                 .stroke(
-                    tint.opacity(0.15),
+                    tint.opacity(0.08),
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
             Circle()
@@ -49,18 +52,30 @@ public struct CountdownRing: View {
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .animation(reduceMotion ? nil : .linear(duration: 0.25), value: clamped)
+                .animation(
+                    (reduceMotion || !animationEnabled) ? nil : .linear(duration: 0.25),
+                    value: clamped
+                )
         }
         .accessibilityHidden(true)
     }
+}
+
+// MARK: - Tone color access (matches StatusPill)
+
+extension StatusPill.Tone {
+    /// Public surface so other components (e.g. CountdownRing,
+    /// AnimatedNFCGlyph) can share the same tone palette without
+    /// duplicating the lookup.
+    var publicFillColor: Color { fillColor }
 }
 
 #if DEBUG
 #Preview {
     HStack {
         CountdownRing(progress: 0.95).frame(width: 60, height: 60)
-        CountdownRing(progress: 0.50).frame(width: 60, height: 60)
-        CountdownRing(progress: 0.10).frame(width: 60, height: 60)
+        CountdownRing(progress: 0.50, tone: .positive).frame(width: 60, height: 60)
+        CountdownRing(progress: 0.10, tone: .warning).frame(width: 60, height: 60)
     }
     .padding()
 }

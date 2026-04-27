@@ -11,6 +11,10 @@
 //  Used on the home screen ("Online", "Offline", "Connecting"…) and
 //  the success card ("Active", "Pending", "Terminated"…).
 //
+//  Visual treatment mirrors the ExpresSync web `StatusBadge`
+//  (`expressync/components/shared/StatusBadge.tsx`): a tinted-glass
+//  capsule whose tint comes from a semantic color token.
+//
 
 import SwiftUI
 
@@ -23,13 +27,28 @@ public struct StatusPill: View {
         case neutral
         case info
 
-        var color: Color {
+        /// Fill / stroke / glass-tint color.
+        var fillColor: Color {
             switch self {
-            case .positive: return ColorPalette.voltGreen
+            case .positive: return ColorPalette.success
             case .warning:  return ColorPalette.warningAmber
             case .negative: return ColorPalette.destructiveRose
-            case .neutral:  return ColorPalette.borderSubtle
-            case .info:     return ColorPalette.accentTeal
+            case .neutral:  return ColorPalette.mutedForeground
+            case .info:     return ColorPalette.info
+            }
+        }
+
+        /// Text + icon color. Web pattern: `text-{tone}-700` light /
+        /// `text-{tone}-400` dark. iOS asset catalogs already encode
+        /// both luminosity variants, so we read straight from the
+        /// matching token.
+        var textColor: Color {
+            switch self {
+            case .positive: return ColorPalette.success
+            case .warning:  return ColorPalette.warningAmber
+            case .negative: return ColorPalette.destructiveRose
+            case .neutral:  return ColorPalette.mutedForeground
+            case .info:     return ColorPalette.info
             }
         }
     }
@@ -37,31 +56,38 @@ public struct StatusPill: View {
     public let label: String
     public let systemImage: String
     public let tone: Tone
+    public let iconOpacity: Double
 
-    public init(label: String, systemImage: String, tone: Tone) {
+    public init(
+        label: String,
+        systemImage: String,
+        tone: Tone,
+        iconOpacity: Double = 1.0
+    ) {
         self.label = label
         self.systemImage = systemImage
         self.tone = tone
+        self.iconOpacity = iconOpacity
     }
 
     public var body: some View {
         HStack(spacing: Spacing.xs) {
             Image(systemName: systemImage)
                 .font(.caption.weight(.semibold))
+                .opacity(iconOpacity)
                 .accessibilityHidden(true)
             Text(label)
                 .font(.caption.weight(.semibold))
         }
         .padding(.horizontal, Spacing.sm)
         .padding(.vertical, Spacing.xs)
-        .foregroundStyle(.primary)
+        .foregroundStyle(tone.textColor)
         .background(
+            // iOS 26 Liquid Glass with a tone-tinted hue. Falls back
+            // to a translucent fill on older OS, but we now ship at
+            // iOS 26 only.
             Capsule(style: .continuous)
-                .fill(tone.color.opacity(0.15))
-        )
-        .overlay(
-            Capsule(style: .continuous)
-                .strokeBorder(tone.color.opacity(0.40), lineWidth: 1)
+                .glassEffect(.regular.tint(tone.fillColor.opacity(0.20)))
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label) status")

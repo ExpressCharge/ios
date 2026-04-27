@@ -22,8 +22,6 @@ public struct SuccessView: View {
     public let onScanAnother: () -> Void
     public let onBackToReady: () -> Void
 
-    @State private var checkmarkScale: CGFloat = 0.5
-
     public init(
         result: EnrichedScanResult,
         onScanAnother: @escaping () -> Void = {},
@@ -44,14 +42,9 @@ public struct SuccessView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .resizable()
                     .scaledToFit()
-                    .foregroundStyle(ColorPalette.voltGreen)
+                    .foregroundStyle(ColorPalette.success)
                     .frame(width: 120, height: 120)
-                    .scaleEffect(checkmarkScale)
-                    .onAppear {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.55)) {
-                            checkmarkScale = 1.0
-                        }
-                    }
+                    .symbolEffect(.bounce, options: .nonRepeating)
                     .accessibilityLabel("Scan successful")
 
                 customerCard
@@ -60,19 +53,7 @@ public struct SuccessView: View {
                 Spacer()
 
                 VStack(spacing: Spacing.sm) {
-                    Button(action: onScanAnother) {
-                        Text("Scan another")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Spacing.md)
-                            .foregroundStyle(.white)
-                            .background(
-                                RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                                    .fill(ColorPalette.primaryCyan)
-                            )
-                    }
-                    .buttonStyle(.plain)
-
+                    PrimaryButton("Scan another", action: onScanAnother)
                     Button("Back to ready", action: onBackToReady)
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -123,7 +104,7 @@ public struct SuccessView: View {
                     .foregroundStyle(.white)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(ColorPalette.accentTeal)
+                            .fill(ColorPalette.info)
                     )
             }
         }

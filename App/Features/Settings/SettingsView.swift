@@ -111,6 +111,9 @@ public struct SettingsView: View {
         .sheet(isPresented: $isShowingDiagnostics) {
             DiagnosticsSheet()
                 .environment(coordinator)
+                .presentationDetents([.medium, .large])
+                .presentationBackground(.thinMaterial)
+                .presentationCornerRadius(32)
         }
     }
 

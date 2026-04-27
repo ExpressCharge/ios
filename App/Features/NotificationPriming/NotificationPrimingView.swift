@@ -30,6 +30,7 @@ public struct NotificationPrimingView: View {
                 .scaledToFit()
                 .foregroundStyle(ColorPalette.primaryCyan)
                 .frame(width: 88, height: 88)
+                .symbolEffect(.bounce, options: .nonRepeating)
                 .accessibilityHidden(true)
 
             VStack(spacing: Spacing.md) {
@@ -47,26 +48,11 @@ public struct NotificationPrimingView: View {
             Spacer()
 
             VStack(spacing: Spacing.md) {
-                Button(action: handleAllowTapped) {
-                    HStack(spacing: Spacing.sm) {
-                        if isRequesting {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .tint(.white)
-                        }
-                        Text("Allow Notifications")
-                            .font(.headline)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.md)
-                    .foregroundStyle(.white)
-                    .background(
-                        RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                            .fill(ColorPalette.primaryCyan)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(isRequesting)
+                PrimaryButton(
+                    "Allow Notifications",
+                    state: isRequesting ? .loading : .default,
+                    action: handleAllowTapped
+                )
 
                 Button("Not now") {
                     coordinator.didFinishPriming()

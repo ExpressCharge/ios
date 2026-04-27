@@ -121,30 +121,11 @@ public struct RegistrationView: View {
             Spacer()
 
             // CTA.
-            Button {
-                Task { await vm.submit() }
-            } label: {
-                HStack(spacing: Spacing.sm) {
-                    if vm.isSubmitting {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(.white)
-                    }
-                    Text("Register")
-                        .font(.headline)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Spacing.md)
-                .foregroundStyle(.white)
-                .background(
-                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                        .fill(vm.label.trimmingCharacters(in: .whitespaces).isEmpty
-                              ? ColorPalette.borderSubtle
-                              : ColorPalette.primaryCyan)
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(vm.isSubmitting || vm.label.trimmingCharacters(in: .whitespaces).isEmpty)
+            PrimaryButton(
+                "Register",
+                state: state(for: vm),
+                action: { Task { await vm.submit() } }
+            )
             .padding(.horizontal, Spacing.lg)
             .padding(.bottom, Spacing.xl)
         }
@@ -153,6 +134,12 @@ public struct RegistrationView: View {
                 coordinator.didCompleteRegistration()
             }
         }
+    }
+
+    private func state(for vm: RegistrationViewModel) -> PrimaryButton.State {
+        if vm.isSubmitting { return .loading }
+        if vm.label.trimmingCharacters(in: .whitespaces).isEmpty { return .disabled }
+        return .default
     }
 
     private func copy(for error: RegistrationError) -> String {

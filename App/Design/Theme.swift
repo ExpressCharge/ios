@@ -4,10 +4,9 @@
 //
 //  Aggregates the design-token primitives — colors, spacing, radius,
 //  typography — into a single value plumbed through the SwiftUI
-//  environment. Mirrors `docs/design-tokens.json`.
+//  environment. Mirrors the ExpresSync web `:root` / `.dark` token set.
 //
-//  Spec: `40-frontend.md` § "Design tokens for iOS team" + `50-ios.md`
-//  § "Theme".
+//  Spec: `40-frontend.md` § "Design tokens for iOS team" + COLORS.md.
 //
 
 import SwiftUI
@@ -34,7 +33,7 @@ public enum Radius {
 
 /// Typography uses the system stack (`-apple-system`) on iOS — no
 /// custom font registration required. Monospace is used in the
-/// diagnostics sheet (E-app-wire).
+/// diagnostics sheet.
 public enum Typography {
     public static let monoStack = "Menlo"
 }
@@ -63,22 +62,36 @@ public struct Theme: Sendable {
     public struct Colors: Sendable {
         public let primaryCyan: ColorToken
         public let voltGreen: ColorToken
+        public let success: ColorToken
+        public let info: ColorToken
         public let warningAmber: ColorToken
         public let destructiveRose: ColorToken
-        public let accentTeal: ColorToken
         public let background: ColorToken
         public let card: ColorToken
+        public let muted: ColorToken
+        public let foreground: ColorToken
+        public let mutedForeground: ColorToken
         public let borderSubtle: ColorToken
+        public let glowCyan: ColorToken
+        public let glowGreen: ColorToken
+        public let glowViolet: ColorToken
 
         public static let `default` = Colors(
             primaryCyan: .primaryCyan,
             voltGreen: .voltGreen,
+            success: .success,
+            info: .info,
             warningAmber: .warningAmber,
             destructiveRose: .destructiveRose,
-            accentTeal: .accentTeal,
             background: .background,
             card: .card,
-            borderSubtle: .borderSubtle
+            muted: .muted,
+            foreground: .foreground,
+            mutedForeground: .mutedForeground,
+            borderSubtle: .borderSubtle,
+            glowCyan: .glowCyan,
+            glowGreen: .glowGreen,
+            glowViolet: .glowViolet
         )
     }
 

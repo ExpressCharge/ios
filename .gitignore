@@ -65,5 +65,6 @@ fastlane/test_output
 # Editor
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
