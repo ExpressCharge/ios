@@ -36,10 +36,16 @@ public struct ReadyView: View {
         .sheet(isPresented: $isShowingSettings) {
             SettingsView()
                 .environment(coordinator)
+                .presentationDetents([.medium, .large])
+                .presentationBackground(.thinMaterial)
+                .presentationCornerRadius(32)
         }
         .sheet(isPresented: $isShowingDiagnostics) {
             DiagnosticsSheet()
                 .environment(coordinator)
+                .presentationDetents([.medium, .large])
+                .presentationBackground(.thinMaterial)
+                .presentationCornerRadius(32)
         }
         .onAppear {
             // First-render side effects only — the coordinator's
@@ -58,7 +64,7 @@ public struct ReadyView: View {
     private var content: some View {
         if let scan = coordinator.scan {
             switch scan.state {
-            case .scanRequested(let request):
+            case .scanRequested(let request), .scanning(let request):
                 TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
                     ScanActiveView(
                         request: request,
@@ -67,20 +73,6 @@ public struct ReadyView: View {
                             armedAt: scan.armedAt,
                             now: context.date
                         ),
-                        onTapToScan: { scan.beginScan() },
-                        onCancel: { scan.cancelActiveScan() }
-                    )
-                }
-            case .scanning(let request):
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
-                    ScanActiveView(
-                        request: request,
-                        progress: progressNow(
-                            for: request,
-                            armedAt: scan.armedAt,
-                            now: context.date
-                        ),
-                        onTapToScan: { /* already scanning — no-op */ },
                         onCancel: { scan.cancelActiveScan() }
                     )
                 }
@@ -106,14 +98,9 @@ public struct ReadyView: View {
 
     private func readyChrome(scan: ScanCoordinator?) -> some View {
         VStack(spacing: Spacing.lg) {
-            // Brand row (top-left logo, top-right status pill).
+            // Brand row (top-left lockup, top-right status pill).
             HStack {
-                HStack(spacing: Spacing.sm) {
-                    Image(systemName: "bolt.fill")
-                        .foregroundStyle(ColorPalette.primaryCyan)
-                    Text("ExpresScan")
-                        .font(.headline)
-                }
+                BrandLockup(.compact)
                 Spacer()
                 connectionPill(scan: scan)
                     .onTapGesture { isShowingDiagnostics = true }
@@ -126,11 +113,7 @@ public struct ReadyView: View {
 
             // Hero: animated NFC glyph + label.
             VStack(spacing: Spacing.lg) {
-                AnimatedNFCGlyph(
-                    size: 96,
-                    tint: heroTint(scan: scan),
-                    cycle: heroCycle(scan: scan)
-                )
+                AnimatedNFCGlyph(size: 96, tone: heroTone(scan: scan))
                 Text(heroTitle(scan: scan))
                     .font(.largeTitle.weight(.bold))
                 Text(heroBody(scan: scan))
@@ -139,9 +122,11 @@ public struct ReadyView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Spacing.lg)
                 if let scan, scan.pendingScanResultCount > 0 {
-                    Text("\(scan.pendingScanResultCount) pending upload\(scan.pendingScanResultCount == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    StatusPill(
+                        label: "\(scan.pendingScanResultCount) pending upload\(scan.pendingScanResultCount == 1 ? "" : "s")",
+                        systemImage: "clock.fill",
+                        tone: .warning
+                    )
                 }
             }
 
@@ -216,18 +201,11 @@ public struct ReadyView: View {
         }
     }
 
-    private func heroTint(scan: ScanCoordinator?) -> Color {
+    private func heroTone(scan: ScanCoordinator?) -> StatusPill.Tone {
         switch scan?.state {
-        case .offline?: return ColorPalette.borderSubtle
-        case .connecting?: return ColorPalette.accentTeal
-        default: return ColorPalette.primaryCyan
-        }
-    }
-
-    private func heroCycle(scan: ScanCoordinator?) -> Double {
-        switch scan?.state {
-        case .connecting?: return 0.5
-        default: return 0.8
+        case .offline?:    return .neutral
+        case .connecting?: return .info
+        default:           return .info
         }
     }
 

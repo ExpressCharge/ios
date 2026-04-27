@@ -85,22 +85,36 @@ public final class ScanCoordinator {
 
     // MARK: - Dependencies (constructor-injected)
 
+    @ObservationIgnored
     private let environment: AppEnvironment
+    @ObservationIgnored
     private let nfc: NFCService
+    @ObservationIgnored
     private let heartbeat: HeartbeatService
+    @ObservationIgnored
     private let queue: ScanResultQueue
     /// Closure injected so unit tests can swap in a stub. In production
     /// this is `EventStreamReconnector(env:)`.
+    @ObservationIgnored
     private let makeReconnector: @MainActor () -> EventStreamReconnector
     /// Closure for `URLSession`-based clock — overridable in tests.
+    @ObservationIgnored
     private let now: @Sendable () -> Date
 
+    @ObservationIgnored
     private var streamTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var heartbeatTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var queueDrainTask: Task<Void, Never>?
+    @ObservationIgnored
     private var reconnector: EventStreamReconnector?
     /// Recent in-memory dedup record for `(pairingCode, expiresAt)` —
     /// covers the 90 s TTL window. Mirrored to UserDefaults so a
     /// background-tap-relaunch doesn't re-arm the same pairing.
+    @ObservationIgnored
     private var recentPairings: [String: Date] = [:]
+    @ObservationIgnored
     private var coordinatorRouter: RootCoordinator?
 
     /// Coalesce window: 90 s, matching the backend pairing TTL.
@@ -162,7 +176,8 @@ public final class ScanCoordinator {
             }
         }
 
-        Task { [heartbeat, environment] in
+        heartbeatTask?.cancel()
+        heartbeatTask = Task { [heartbeat, environment] in
             await heartbeat.start(
                 deviceTokenAvailable: { [environment] in
                     (try? await environment.authStore.loadDeviceToken()) != nil
@@ -173,7 +188,8 @@ public final class ScanCoordinator {
             )
         }
 
-        Task { [queue, weak self] in
+        queueDrainTask?.cancel()
+        queueDrainTask = Task { [queue, weak self] in
             // Drain any persisted offline scan results.
             let pending = await queue.drain { [weak self] count in
                 Task { @MainActor in self?.pendingScanResultCount = count }
@@ -187,6 +203,10 @@ public final class ScanCoordinator {
     public func stopConnecting() {
         streamTask?.cancel()
         streamTask = nil
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+        queueDrainTask?.cancel()
+        queueDrainTask = nil
         Task { [heartbeat] in await heartbeat.stop() }
         reconnector = nil
         connectionStatus = .offline
@@ -222,10 +242,22 @@ public final class ScanCoordinator {
 
         armedAt = now()
         state = .scanRequested(request)
+
+        // Auto-fire the iOS NFC reader sheet so it acts as the primary
+        // scan UI. The user no longer has to tap a "Tap to scan" button
+        // — the request arriving IS the prompt, and dismissing the
+        // sheet (system-Cancel inside it) is now the canonical cancel
+        // affordance, propagated to the admin via
+        // `cancelActiveScan` → `/api/devices/scan-cancel`. Skipping the
+        // intermediate `.scanRequested` UI keeps the active screen's
+        // visible bits (countdown ring + arrow indicator) co-located
+        // with what iOS already shows.
+        beginScan()
     }
 
-    /// Called by the user tapping "Tap to scan" on `ScanActiveView`.
-    /// Drives the NFC session, signs the result, and POSTs.
+    /// Drives the NFC session, signs the result, and POSTs. Invoked
+    /// automatically from `handleIncomingScanRequest`; also kept
+    /// public so a debug screen / future "retry" button can reuse it.
     public func beginScan() {
         guard case .scanRequested(let request) = state else { return }
 
@@ -236,12 +268,53 @@ public final class ScanCoordinator {
         }
     }
 
-    /// Manual cancel from the active screen — returns to ready without
-    /// surfacing an error.
+    /// Manual cancel — returns to ready without surfacing an error AND
+    /// notifies the server so the admin's in-flight TapToAddModal
+    /// closes immediately. Handles both the pre-NFC `.scanRequested`
+    /// state (legacy "Tap to scan" button) and the active-NFC
+    /// `.scanning` state (auto-fired NFC sheet, plus the iOS-supplied
+    /// Cancel chrome inside that sheet — see
+    /// `runScan`'s `.userCanceled` branch). When `.scanning`, the NFC
+    /// session is invalidated explicitly so the iOS sheet dismisses
+    /// even when the cancel originates outside the sheet (e.g. a web
+    /// `event: cancelled` SSE event).
+    ///
+    /// The local state flip happens synchronously; the
+    /// `/api/devices/scan-cancel` POST is fire-and-forget so a
+    /// transient network blip can't trap the user on the active
+    /// screen.
     public func cancelActiveScan() {
-        guard case .scanRequested = state else { return }
+        let pairingCode: String?
+        switch state {
+        case .scanRequested(let request):
+            pairingCode = request.pairingCode
+        case .scanning(let request):
+            pairingCode = request.pairingCode
+            // Force-dismiss the iOS NFC sheet. Safe even when called
+            // from inside `runScan`'s `.userCanceled` branch (the
+            // continuation is already nil by then).
+            nfc.cancel()
+        default:
+            return
+        }
         state = .readyToScan
         armedAt = nil
+
+        guard let pairingCode else { return }
+        Task { [environment] in
+            let body = ScanCancelRequest(pairingCode: pairingCode)
+            let endpoint = Endpoint.with(
+                path: "/api/devices/scan-cancel",
+                method: .post,
+                requiresAuth: true,
+                body: body
+            )
+            // Best-effort. Server-side cleanup is also covered by the
+            // 90 s pairing TTL — if this POST fails, the admin modal will
+            // still drop after the TTL window. We don't surface errors
+            // because the user already sees their local state cleared.
+            _ = try? await environment.api.send(endpoint)
+        }
     }
 
     /// Manually dismiss a `.success` or `.error` screen back to ready.
@@ -273,7 +346,14 @@ public final class ScanCoordinator {
                 case .mifareClassicUnsupported, .unsupportedTag:
                     state = .error(.unsupportedCard)
                 case .userCanceled:
-                    state = .readyToScan
+                    // The user dismissed the iOS NFC reader sheet —
+                    // treat as a full scan cancel so the admin's
+                    // TapToAddModal closes too. `cancelActiveScan`
+                    // also invalidates the NFC session, but the
+                    // continuation is already nil here so that's a
+                    // no-op.
+                    cancelActiveScan()
+                    return
                 case .systemUnavailable, .underlying:
                     state = .error(.network)
                 }
@@ -414,6 +494,37 @@ public final class ScanCoordinator {
             } catch {
                 // Malformed scan request — log + swallow.
             }
+
+        case "scan.cancelled":
+            // Bidirectional cancel sync — the admin closed the
+            // TapToAddModal (or another device session cancelled the
+            // same scan via /api/devices/scan-cancel). Drop the active
+            // request locally if its `pairingCode` matches; do not
+            // surface an error (admin cancel is normal flow, not a
+            // failure).
+            guard let data = event.data.data(using: .utf8) else { return }
+            let payload = try? JSONDecoder().decode(ScanCancelledPayload.self, from: data)
+            let activePairingCode: String?
+            switch state {
+            case .scanRequested(let req): activePairingCode = req.pairingCode
+            case .scanning(let req): activePairingCode = req.pairingCode
+            default: return
+            }
+            if let payload, let active = activePairingCode,
+               payload.pairingCode != active {
+                // Cancel for a different pairing — ignore. Shouldn't
+                // happen (server filters by deviceId), belt-and-braces.
+                return
+            }
+            // If we're mid-NFC, dismiss the iOS reader sheet so the
+            // user sees the cancel land instantly. Do this BEFORE
+            // flipping state so the NFCService's continuation can
+            // still see `.scanning` if it runs synchronously.
+            if case .scanning = state {
+                nfc.cancel()
+            }
+            state = .readyToScan
+            armedAt = nil
 
         case "device.session.replaced":
             // Another device session took over; the SSE will close

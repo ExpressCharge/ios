@@ -50,12 +50,16 @@ public enum RootRoute: Equatable {
 public final class RootCoordinator {
 
     public var route: RootRoute = .launching
+
+    @ObservationIgnored
     public weak var environment: AppEnvironment?
 
     /// Live for the duration of a signed-in session. `nil` when the
     /// user is unauthenticated (welcome/login/registering/priming).
+    @ObservationIgnored
     public private(set) var scan: ScanCoordinator?
     /// Live for the duration of the app process (after `bootstrap`).
+    @ObservationIgnored
     public private(set) var push: PushService?
 
     public init() {}
@@ -140,6 +144,7 @@ public final class RootCoordinator {
 public struct RootView: View {
 
     @Environment(\.app) private var app
+    @Environment(\.scenePhase) private var scenePhase
     @State private var coordinator = RootCoordinator()
 
     public init() {}
@@ -149,13 +154,18 @@ public struct RootView: View {
             switch coordinator.route {
             case .launching:
                 LaunchView()
-            case .welcome:
-                WelcomeView()
-                    .environment(coordinator)
-            case .loggingIn:
+            case .welcome, .loggingIn:
                 // Login uses ASWebAuthenticationSession which presents
-                // its own modal — the underlying view stays Welcome.
-                WelcomeView(showingLoginActivity: true)
+                // its own modal — the underlying view stays Welcome. We
+                // MUST keep both cases under one switch branch so SwiftUI
+                // preserves WelcomeView's structural identity (and its
+                // `@State LoginViewModel`) across the `.welcome ↔
+                // .loggingIn` transition. Splitting them re-creates the
+                // view, deallocating the LoginViewModel that owns the
+                // in-flight auth session — the session's completion
+                // closure captures `[weak self]`, so the callback fires
+                // into a nil `self` and the route is never advanced.
+                WelcomeView(showingLoginActivity: coordinator.route == .loggingIn)
                     .environment(coordinator)
             case .registering(let code, let verifier):
                 RegistrationView(
@@ -176,6 +186,47 @@ public struct RootView: View {
         .task {
             await coordinator.bootstrap(environment: app)
         }
+        .onOpenURL { url in
+            // Universal Link entry-point (custom-scheme path / iOS 18+
+            // unified delivery). Most ULs land here.
+            handleUniversalLink(url)
+        }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            // Belt-and-braces: some Universal Link delivery paths still
+            // use the legacy `NSUserActivity` channel. Same handler.
+            if let url = activity.webpageURL {
+                handleUniversalLink(url)
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .background:
+                coordinator.scan?.handleEnterBackground()
+            case .active:
+                coordinator.scan?.handleEnterForeground()
+            case .inactive:
+                break
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    private func handleUniversalLink(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.host == BuildConfig.universalLinkHost,
+              components.path == BuildConfig.registrationCallbackPath else {
+            return
+        }
+        guard let code = components.queryItems?.first(where: { $0.name == "code" })?.value,
+              !code.isEmpty else {
+            return
+        }
+        NotificationCenter.default.post(
+            name: AppNotifications.universalLinkRegistrationCallback,
+            object: nil,
+            userInfo: ["code": code]
+        )
     }
 }
 

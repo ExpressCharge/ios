@@ -113,14 +113,19 @@ public final class LoginViewModel: NSObject {
 
         // The server's POST handler 302s the in-session web view to
         // `expresscan://register/callback?code=…`. AuthServices matches
-        // the redirect's scheme against the session's `callbackURLScheme`
-        // and — when they match — dismisses the auth UI and delivers
-        // the URL to the completion handler. Works reliably across iOS
-        // versions and skips the AASA-validation hot-path that the iOS
-        // 17.4+ `.https(host:path:)` Callback exposed us to.
+        // the redirect's scheme against the session's callback and —
+        // when they match — dismisses the auth UI and delivers the URL
+        // to the completion handler.
+        //
+        // We use the iOS 17.4+ `Callback.customScheme(_:)` initializer
+        // instead of the deprecated `callbackURLScheme:` parameter:
+        // testing on iOS 26 showed the deprecated form silently fails
+        // to intercept the form-POST 302, even with the scheme
+        // registered in `Info.plist` `CFBundleURLTypes`. The modern
+        // initializer fixes the intercept.
         let session = ASWebAuthenticationSession(
             url: url,
-            callbackURLScheme: BuildConfig.callbackURLScheme
+            callback: .customScheme(BuildConfig.callbackURLScheme)
         ) { [weak self] callbackURL, error in
             Task { @MainActor in
                 self?.handleSessionCompletion(callbackURL: callbackURL, error: error)
