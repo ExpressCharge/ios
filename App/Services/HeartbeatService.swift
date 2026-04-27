@@ -24,10 +24,6 @@ import Foundation
 import FoundationNetworking
 #endif
 
-#if canImport(UIKit)
-import UIKit
-#endif
-
 import Models
 import Networking
 
@@ -57,15 +53,21 @@ public actor HeartbeatService {
         loop = Task { [api] in
             while !Task.isCancelled {
                 if await deviceTokenAvailable() {
-                    let payload = HeartbeatPayload(
-                        appVersion: Self.shortVersion,
-                        osVersion: Self.osVersion
-                    )
-                    let endpoint = Endpoint.with(
+                    // Bodyless POST. The server's `heartbeatBodySchema`
+                    // is `.strict()` and only knows about
+                    // `(batteryLevel, isCharging, networkType)`; sending
+                    // `{appVersion, osVersion}` (the historical iOS
+                    // shape) gets rejected with `400 invalid_body` and
+                    // `last_seen_at` never updates — so the device shows
+                    // offline server-side even though the SSE link is
+                    // healthy. Until we capture battery/charging/network
+                    // here there's nothing to report; an empty body
+                    // bypasses the schema branch entirely and just
+                    // refreshes `last_seen_at`.
+                    let endpoint = Endpoint(
                         path: "/api/devices/heartbeat",
                         method: .post,
-                        requiresAuth: true,
-                        body: payload
+                        requiresAuth: true
                     )
                     do {
                         try await api.send(endpoint)
@@ -77,7 +79,13 @@ public actor HeartbeatService {
                         // is "fire-and-forget" by design.
                     }
                 }
-                try? await Task.sleep(for: .seconds(Self.interval))
+                do {
+                    try await Task.sleep(for: .seconds(Self.interval))
+                } catch {
+                    // Cancellation is the only thing Task.sleep throws —
+                    // exit the loop cleanly.
+                    return
+                }
             }
         }
     }
@@ -86,19 +94,5 @@ public actor HeartbeatService {
     public func stop() {
         loop?.cancel()
         loop = nil
-    }
-
-    // MARK: - Static helpers
-
-    private static var shortVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-    }
-
-    private static var osVersion: String {
-        #if canImport(UIKit)
-        return UIDevice.current.systemVersion
-        #else
-        return ProcessInfo.processInfo.operatingSystemVersionString
-        #endif
     }
 }

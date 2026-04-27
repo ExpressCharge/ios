@@ -2,16 +2,24 @@
 //  ScanActiveView.swift
 //  ExpresScan
 //
-//  Shown when a scan request is armed and waiting for the user to tap
-//  a card. Per the wireframes:
-//   - Glyph turns green and pulses faster (0.4s).
-//   - Countdown ring around the glyph reflects time left.
-//   - Dynamic subheading by `ScanPurpose`.
-//   - "Tap to scan" button starts the NFCTagReaderSession (E-app-wire).
-//   - Cancel returns to Ready.
+//  Shown when a scan request is armed. The iOS-supplied NFC reader
+//  sheet — fired automatically by `ScanCoordinator.handleIncomingScanRequest`
+//  → `beginScan()` — IS the primary scan UI. The system sheet covers the
+//  bottom ~70 % of the screen, so this view's job is to fill the
+//  remaining top band with what iOS doesn't show:
 //
-//  Skeleton: layout + bindings only. The actual `NFCTagReaderSession`
-//  presentation lives in `NFCService` (E-app-wire).
+//   - Countdown ring driven by the server-stamped `expiresAtEpochMs`,
+//     so the user knows how long they have left.
+//   - Upward chevron pointing at the iPhone's NFC antenna (top edge),
+//     so they know where to hold the card.
+//   - Subheading + optional hint pill explaining what the scan is for.
+//
+//  The system sheet's own Cancel chrome is the primary cancel affordance
+//  — that flows through `runScan`'s `.userCanceled` branch into
+//  `cancelActiveScan` and notifies the admin web UI. We keep an explicit
+//  Cancel button on this screen as a fallback for the moment between
+//  request-arrival and the iOS sheet appearing (a single frame in
+//  practice).
 //
 //  Spec: `50-ios.md` § "UX details" → "Scan request".
 //
@@ -26,20 +34,20 @@ public struct ScanActiveView: View {
     /// 0…1 ring progress; 1 at issuance, 0 at expiry.
     public let progress: Double
 
-    /// Wired by E-app-wire to `NFCService.beginSession(...)` and
-    /// `ScanCoordinator.cancelScan()` respectively.
-    public let onTapToScan: () -> Void
+    /// Invoked when the user taps the fallback Cancel button. The
+    /// system NFC sheet's own Cancel is wired separately via
+    /// `NFCService` → `cancelActiveScan`.
     public let onCancel: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         request: ScanRequest,
         progress: Double,
-        onTapToScan: @escaping () -> Void = {},
         onCancel: @escaping () -> Void = {}
     ) {
         self.request = request
         self.progress = progress
-        self.onTapToScan = onTapToScan
         self.onCancel = onCancel
     }
 
@@ -48,16 +56,41 @@ public struct ScanActiveView: View {
             ColorPalette.background.ignoresSafeArea()
 
             VStack(spacing: Spacing.lg) {
-                Spacer()
+                Spacer().frame(height: Spacing.md)
+
+                // Upward chevron pointing at the NFC antenna (top edge
+                // of the iPhone). Sits ABOVE the countdown ring + glyph
+                // and breathes continuously: a slow sine-wave drives a
+                // synchronised rise+grow / fall+shrink loop. The fixed
+                // outer frame absorbs the offset/scale so the layout
+                // below stays put. Honors `reduceMotion` — when on,
+                // the chevron renders as a static, larger glyph.
+                Group {
+                    if reduceMotion {
+                        chevron(scale: 1.0)
+                    } else {
+                        TimelineView(.animation) { context in
+                            let t = context.date.timeIntervalSinceReferenceDate
+                            // 1.6s period — slow enough to feel calm,
+                            // fast enough to read as "active".
+                            let phase = (t.truncatingRemainder(dividingBy: 1.6)) / 1.6
+                            let s = sin(phase * 2 * .pi)
+                            // Rises 14pt at peak, sinks 14pt at trough;
+                            // scales 0.88…1.12 in lockstep so the
+                            // arrow grows as it rises (one breath).
+                            let offsetY = -14.0 * s
+                            let scale = 1.0 + 0.12 * s
+                            chevron(scale: scale)
+                                .offset(y: CGFloat(offsetY))
+                        }
+                    }
+                }
+                .frame(height: 110)
 
                 ZStack {
-                    CountdownRing(progress: progress, lineWidth: 8, tint: ColorPalette.voltGreen)
+                    CountdownRing(progress: progress, lineWidth: 8, tone: .positive)
                         .frame(width: 160, height: 160)
-                    AnimatedNFCGlyph(
-                        size: 96,
-                        tint: ColorPalette.voltGreen,
-                        cycle: 0.4
-                    )
+                    AnimatedNFCGlyph(size: 96, tone: .positive)
                 }
                 .accessibilityLabel("Scan a card now")
 
@@ -81,28 +114,23 @@ public struct ScanActiveView: View {
 
                 Spacer()
 
-                VStack(spacing: Spacing.sm) {
-                    Button(action: onTapToScan) {
-                        Text("Tap to scan")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Spacing.md)
-                            .foregroundStyle(.white)
-                            .background(
-                                RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                                    .fill(ColorPalette.voltGreen)
-                            )
-                    }
-                    .buttonStyle(.plain)
-
-                    Button("Cancel", role: .cancel, action: onCancel)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, Spacing.lg)
-                .padding(.bottom, Spacing.xl)
+                Button("Cancel", role: .cancel, action: onCancel)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, Spacing.xl)
             }
         }
+    }
+
+    /// Static chevron used as the breathing-loop's leaf. Centralised so
+    /// reduce-motion and the `TimelineView` branch can't drift apart in
+    /// styling.
+    private func chevron(scale: Double) -> some View {
+        Image(systemName: "chevron.up")
+            .font(.system(size: 84, weight: .bold))
+            .foregroundStyle(ColorPalette.voltGreen)
+            .scaleEffect(scale)
+            .accessibilityLabel("Hold card to top of phone")
     }
 
     private func subheading(for request: ScanRequest) -> String {

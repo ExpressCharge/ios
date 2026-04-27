@@ -17,9 +17,11 @@
 //      kept in the switch below for forward compat.
 //
 //  MIFARE Classic detection: per `50-ios.md` § "NFC service", iPhone
-//  CAN'T read MIFARE Classic. We detect it via the
-//  `NFCMiFareTag.mifareFamily == .classic` selector and reject with a
-//  friendly error.
+//  CAN'T read MIFARE Classic. The CoreNFC SDK doesn't even expose a
+//  `.classic` case on `NFCMiFareFamily` — the framework filters those
+//  tags out at polling time, so they never reach our delegate.  If a
+//  card slips through with an unknown family we surface the generic
+//  unsupported-tag path.
 //
 //  Spec:
 //    - `50-ios.md` § "NFC service"
@@ -131,7 +133,7 @@ public final class NFCService: NSObject, @unchecked Sendable {
             Task { [weak self] in
                 try? await Task.sleep(for: .seconds(timeoutSeconds))
                 guard self?.session === captured else { return }
-                self?.fail(with: NFCError.timeout, message: "Timed out — no card seen.")
+                self?.fail(with: NFCError.timeout, message: "No card detected. Try again.")
             }
         }
     }
@@ -157,6 +159,19 @@ public final class NFCService: NSObject, @unchecked Sendable {
         session?.invalidate(errorMessage: message)
         session = nil
         cont?.resume(throwing: error)
+    }
+
+    /// Externally cancel the active session — used when the admin's
+    /// `event: scan.cancelled` arrives while we're mid-NFC, so the iOS
+    /// reader sheet dismisses without the user having to tap Cancel.
+    /// Treated as a user-cancel (no error UI). Pinned to `@MainActor`
+    /// because the underlying `session` / `continuation` storage is
+    /// mutated only on the main queue (the delegate queue is `nil`
+    /// → main).
+    @MainActor
+    public func cancel() {
+        guard continuation != nil else { return }
+        fail(with: .userCanceled, message: "Cancelled.")
     }
 }
 
@@ -198,79 +213,90 @@ extension NFCService: NFCTagReaderSessionDelegate {
             return
         }
 
-        // Connect to the tag, then dispatch on family to extract the UID.
+        // Pre-extract everything we need from the tag synchronously
+        // (the `identifier` / `mifareFamily` properties are valid pre-
+        // connect). This keeps the `session.connect` completion
+        // handler — which is `@Sendable` — from capturing the
+        // non-Sendable `NFCTag`.
+        let outcome = Self.extractOutcome(from: tag)
+
+        // Connect to the tag, then deliver the pre-extracted outcome.
         session.connect(to: tag) { [weak self] connectError in
             guard let self else { return }
             if let connectError {
+                let code = (connectError as NSError).code
+                let message = connectError.localizedDescription
                 Task { @MainActor in
                     self.fail(
-                        with: .underlying(
-                            code: (connectError as NSError).code,
-                            message: connectError.localizedDescription
-                        ),
-                        message: "Couldn't read card. Try again."
+                        with: .underlying(code: code, message: message),
+                        message: "Couldn't read that card. Try again."
                     )
                 }
                 return
             }
 
-            switch tag {
-            case .miFare(let mifare):
-                if mifare.mifareFamily == .classic {
-                    Task { @MainActor in
-                        self.fail(
-                            with: .mifareClassicUnsupported,
-                            message: "Card not supported on iPhone — use a charger reader."
-                        )
-                    }
-                    return
-                }
-                let uid = mifare.identifier.hexUppercased
-                let family = Self.mifareFamilyLabel(mifare.mifareFamily)
+            switch outcome {
+            case .success(let result):
                 Task { @MainActor in
-                    self.succeed(
-                        with: NFCScanResult(idTag: uid, tagType: family),
-                        message: "Card read."
-                    )
+                    self.succeed(with: result, message: "Card read.")
                 }
-
-            case .iso7816(let iso):
-                let uid = iso.identifier.hexUppercased
-                Task { @MainActor in
-                    self.succeed(
-                        with: NFCScanResult(idTag: uid, tagType: "iso7816"),
-                        message: "Card read."
-                    )
-                }
-
-            case .iso15693(let iso):
-                let uid = iso.identifier.hexUppercased
-                Task { @MainActor in
-                    self.succeed(
-                        with: NFCScanResult(idTag: uid, tagType: "iso15693"),
-                        message: "Card read."
-                    )
-                }
-
-            case .feliCa(let felica):
-                // FeliCa lacks an `identifier` — the IDm is the
-                // closest analogue.
-                let idm = felica.currentIDm.hexUppercased
-                Task { @MainActor in
-                    self.succeed(
-                        with: NFCScanResult(idTag: idm, tagType: "feliCa"),
-                        message: "Card read."
-                    )
-                }
-
-            @unknown default:
+            case .mifareClassic:
                 Task { @MainActor in
                     self.fail(
-                        with: .unsupportedTag(family: "unknown"),
-                        message: "Card type not supported."
+                        with: .mifareClassicUnsupported,
+                        message: "This card isn't supported. Try a different one."
+                    )
+                }
+            case .unsupported(let family):
+                Task { @MainActor in
+                    self.fail(
+                        with: .unsupportedTag(family: family),
+                        message: "This card isn't supported. Try a different one."
                     )
                 }
             }
+        }
+    }
+
+    /// Sendable summary of a detected tag. Computed eagerly so the
+    /// `@Sendable` connect-completion closure never captures the
+    /// underlying `NFCTag`.
+    private enum TagOutcome: Sendable {
+        case success(NFCScanResult)
+        case mifareClassic
+        case unsupported(family: String)
+    }
+
+    private static func extractOutcome(from tag: NFCTag) -> TagOutcome {
+        switch tag {
+        case .miFare(let mifare):
+            // CoreNFC has no `.classic` case (iPhones can't read
+            // MIFARE Classic at all); `.unknown` is the closest we
+            // ever see for an oddball Type-A tag we shouldn't trust
+            // the UID of, so we reject those defensively.
+            if mifare.mifareFamily == .unknown {
+                return .mifareClassic
+            }
+            let uid = mifare.identifier.hexUppercased
+            let family = mifareFamilyLabel(mifare.mifareFamily)
+            return .success(NFCScanResult(idTag: uid, tagType: family))
+
+        case .iso7816(let iso):
+            let uid = iso.identifier.hexUppercased
+            return .success(NFCScanResult(idTag: uid, tagType: "iso7816"))
+
+        case .iso15693(let iso):
+            let uid = iso.identifier.hexUppercased
+            return .success(NFCScanResult(idTag: uid, tagType: "iso15693"))
+
+        case .feliCa(let felica):
+            // FeliCa lacks an `identifier` — the IDm is the closest
+            // analogue.
+            let idm = felica.currentIDm.hexUppercased
+            return .success(NFCScanResult(idTag: idm, tagType: "feliCa"))
+
+        @unknown default:
+            return .unsupported(family: "unknown")
         }
     }
 
@@ -302,7 +328,6 @@ extension NFCService: NFCTagReaderSessionDelegate {
         case .ultralight: return "miFare-ultralight"
         case .plus: return "miFare-plus"
         case .desfire: return "miFare-desfire"
-        case .classic: return "miFare-classic"
         case .unknown: return "miFare-unknown"
         @unknown default: return "miFare-unknown"
         }
