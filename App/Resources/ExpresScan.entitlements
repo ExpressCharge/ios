@@ -2,25 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- NFC Tag Reading. We register only the TAG format because we use
-         NFCTagReaderSession (the more permissive of the two NFC APIs);
-         NDEF would require an additional `NDEF` entry. -->
-    <key>com.apple.developer.nfc.readersession.formats</key>
-    <array>
-        <string>TAG</string>
-    </array>
-
-    <!-- Universal Link domain. Apple requires the entry to start with
-         `applinks:`. Used by `SceneDelegate.scene(_:continue:)` for the
-         PKCE registration callback. -->
-    <key>com.apple.developer.associated-domains</key>
-    <array>
-        <string>applinks:manage.example.com</string>
-    </array>
-
-    <!-- APNs environment. The xcodegen pre-build script rewrites this to
-         `production` for Release builds. -->
-    <key>aps-environment</key>
-    <string>development</string>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:manage.example.com</string>
+	</array>
+	<key>com.apple.developer.nfc.readersession.formats</key>
+	<array>
+		<string>TAG</string>
+	</array>
 </dict>
 </plist>

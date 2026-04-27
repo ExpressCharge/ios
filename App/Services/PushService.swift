@@ -90,7 +90,11 @@ public final class PushService {
     /// Convert the canonical APNs payload (see `20-contracts.md`) into
     /// a `ScanRequest`. Returns `nil` if any required field is missing
     /// or malformed.
-    static func decodeScanRequest(
+    ///
+    /// `nonisolated` because the function is pure (no `self` access)
+    /// and we want to call it from unit tests that don't run on
+    /// `@MainActor`.
+    nonisolated static func decodeScanRequest(
         from userInfo: [AnyHashable: Any]
     ) -> ScanRequest? {
         guard

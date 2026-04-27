@@ -20,20 +20,22 @@ name: ExpresScan
 options:
   bundleIdPrefix: gg.vlad
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "26.0"
   developmentLanguage: en
   createIntermediateGroups: true
   generateEmptyDirectories: true
   groupSortPosition: top
 
 # Default settings inherited by every target & configuration unless
-# overridden. The strictness flags here match `50-ios.md`'s requirement for
-# Swift 6 with `targeted` strict concurrency (NOT `complete`).
+# overridden. iOS 26 / Swift 6.3 with `complete` strict concurrency — the
+# app target compiles cleanly against this matrix and we want regressions
+# (e.g. an unguarded @MainActor capture) to fail the build instead of
+# emitting a warning we'd ignore.
 settings:
   base:
-    SWIFT_VERSION: "6.0"
-    SWIFT_STRICT_CONCURRENCY: targeted
-    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    SWIFT_VERSION: "6.3"
+    SWIFT_STRICT_CONCURRENCY: complete
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
     TARGETED_DEVICE_FAMILY: "1,2"
     DEVELOPMENT_TEAM: "ABC1234XYZ"
@@ -67,7 +69,7 @@ targets:
   ExpresScan:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "26.0"
     sources:
       - path: App
         excludes:
@@ -90,14 +92,20 @@ targets:
           - nfc
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
-          UISceneConfigurations:
-            UIWindowSceneSessionRoleApplication:
-              - UISceneConfigurationName: Default Configuration
-                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
         UIBackgroundModes:
           - remote-notification
         NFCReaderUsageDescription: "ExpresScan reads the unique ID from your NFC charge card so the charging station can verify your account and start your session."
         ITSAppUsesNonExemptEncryption: false
+        # Register the `expresscan://` scheme used by ASWebAuthenticationSession's
+        # callback. iOS 26 silently fails to intercept the auth-session 302 to
+        # `expresscan://register/callback?code=…` when the scheme is not declared
+        # here, despite Apple's docs claiming registration is unnecessary for the
+        # auth-session path. Belt-and-braces: register it.
+        CFBundleURLTypes:
+          - CFBundleURLName: gg.vlad.expresscan.callback
+            CFBundleTypeRole: None
+            CFBundleURLSchemes:
+              - expresscan
         UIStatusBarStyle: UIStatusBarStyleDefault
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -171,7 +179,7 @@ targets:
   ExpresScanTests:
     type: bundle.unit-test
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "26.0"
     sources:
       - path: ExpresScanTests
     dependencies:
@@ -184,12 +192,28 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/ExpresScan.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ExpresScan"
 
+  ExpresScanUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: ExpresScanUITests
+    dependencies:
+      - target: ExpresScan
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: gg.vlad.expresscan.uitests
+        PRODUCT_NAME: ExpresScanUITests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ExpresScan
+
 schemes:
   ExpresScan-Debug:
     build:
       targets:
         ExpresScan: all
         ExpresScanTests: [test]
+        ExpresScanUITests: [test]
     run:
       config: Debug
       askForAppToLaunch: false
@@ -198,6 +222,7 @@ schemes:
       gatherCoverageData: true
       targets:
         - ExpresScanTests
+        - ExpresScanUITests
     profile:
       config: Debug
     analyze:

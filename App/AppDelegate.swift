@@ -37,6 +37,16 @@ public enum AppNotifications {
 /// Identifier of the single notification category we register.
 public let scanRequestCategoryIdentifier = "NFC_SCAN_REQUEST"
 
+/// Sendable wrapper for an immutable APNs payload dictionary. The
+/// underlying `[AnyHashable: Any]` is not statically Sendable, but
+/// the `userInfo` returned by `UNNotificationContent` / the
+/// `didReceiveRemoteNotification` callback is owned by us once
+/// captured (Foundation copies it), so crossing isolation boundaries
+/// with it is safe in practice.
+private struct PushPayload: @unchecked Sendable {
+    let userInfo: [AnyHashable: Any]
+}
+
 @MainActor
 final class AppDelegate: NSObject, UIApplicationDelegate {
 
@@ -134,26 +144,30 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 
     /// Foreground delivery: show the banner + route the payload
     /// through PushService to the live ScanCoordinator.
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+        withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
     ) {
-        let payload = notification.request.content.userInfo
-        AppEnvironment.shared.pushService?.handleRemoteNotification(payload)
+        let payload = PushPayload(userInfo: notification.request.content.userInfo)
+        Task { @MainActor in
+            AppEnvironment.shared.pushService?.handleRemoteNotification(payload.userInfo)
+        }
         // Show banner + sound (no list, no badge). The user is
         // already in the app — they can act on the in-UI prompt.
         completionHandler([.banner, .sound])
     }
 
     /// Tap (or background → app launch) delivery.
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping () -> Void
+        withCompletionHandler completionHandler: @escaping @Sendable () -> Void
     ) {
-        let payload = response.notification.request.content.userInfo
-        AppEnvironment.shared.pushService?.handleRemoteNotification(payload)
+        let payload = PushPayload(userInfo: response.notification.request.content.userInfo)
+        Task { @MainActor in
+            AppEnvironment.shared.pushService?.handleRemoteNotification(payload.userInfo)
+        }
         completionHandler()
     }
 }

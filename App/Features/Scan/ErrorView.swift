@@ -58,18 +58,7 @@ public struct ErrorView: View {
 
                 VStack(spacing: Spacing.sm) {
                     if info.showsRetry {
-                        Button(action: onRetry) {
-                            Text(info.retryLabel)
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, Spacing.md)
-                                .foregroundStyle(.white)
-                                .background(
-                                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                                        .fill(ColorPalette.primaryCyan)
-                                )
-                        }
-                        .buttonStyle(.plain)
+                        PrimaryButton(info.retryLabel, action: onRetry)
                     }
 
                     Button("Back", action: onBack)
@@ -107,7 +96,7 @@ public struct ErrorView: View {
                 icon: "shield.lefthalf.filled.slash",
                 tint: ColorPalette.destructiveRose,
                 title: "Card not supported",
-                body: "MIFARE Classic and similar legacy cards can't be read by iPhone. Use an EV-compatible card.",
+                body: "This card isn't supported. Try a different NFC card.",
                 retryLabel: "Try a different card",
                 showsRetry: true
             )
@@ -125,7 +114,7 @@ public struct ErrorView: View {
                 icon: "timer.circle.fill",
                 tint: ColorPalette.warningAmber,
                 title: "Scan expired",
-                body: "The scan request expired before the card was read. Ask the admin to start a new scan.",
+                body: "The scan request expired. Ask the admin to start a new scan.",
                 retryLabel: "Back to ready",
                 showsRetry: false
             )
@@ -143,7 +132,7 @@ public struct ErrorView: View {
                 icon: "exclamationmark.octagon.fill",
                 tint: ColorPalette.destructiveRose,
                 title: "Something went wrong",
-                body: "The server reported an error. Please try again in a moment.",
+                body: "Something went wrong. Please try again.",
                 retryLabel: "Retry",
                 showsRetry: true
             )
