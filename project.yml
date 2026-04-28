@@ -82,7 +82,7 @@ targets:
     info:
       path: App/Resources/Info.plist
       properties:
-        CFBundleDisplayName: ExpresScan
+        CFBundleDisplayName: ExpressCharge
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
         UILaunchScreen:
@@ -94,7 +94,7 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UIBackgroundModes:
           - remote-notification
-        NFCReaderUsageDescription: "ExpresScan reads the unique ID from your NFC charge card so the charging station can verify your account and start your session."
+        NFCReaderUsageDescription: "ExpressCharge reads the unique ID from your NFC charge card so the charging station can verify your account and start your session."
         ITSAppUsesNonExemptEncryption: false
         # Register the `expresscan://` scheme used by ASWebAuthenticationSession's
         # callback. iOS 26 silently fails to intercept the auth-session 302 to

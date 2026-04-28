@@ -34,7 +34,7 @@ public struct Wordmark: View {
     public let text: String
     public let size: Size
 
-    public init(text: String = "ExpresScan", size: Size = .medium) {
+    public init(text: String = "ExpressCharge", size: Size = .medium) {
         self.text = text
         self.size = size
     }
@@ -73,7 +73,7 @@ public struct AnimatedWordmark: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init(text: String = "ExpresScan", size: Wordmark.Size = .large) {
+    public init(text: String = "ExpressCharge", size: Wordmark.Size = .large) {
         self.text = text
         self.size = size
     }

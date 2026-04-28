@@ -43,7 +43,7 @@ public struct WelcomeView: View {
                 BrandLockup(.login)
 
                 // Subhead body copy.
-                Text("Turn your iPhone into an NFC card reader for ExpresSync. Sign in with your admin account to register this device.")
+                Text("Welcome to ExpressCharge. Sign in to control your chargers and use this iPhone as an NFC tap reader.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -53,13 +53,13 @@ public struct WelcomeView: View {
 
                 // CTA.
                 PrimaryButton(
-                    "Sign in to ExpresSync",
+                    "Sign in",
                     state: (showingLoginActivity || loginViewModel.isPresenting) ? .loading : .default,
                     action: handleSignInTapped
                 )
                 .padding(.horizontal, Spacing.lg)
                 .padding(.bottom, Spacing.xl)
-                .accessibilityHint("Opens Safari to sign in to your ExpresSync account.")
+                .accessibilityHint("Opens Safari to sign in to your ExpressCharge account.")
             }
         }
         .onChange(of: loginViewModel.deliveredCode) { _, newCode in
