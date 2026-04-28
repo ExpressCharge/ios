@@ -38,22 +38,32 @@ public struct DeviceMeResponse: Codable, Sendable, Equatable {
     public let label: String
     public let kind: String?
     public let ownerUserId: String?
+    /// Server-rendered identity for the Account row. Falls back from
+    /// `users.displayName` → `users.name` → `users.email` → null. Use
+    /// this in the UI; `ownerName`/`ownerEmail` are exposed for
+    /// row-by-row inspection in Diagnostics.
     public let ownerDisplayName: String?
+    public let ownerName: String?
+    public let ownerEmail: String?
     public let registeredAtIso: String?
 
     public init(
         deviceId: String,
         label: String,
-        kind: String?,
-        ownerUserId: String?,
-        ownerDisplayName: String?,
-        registeredAtIso: String?
+        kind: String? = nil,
+        ownerUserId: String? = nil,
+        ownerDisplayName: String? = nil,
+        ownerName: String? = nil,
+        ownerEmail: String? = nil,
+        registeredAtIso: String? = nil
     ) {
         self.deviceId = deviceId
         self.label = label
         self.kind = kind
         self.ownerUserId = ownerUserId
         self.ownerDisplayName = ownerDisplayName
+        self.ownerName = ownerName
+        self.ownerEmail = ownerEmail
         self.registeredAtIso = registeredAtIso
     }
 }

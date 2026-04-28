@@ -58,6 +58,8 @@ public struct StatusPill: View {
     public let tone: Tone
     public let iconOpacity: Double
 
+    @Environment(\.colorScheme) private var colorScheme
+
     public init(
         label: String,
         systemImage: String,
@@ -83,14 +85,22 @@ public struct StatusPill: View {
         .padding(.vertical, Spacing.xs)
         .foregroundStyle(tone.textColor)
         .background(
-            // iOS 26 Liquid Glass with a tone-tinted hue. Falls back
-            // to a translucent fill on older OS, but we now ship at
-            // iOS 26 only.
+            // iOS 26 Liquid Glass with a tone-tinted hue. The tint
+            // opacity is lower in dark mode (0.12 vs 0.18 light) so
+            // the pill doesn't pop against dark `Form` backgrounds —
+            // light-mode panels are bright enough to absorb a stronger
+            // tint without overpowering, dark panels aren't.
             Capsule(style: .continuous)
-                .glassEffect(.regular.tint(tone.fillColor.opacity(0.20)))
+                .glassEffect(.regular.tint(tone.fillColor.opacity(tintOpacity)))
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label) status")
+    }
+
+    /// Tint opacity for the glass capsule. Dark mode uses a subtler
+    /// 0.12 wash; light mode keeps the existing 0.18.
+    private var tintOpacity: Double {
+        colorScheme == .dark ? 0.12 : 0.18
     }
 }
 
