@@ -39,7 +39,6 @@ public struct MainTabContainer: View {
             case .loneScan:
                 NavigationStack {
                     ReadyView()
-                        .expressScanToolbarMenu()
                 }
             case .loneChargers:
                 NavigationStack {
@@ -81,7 +80,6 @@ public struct MainTabContainer: View {
             Tab("Scan", systemImage: "nfc") {
                 NavigationStack {
                     ReadyView()
-                        .expressScanToolbarMenu()
                 }
             }
             Tab("Chargers", systemImage: "ev.charger") {
