@@ -88,9 +88,20 @@ public struct ChargersTabView: View {
                         NavigationLink(value: entry) {
                             ChargerListRow(entry: entry)
                         }
+                        // The row carries its own card chrome (bg
+                        // + border per status) so the List's
+                        // default row background must get out of
+                        // the way. Insets reduced to 6/horizontal
+                        // so cards align with the page padding.
+                        .listRowInsets(EdgeInsets(
+                            top: 4, leading: 16,
+                            bottom: 4, trailing: 16
+                        ))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     }
                 }
-                .listStyle(.insetGrouped)
+                .listStyle(.plain)
             }
         }
         .navigationDestination(for: ChargerListEntry.self) { entry in
