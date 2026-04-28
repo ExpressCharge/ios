@@ -77,15 +77,15 @@ public struct MainTabContainer: View {
     @ViewBuilder
     private var liquidGlassTabs: some View {
         TabView {
-            Tab("Scan", systemImage: "wave.3.right.circle.fill") {
-                NavigationStack {
-                    ReadyView()
-                }
-            }
             Tab("Chargers", systemImage: "bolt.fill") {
                 NavigationStack {
                     ChargersTabView()
                         .expressScanToolbarMenu()
+                }
+            }
+            Tab("Scan", systemImage: "wave.3.right.circle.fill") {
+                NavigationStack {
+                    ReadyView()
                 }
             }
         }
