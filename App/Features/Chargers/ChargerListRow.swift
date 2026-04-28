@@ -17,8 +17,8 @@ struct ChargerListRow: View {
 
     var body: some View {
         rowContent
-            .padding(.vertical, Spacing.lg)
-            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, Spacing.md)
+            .padding(.horizontal, Spacing.md)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(stateBackground)
@@ -30,12 +30,12 @@ struct ChargerListRow: View {
     }
 
     private var rowContent: some View {
-        HStack(alignment: .center, spacing: Spacing.md) {
+        HStack(alignment: .center, spacing: Spacing.lg) {
             ChargerFormFactorIcon(size: 56, haloColor: haloColor)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.label)
-                    .font(.body.weight(.semibold))
+                    .font(.title3.weight(.semibold))
                     .lineLimit(2)
                     .truncationMode(.tail)
 
