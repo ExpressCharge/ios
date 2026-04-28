@@ -109,11 +109,9 @@ struct ReservationsCard: View {
                 Text(labelLine(res))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if let tag = res.idTag {
-                    Text(tag)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.tertiary)
-                }
+                // Slice S — drop the raw idTag line. The customer label
+                // above is sufficient identification for operators; the
+                // legacy tag string is internal-only.
             }
             Spacer()
             if res.isCancelable {
