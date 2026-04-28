@@ -24,6 +24,7 @@ struct CustomerPickerSheet: View {
             list
                 .navigationTitle("Pick a customer")
                 .navigationBarTitleDisplayMode(.inline)
+                .expressBackground()
                 .searchable(
                     text: $query,
                     prompt: "Search customers"

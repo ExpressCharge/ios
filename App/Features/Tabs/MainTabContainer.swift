@@ -82,7 +82,7 @@ public struct MainTabContainer: View {
                     ReadyView()
                 }
             }
-            Tab("Chargers", systemImage: "ev.charger") {
+            Tab("Chargers", systemImage: "bolt.fill") {
                 NavigationStack {
                     ChargersTabView()
                         .expressScanToolbarMenu()
