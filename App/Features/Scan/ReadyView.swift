@@ -101,16 +101,11 @@ public struct ReadyView: View {
 
     private func readyChrome(scan: ScanCoordinator?) -> some View {
         VStack(spacing: Spacing.lg) {
-            // Brand row (top-left lockup; top-right is now the toolbar
-            // Settings button — see `.expressScanToolbarMenu()` applied
-            // in `MainTabContainer`).
-            HStack {
-                BrandLockup(.compact)
-                Spacer()
-            }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.top, Spacing.md)
-
+            // Brand + settings live in the navigation toolbar (see the
+            // `.toolbar` block below) so they sit on the same vertical
+            // band. Active scan / result screens render their own
+            // toolbar (CompactCountdown only) and intentionally drop
+            // the settings button.
             Spacer()
 
             // Hero: animated NFC glyph + label. The glyph participates
@@ -184,6 +179,12 @@ public struct ReadyView: View {
             )
             .padding(.horizontal, Spacing.lg)
             .padding(.bottom, Spacing.lg)
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                BrandLockup(.compact)
+            }
+            SettingsToolbarMenuButton()
         }
     }
 
