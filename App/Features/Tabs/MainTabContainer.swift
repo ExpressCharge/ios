@@ -43,9 +43,7 @@ public struct MainTabContainer: View {
                 }
             case .loneChargers:
                 NavigationStack {
-                    ChargersPlaceholderView()
-                        .navigationTitle("Chargers")
-                        .navigationBarTitleDisplayMode(.inline)
+                    ChargersTabView()
                         .expressScanToolbarMenu()
                 }
             case .tabs:
@@ -56,7 +54,7 @@ public struct MainTabContainer: View {
                 }
             case .kioskChargers:
                 KioskShell {
-                    ChargersPlaceholderView()
+                    ChargersTabView()
                 }
             }
         }
@@ -88,9 +86,7 @@ public struct MainTabContainer: View {
             }
             Tab("Chargers", systemImage: "ev.charger") {
                 NavigationStack {
-                    ChargersPlaceholderView()
-                        .navigationTitle("Chargers")
-                        .navigationBarTitleDisplayMode(.inline)
+                    ChargersTabView()
                         .expressScanToolbarMenu()
                 }
             }
@@ -99,13 +95,5 @@ public struct MainTabContainer: View {
     }
 }
 
-/// Placeholder Chargers screen — slice I builds the real list.
-struct ChargersPlaceholderView: View {
-    var body: some View {
-        ContentUnavailableView(
-            "Chargers — coming in slice I",
-            systemImage: "ev.charger",
-            description: Text("The chargers list, start/stop, and reservation cancellation land in a follow-up slice.")
-        )
-    }
-}
+// `ChargersPlaceholderView` was removed in Slice I — `ChargersTabView`
+// is now the real implementation.
