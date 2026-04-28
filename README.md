@@ -10,6 +10,26 @@ iPhone into an NFC card reader for ExpresSync. The repo is split in two:
   SwiftUI app target, code-signed and built via xcodegen on a developer
   machine with full Xcode.
 
+## Pre-commit verification (Wave 6+)
+
+Before every commit on `wave-6-capabilities-chargers` (and after):
+
+```bash
+bin/precommit.sh
+```
+
+Runs `swift test` on the SwiftPM libraries, the banned-imports guard
+(no `UIKit`/`SwiftUI`/`CoreNFC`/etc. in `Sources/`), `swiftformat
+--lint` if installed, and the host-app `ExpresScanTests` bundle on
+the iOS-26 simulator. Fast iteration:
+
+```bash
+PRECOMMIT_FAST=1 bin/precommit.sh   # skips host-app tests
+```
+
+The script expects Xcode-beta at `/Applications/Xcode-beta.app`. Override
+the simulator with `SIM_DEST="platform=iOS Simulator,name=…"`.
+
 ## Run the tests
 
 On a host with **full Xcode** installed:

@@ -7,6 +7,15 @@ Everything below either requires a developer Mac with full Xcode 16+, an
 Apple Developer portal session, or a physical iPhone — i.e. the work that
 couldn't be done on the orchestrator's machine.
 
+## Wave 6 — ExpressCharge (in development)
+
+Wave 6 expands the app to the customer-style ExpressCharge product:
+capability-driven Scan + Chargers tabs, charger remote-control, kiosk
+mode, remote-managed settings, ExpressCharge rebrand. Branch
+`wave-6-capabilities-chargers` carries the work; design summary is in
+[`docs/plan/85-wave6.md`](docs/plan/85-wave6.md). Local pre-commit
+verification: `bin/precommit.sh`.
+
 Steps are listed in priority order; **1–8** are the fastest path to a
 working build on a real iPhone. The rest can follow.
 
