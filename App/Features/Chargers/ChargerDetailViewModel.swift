@@ -2,10 +2,10 @@
 //  ChargerDetailViewModel.swift
 //  ExpresScan
 //
-//  Wave 6 / Slice J — owns the customer-style charger detail screen.
-//  Drives session + reservations bootstrap (parallel-fetch via
-//  `async let`), Start (Path A: auto-bound idTag from active
-//  reservation, no picker; Path B: tag picker), Stop, and per-row
+//  Wave 6 / Slice J + Slice S — owns the customer-style charger detail
+//  screen. Drives session + reservations bootstrap (parallel-fetch via
+//  `async let`), Start (Path A: auto-resolved customer from active
+//  reservation, no picker; Path B: customer picker), Stop, and per-row
 //  reservation cancel.
 //
 //  All public methods stay on the main actor — `@MainActor` is applied
@@ -41,7 +41,8 @@ public final class ChargerDetailViewModel {
 
     public private(set) var session: ChargerSession?
     public private(set) var reservations: [Reservation] = []
-    public private(set) var tags: [IdTagOption] = []
+    /// Slice S — customer list for Path B picker. Lazy-loaded.
+    public private(set) var customers: [CustomerOption] = []
     public private(set) var loadState: Loadable = .idle
     public private(set) var actionInFlight: Bool = false
     public var pickerVisible: Bool = false
@@ -123,48 +124,48 @@ public final class ChargerDetailViewModel {
     }
 
     /// Start charging. Two paths:
-    ///   - **A:** charger has an active reservation with a bound idTag
-    ///     → look the bound `idTag` up in the tag list to obtain its
-    ///       `tagPk` (the backend's start schema requires a positive
-    ///       int), then call start with no picker shown. If the
-    ///       reservation's idTag isn't in the picker list (privacy
-    ///       scoping etc.), fall through to Path B.
-    ///   - **B:** unreserved → open the tag picker; the picker's
-    ///     `onPick` calls `submitStart(tag:)` once the operator picks.
+    ///   - **A:** charger has an active reservation that carries a
+    ///     `lagoCustomerExternalId` → synthesize a minimal
+    ///     `CustomerOption` straight from the reservation and call
+    ///     `submitStart(customer:)` directly. No picker, no extra round
+    ///     trip — the server resolves `OCPP-{externalId}` server-side.
+    ///     If the reservation lacks an externalId (older server, or a
+    ///     blackout), fall through to Path B.
+    ///   - **B:** unreserved → open the customer picker; the picker's
+    ///     `onPick` calls `submitStart(customer:)` once the operator picks.
     public func startCharging() async {
         guard !actionInFlight else { return }
-        if let res = currentReservation, let boundTag = res.idTag {
-            // Path A: load tags and look up the bound tag's full
-            // `IdTagOption` (we need the real `tagPk` — the backend's
-            // start schema is `tagPk: positive int`, so synthesizing
-            // a 0 sentinel would fail-closed at validation time).
-            await ensureTagsLoaded()
-            if let match = tags.first(where: { $0.idTag == boundTag }) {
-                await submitStart(tag: match)
-                return
-            }
-            // Fall-through: bound idTag isn't in the visible tag list
-            // (the reservation's tag belongs to a customer the caller
-            // can't otherwise see). Show the picker so the operator
-            // can pick something else, or escalate via the web admin.
-            pickerVisible = true
-        } else {
-            // Path B: load tags lazily before showing the picker.
-            await ensureTagsLoaded()
-            pickerVisible = true
+        if let res = currentReservation, let extId = res.lagoCustomerExternalId {
+            // Path A: synthesize the minimum CustomerOption needed to
+            // submit. The server doesn't read any other field for the
+            // resolution; the rest are set sensibly so the optimistic
+            // session flip below renders cleanly.
+            let synthesized = CustomerOption(
+                lagoCustomerExternalId: extId,
+                userId: "",
+                displayName: res.customerLabel ?? extId,
+                name: res.customerLabel,
+                email: nil,
+                isOwn: false,
+                lastUsedAt: nil
+            )
+            await submitStart(customer: synthesized)
+            return
         }
+        // Path B: load customers lazily before showing the picker.
+        await ensureCustomersLoaded()
+        pickerVisible = true
     }
 
     /// Submit the actual remote-start. Called from Path A directly and
     /// from Path B when the picker resolves.
-    public func submitStart(tag: IdTagOption) async {
+    public func submitStart(customer: CustomerOption) async {
         guard !actionInFlight else { return }
         actionInFlight = true
         defer { actionInFlight = false }
 
         let body = StartBody(
-            idTag: tag.idTag,
-            tagPk: tag.tagPk,
+            lagoCustomerExternalId: customer.lagoCustomerExternalId,
             reservationId: currentReservation?.reservationId
         )
         let endpoint = Endpoint.with(
@@ -175,12 +176,14 @@ public final class ChargerDetailViewModel {
         do {
             try await api.send(endpoint)
             // Optimistic flip → preparing; real session lands on the
-            // next refresh.
+            // next refresh. We don't know the resolved idTag client-side
+            // (it's `OCPP-{externalId}`, but we leave that to the server
+            // confirmation) so we leave it nil here.
             session = ChargerSession(
                 chargerId: entry.chargerId,
                 state: .preparing,
-                idTag: tag.idTag,
-                customerName: tag.customerName
+                idTag: nil,
+                customerName: customer.displayName
             )
             // Refresh shortly after so kwh/kw/elapsed catch up.
             await loadSessionAndReservations()
@@ -259,21 +262,21 @@ public final class ChargerDetailViewModel {
 
     // MARK: - Private
 
-    /// Lazily fetch the tag list before showing the picker. Cached for
-    /// the lifetime of the VM — the operator typically picks once.
-    private func ensureTagsLoaded() async {
-        if !tags.isEmpty { return }
+    /// Lazily fetch the customer list before showing the picker. Cached
+    /// for the lifetime of the VM — the operator typically picks once.
+    private func ensureCustomersLoaded() async {
+        if !customers.isEmpty { return }
         let endpoint = Endpoint(
-            path: "/api/admin/devices/\(entry.chargerId)/tags",
+            path: "/api/admin/devices/\(entry.chargerId)/customers",
             method: .get
         )
         do {
-            let response: TagsResponse = try await api.request(endpoint)
-            tags = response.tags
+            let response: CustomersResponse = try await api.request(endpoint)
+            customers = response.customers
         } catch {
             // Soft failure — picker still opens with an empty list and
             // the view renders an empty-state message.
-            tags = []
+            customers = []
         }
     }
 
@@ -366,8 +369,7 @@ public final class ChargerDetailViewModel {
     // MARK: - Wire-body shapes
 
     private struct StartBody: Encodable, Sendable {
-        let idTag: String
-        let tagPk: Int
+        let lagoCustomerExternalId: String
         let reservationId: String?
     }
 
