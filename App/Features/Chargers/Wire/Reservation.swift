@@ -20,7 +20,14 @@ public struct Reservation: Codable, Sendable, Equatable, Identifiable {
     public let endsAt: Date
     /// `nil` ⇔ blackout (or unmapped tag). Render as "Blackout".
     public let customerLabel: String?
+    /// Slice S — Lago customer `external_id`. Path A start uses this to
+    /// resolve the customer (and thus the `OCPP-{externalId}` parent tag)
+    /// without a separate picker round-trip. `nil` for blackouts.
+    public let lagoCustomerExternalId: String?
     public let isBlackout: Bool
+    /// Legacy idTag (Slice J). Decoded as optional; kept during the
+    /// rolling-deploy window so older server builds still parse. iOS no
+    /// longer renders this — see `customerLabel`.
     public let idTag: String?
     public let isCancelable: Bool
 
@@ -31,17 +38,39 @@ public struct Reservation: Codable, Sendable, Equatable, Identifiable {
         startsAt: Date,
         endsAt: Date,
         customerLabel: String?,
+        lagoCustomerExternalId: String? = nil,
         isBlackout: Bool,
-        idTag: String?,
+        idTag: String? = nil,
         isCancelable: Bool
     ) {
         self.reservationId = reservationId
         self.startsAt = startsAt
         self.endsAt = endsAt
         self.customerLabel = customerLabel
+        self.lagoCustomerExternalId = lagoCustomerExternalId
         self.isBlackout = isBlackout
         self.idTag = idTag
         self.isCancelable = isCancelable
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case reservationId, startsAt, endsAt, customerLabel
+        case lagoCustomerExternalId, isBlackout, idTag, isCancelable
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.reservationId = try c.decode(String.self, forKey: .reservationId)
+        self.startsAt = try c.decode(Date.self, forKey: .startsAt)
+        self.endsAt = try c.decode(Date.self, forKey: .endsAt)
+        self.customerLabel = try c.decodeIfPresent(String.self, forKey: .customerLabel)
+        // Slice S — optional during rolling deploy.
+        self.lagoCustomerExternalId = try c.decodeIfPresent(
+            String.self, forKey: .lagoCustomerExternalId
+        )
+        self.isBlackout = try c.decode(Bool.self, forKey: .isBlackout)
+        self.idTag = try c.decodeIfPresent(String.self, forKey: .idTag)
+        self.isCancelable = try c.decode(Bool.self, forKey: .isCancelable)
     }
 
     /// `true` when `Date()` falls inside `[startsAt, endsAt)`. Drives the

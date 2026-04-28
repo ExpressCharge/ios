@@ -81,8 +81,8 @@ struct ChargerDetailView: View {
         .scrollEdgeEffectStyle(.soft, for: .top)
         .refreshable { await vm.refresh() }
         .sheet(isPresented: $bound.pickerVisible) {
-            TagPickerSheet(tags: vm.tags) { tag in
-                Task { await vm.submitStart(tag: tag) }
+            CustomerPickerSheet(customers: vm.customers) { customer in
+                Task { await vm.submitStart(customer: customer) }
             }
         }
         .confirmationDialog(
