@@ -33,6 +33,8 @@ struct ChargerListRow: View {
                         .lineLimit(1)
                 }
 
+                Spacer(minLength: 0)
+
                 HStack(spacing: 6) {
                     Image(systemName: entry.state.systemImage)
                         .font(.caption2)
@@ -43,6 +45,7 @@ struct ChargerListRow: View {
                         .lineLimit(1)
                 }
             }
+            .frame(minHeight: 56, alignment: .topLeading)
             .layoutPriority(1)
 
             Spacer(minLength: 0)
