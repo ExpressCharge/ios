@@ -17,10 +17,7 @@ struct ChargerListRow: View {
 
     var body: some View {
         rowContent
-            .padding(.top, Spacing.lg)
-            .padding(.bottom, Spacing.md)
-            .padding(.leading, Spacing.md)
-            .padding(.trailing, Spacing.sm)
+            .padding(Spacing.md)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(stateBackground)
@@ -48,23 +45,12 @@ struct ChargerListRow: View {
                         .lineLimit(1)
                 }
 
-                // Bottom row: state on the left, capability pills
-                // on the right. The state's icon + label encodes
-                // "what's happening right now"; the pills encode
-                // "what this charger can do" — pairing them on a
-                // single line keeps the card compact while letting
-                // the eye pick whichever it cares about.
-                HStack(alignment: .center, spacing: 6) {
-                    Image(systemName: entry.state.systemImage)
-                        .font(.caption2)
-                        .foregroundStyle(stateForeground)
-                    Text(entry.state.displayLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-
-                    Spacer(minLength: 8)
-
+                // Bottom row: capability pills, left-aligned. The
+                // charger's status is already encoded by the icon
+                // halo (and reinforced by the card's tinted bg +
+                // border), so a separate state line would be
+                // redundant noise.
+                HStack(spacing: 6) {
                     CapabilityPill(
                         label: "Mobile Start",
                         systemImage: "iphone",
