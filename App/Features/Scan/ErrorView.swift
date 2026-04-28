@@ -14,15 +14,21 @@ import SwiftUI
 public struct ErrorView: View {
 
     public let error: ScanError
+    public let iconNamespace: Namespace.ID?
     public let onRetry: () -> Void
     public let onBack: () -> Void
 
+    /// Seconds before auto-return to ready.
+    private static let autoDismissSeconds: UInt64 = 10
+
     public init(
         error: ScanError,
+        iconNamespace: Namespace.ID? = nil,
         onRetry: @escaping () -> Void = {},
         onBack: @escaping () -> Void = {}
     ) {
         self.error = error
+        self.iconNamespace = iconNamespace
         self.onRetry = onRetry
         self.onBack = onBack
     }
@@ -36,12 +42,13 @@ public struct ErrorView: View {
             VStack(spacing: Spacing.lg) {
                 Spacer()
 
-                Image(systemName: info.icon)
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(info.tint)
-                    .frame(width: 96, height: 96)
-                    .accessibilityHidden(true)
+                // Uses the shared matched-geometry icon (red x) so the
+                // morph from the scan-active center is continuous.
+                ScanIconView(
+                    mode: .result(.failure),
+                    size: 96,
+                    namespace: iconNamespace
+                )
 
                 VStack(spacing: Spacing.sm) {
                     Text(info.title)
@@ -68,6 +75,17 @@ public struct ErrorView: View {
                 .padding(.horizontal, Spacing.lg)
                 .padding(.bottom, Spacing.xl)
             }
+        }
+        .task {
+            // Auto-dismiss back to ready after 10s. Mirrors the
+            // SuccessView behaviour. The user can still tap the Back
+            // button to dismiss earlier; the manual Retry button (when
+            // shown) re-arms a scan via the coordinator.
+            try? await Task.sleep(
+                nanoseconds: Self.autoDismissSeconds * 1_000_000_000
+            )
+            guard !Task.isCancelled else { return }
+            onBack()
         }
     }
 

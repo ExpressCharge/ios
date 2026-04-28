@@ -33,6 +33,9 @@ public struct ScanActiveView: View {
     public let request: ScanRequest
     /// 0…1 ring progress; 1 at issuance, 0 at expiry.
     public let progress: Double
+    /// Namespace from `ReadyView` for the matched-geometry icon morph.
+    /// Optional so the type-checker is happy when previewed in isolation.
+    public let iconNamespace: Namespace.ID?
 
     /// Invoked when the user taps the fallback Cancel button. The
     /// system NFC sheet's own Cancel is wired separately via
@@ -40,14 +43,21 @@ public struct ScanActiveView: View {
     public let onCancel: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Wind-up flag: starts `false`, animates 0→1 over 600ms, then
+    /// flips `true` so the ring reverts to live countdown progress.
+    @State private var armingComplete: Bool = false
+    /// Drives the wind-up sweep value (0 → 1.0).
+    @State private var windUpProgress: Double = 0.0
 
     public init(
         request: ScanRequest,
         progress: Double,
+        iconNamespace: Namespace.ID? = nil,
         onCancel: @escaping () -> Void = {}
     ) {
         self.request = request
         self.progress = progress
+        self.iconNamespace = iconNamespace
         self.onCancel = onCancel
     }
 
@@ -88,15 +98,25 @@ public struct ScanActiveView: View {
                 .frame(height: 110)
 
                 ZStack {
-                    CountdownRing(progress: progress, lineWidth: 8, tone: .positive)
+                    // While `armingComplete == false` the ring tracks
+                    // the wind-up sweep (0 → 1.0); after that, it
+                    // tracks the live `progress` countdown. The
+                    // wind-up sweep reads as "arming the scan."
+                    CountdownRing(
+                        progress: armingComplete ? progress : windUpProgress,
+                        lineWidth: 8,
+                        tone: .positive
+                    )
                         .frame(width: 160, height: 160)
-                    AnimatedNFCGlyph(size: 96, tone: .positive)
+                    ScanIconView(
+                        mode: .armed,
+                        size: 96,
+                        namespace: iconNamespace
+                    )
                 }
                 .accessibilityLabel("Scan a card now")
 
                 VStack(spacing: Spacing.sm) {
-                    Text("Scan a card now")
-                        .font(.title.weight(.bold))
                     Text(subheading(for: request))
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -118,6 +138,23 @@ public struct ScanActiveView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .padding(.bottom, Spacing.xl)
+            }
+        }
+        .onAppear {
+            // Reduce-motion: skip the sweep, jump straight to live
+            // countdown.
+            if reduceMotion {
+                windUpProgress = 1.0
+                armingComplete = true
+                return
+            }
+            // 600ms 0→1.0 wind-up, then flip to live countdown.
+            withAnimation(.easeInOut(duration: 0.6)) {
+                windUpProgress = 1.0
+            }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                armingComplete = true
             }
         }
     }

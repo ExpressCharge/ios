@@ -24,6 +24,11 @@ public struct ReadyView: View {
     @Environment(RootCoordinator.self) private var coordinator
     @State private var isShowingHow: Bool = false
     @State private var isShowingDiagnostics: Bool = false
+    /// Shared namespace for the matched-geometry icon morph between the
+    /// hero (Ready), the active scan center, and the result screens.
+    /// Lives here because all four screens render as cases of `content`
+    /// inside this view's body — they're structural siblings.
+    @Namespace private var iconNamespace
 
     public init() {}
 
@@ -65,18 +70,20 @@ public struct ReadyView: View {
                             armedAt: scan.armedAt,
                             now: context.date
                         ),
+                        iconNamespace: iconNamespace,
                         onCancel: { scan.cancelActiveScan() }
                     )
                 }
             case .success(let result):
                 SuccessView(
                     result: result,
-                    onScanAnother: { scan.dismissResult() },
-                    onBackToReady: { scan.dismissResult() }
+                    iconNamespace: iconNamespace,
+                    onAutoDismiss: { scan.dismissResult() }
                 )
             case .error(let error):
                 ErrorView(
                     error: error,
+                    iconNamespace: iconNamespace,
                     onRetry: { scan.dismissResult() },
                     onBack: { scan.dismissResult() }
                 )
@@ -102,16 +109,26 @@ public struct ReadyView: View {
 
             Spacer()
 
-            // Hero: animated NFC glyph + label.
+            // Hero: animated NFC glyph + label. The glyph participates
+            // in a `matchedGeometryEffect` so it morphs position into
+            // the ScanActive / Success / Error screens when the
+            // coordinator transitions out of `.idle / .connecting /
+            // .readyToScan / .offline`.
             VStack(spacing: Spacing.lg) {
-                AnimatedNFCGlyph(size: 96, tone: heroTone(scan: scan))
+                ScanIconView(
+                    mode: .idle(tone: heroTone(scan: scan)),
+                    size: 96,
+                    namespace: iconNamespace
+                )
                 Text(heroTitle(scan: scan))
                     .font(.largeTitle.weight(.bold))
-                Text(heroBody(scan: scan))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Spacing.lg)
+                if let body = heroBody(scan: scan) {
+                    Text(body)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Spacing.lg)
+                }
                 // Inline connection chip — visible only when state ≠
                 // online (per UX research P1-1). Tappable to surface
                 // diagnostics. Hidden when online for clean chrome.
@@ -184,14 +201,18 @@ public struct ReadyView: View {
         }
     }
 
-    private func heroBody(scan: ScanCoordinator?) -> String {
+    /// Returns the state-specific subtitle, or `nil` for the default
+    /// idle/ready states where we now omit the static "wait for a
+    /// scan" copy entirely. Connecting and offline keep their
+    /// state-meaningful copy.
+    private func heroBody(scan: ScanCoordinator?) -> String? {
         switch scan?.state {
         case .connecting?:
             return "Linking to ExpressCharge…"
         case .offline?:
             return "We'll reconnect as soon as you're back online."
         default:
-            return "Wait for a charging station or admin to start a scan."
+            return nil
         }
     }
 
