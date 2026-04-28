@@ -120,12 +120,15 @@ targets:
           - TAG
         com.apple.developer.associated-domains:
           - applinks:manage.example.com
-        # TODO(provisioning): user-assigned-device-name entitlement requested
-        # via https://developer.apple.com/contact/request/personalized-name/.
-        # Without Apple's grant, `UIDevice.current.name` returns the generic
-        # "iPhone" / "iPad" on iOS 16+; the registration view falls back to
-        # "<localizedModel> (<deviceId-last-4>)" in that case.
-        com.apple.developer.device-information.user-assigned-device-name: true
+        # TODO(provisioning): `com.apple.developer.device-information.user-assigned-device-name`
+        # requires Apple's manual approval (request via
+        # https://developer.apple.com/contact/request/personalized-name/).
+        # Until granted, leave the entitlement OFF — the dev-team
+        # provisioning profile won't carry it and the for-device build
+        # will fail. `RegistrationViewModel.resolveDefaultLabel` falls
+        # back to "<localizedModel> (<deviceId-last-4>)" so registration
+        # still works without it. Re-enable the entitlement on this line
+        # once Apple approves the request.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: gg.vlad.expresscan
