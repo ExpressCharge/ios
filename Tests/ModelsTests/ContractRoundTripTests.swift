@@ -148,7 +148,7 @@ struct ContractRoundTripTests {
           "deviceId": "11111111-2222-3333-4444-555555555555",
           "deviceToken": "dev_abc123def456",
           "deviceSecret": "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI",
-          "capabilities": ["tap"],
+          "capabilities": ["scanner"],
           "expiresAtIso": "2027-04-25T12:34:56.000Z"
         }
         """
@@ -157,7 +157,7 @@ struct ContractRoundTripTests {
             from: Data(json.utf8)
         )
         #expect(decoded.deviceToken.hasPrefix("dev_"))
-        #expect(decoded.capabilities == [.tap])
+        #expect(decoded.capabilities == [.scanner])
 
         let reEncoded = try encoder.encode(decoded)
         let reDecoded = try decoder.decode(
@@ -180,7 +180,7 @@ struct ContractRoundTripTests {
             appVersion: "1.0.0",
             pushToken: "Zm9v",
             apnsEnvironment: .sandbox,
-            requestedCapabilities: [.tap]
+            requestedCapabilities: [.scanner]
         )
         let data = try encoder.encode(request)
         let decoded = try decoder.decode(
