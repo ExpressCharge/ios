@@ -48,13 +48,23 @@ struct ChargerListRow: View {
 
                 Spacer(minLength: 0)
 
-                // Capability pills sit above the state line so the
-                // bottom of the row reads top-down: "what this card
-                // can do" → "what this card is doing right now".
-                // Mobile Start is shown on every charger (all OCPP
-                // chargers support RemoteStartTransaction); NFC is
-                // shown when the row carries the `scanner` capability.
-                HStack(spacing: 6) {
+                // Bottom row: state on the left, capability pills
+                // on the right. The state's icon + label encodes
+                // "what's happening right now"; the pills encode
+                // "what this charger can do" — pairing them on a
+                // single line keeps the card compact while letting
+                // the eye pick whichever it cares about.
+                HStack(alignment: .center, spacing: 6) {
+                    Image(systemName: entry.state.systemImage)
+                        .font(.caption2)
+                        .foregroundStyle(stateForeground)
+                    Text(entry.state.displayLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
                     CapabilityPill(
                         label: "Mobile Start",
                         systemImage: "iphone",
@@ -68,22 +78,6 @@ struct ChargerListRow: View {
                         )
                     }
                 }
-
-                HStack(spacing: 6) {
-                    Image(systemName: entry.state.systemImage)
-                        .font(.caption2)
-                        .foregroundStyle(stateForeground)
-                    Text(entry.state.displayLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                // Inset to align the state-icon with the pill text
-                // (pills carry 8pt internal padding; matching that
-                // here keeps the bottom of the card on a single
-                // visual baseline) and add a small top breathing
-                // room so the line lifts off the pills.
-                .padding(.leading, 4)
                 .padding(.top, 4)
             }
             .frame(minHeight: 72, alignment: .topLeading)
