@@ -17,7 +17,8 @@ struct ChargerListRow: View {
 
     var body: some View {
         rowContent
-            .padding(Spacing.md)
+            .padding(.vertical, Spacing.lg)
+            .padding(.horizontal, Spacing.md)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(stateBackground)
@@ -34,7 +35,7 @@ struct ChargerListRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.label)
-                    .font(.title3.weight(.semibold))
+                    .font(.headline)
                     .lineLimit(2)
                     .truncationMode(.tail)
 
