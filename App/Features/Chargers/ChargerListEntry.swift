@@ -21,6 +21,11 @@ public struct ChargerListEntry: Codable, Identifiable, Hashable, Sendable {
     public let maxKw: Double?
     public let state: ChargerState
     public let lastSeenAt: Date?
+    /// Per-row capability set from `chargers_cache.capabilities`. Always
+    /// contains `"charger"` (auto-managed by the StEvE sync); may also
+    /// carry `"scanner"` when the charger has a built-in NFC reader.
+    /// Optional on the wire so older server builds keep round-tripping.
+    public let capabilities: [String]?
 
     /// Identifiable conformance — the `chargeBoxId` is unique per
     /// charger and stable across rebuilds.
