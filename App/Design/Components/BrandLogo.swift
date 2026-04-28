@@ -59,7 +59,7 @@ public struct BrandLogo: View {
         }
         .frame(width: size.dimension * 1.30, height: size.dimension * 1.30)
         .accessibilityElement()
-        .accessibilityLabel("ExpresScan")
+        .accessibilityLabel("ExpressCharge")
     }
 
     // MARK: - Layers

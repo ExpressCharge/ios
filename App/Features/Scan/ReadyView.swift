@@ -180,7 +180,7 @@ public struct ReadyView: View {
     private func heroBody(scan: ScanCoordinator?) -> String {
         switch scan?.state {
         case .connecting?:
-            return "Linking to ExpresSync…"
+            return "Linking to ExpressCharge…"
         case .offline?:
             return "We'll reconnect as soon as you're back online."
         default:
@@ -211,7 +211,7 @@ public struct ReadyView: View {
 
     private var howThisWorksContent: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            Bullet(symbol: "1.circle.fill", text: "Stay signed in. The app keeps a secure, low-power link to ExpresSync.")
+            Bullet(symbol: "1.circle.fill", text: "Stay signed in. The app keeps a secure, low-power link to ExpressCharge.")
             Bullet(symbol: "2.circle.fill", text: "When a charging station or admin starts a scan, your iPhone vibrates.")
             Bullet(symbol: "3.circle.fill", text: "Hold the card to the top of your iPhone. The result appears on screen.")
         }

@@ -102,7 +102,7 @@ public struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This iPhone will stop receiving scan requests. You'll need to sign in again to use ExpresScan.")
+            Text("This iPhone will stop receiving scan requests. You'll need to sign in again to use ExpressCharge.")
         }
     }
 

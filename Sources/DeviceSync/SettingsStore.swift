@@ -53,7 +53,7 @@ public actor SettingsStore {
     /// Designated initialiser.
     ///
     /// - Parameter directoryURL: Defaults to
-    ///   `~/Library/Application Support/ExpresScan/`. Tests pass a
+    ///   `~/Library/Application Support/ExpressCharge/`. Tests pass a
     ///   per-test temp directory.
     public init(directoryURL: URL? = nil) throws {
         let dir: URL
@@ -62,7 +62,7 @@ public actor SettingsStore {
         } else {
             // iOS 16+ / macOS 13+ — `URL.applicationSupportDirectory`.
             let base = URL.applicationSupportDirectory
-            dir = base.appendingPathComponent("ExpresScan", isDirectory: true)
+            dir = base.appendingPathComponent("ExpressCharge", isDirectory: true)
         }
         try FileManager.default.createDirectory(
             at: dir,

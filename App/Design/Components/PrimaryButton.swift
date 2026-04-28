@@ -93,7 +93,7 @@ public struct PrimaryButton: View {
 #if DEBUG
 #Preview {
     VStack(spacing: 16) {
-        PrimaryButton("Sign in to ExpresSync", action: {})
+        PrimaryButton("Sign in to ExpressCharge", action: {})
         PrimaryButton("Tap to scan", systemImage: "wave.3.right", variant: .success, action: {})
         PrimaryButton("Sign out", variant: .destructive, action: {})
         PrimaryButton("Loading", state: .loading, action: {})
