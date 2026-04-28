@@ -4,7 +4,17 @@
 //
 //  Generic error surface — one screen with five branded variants
 //  selected by the `ScanError` case. Each variant carries a distinct
-//  icon (NOT just colour) and a unique recovery copy.
+//  recovery copy. The leading icon is the shared red `xmark` from
+//  `ScanIconView` so the matched-geometry morph from the scan-active
+//  center is continuous.
+//
+//  Slice N (a640f12) added the matched-geometry icon + the 10s
+//  auto-dismiss back to ready.
+//
+//  Slice N+1 adds the chrome:
+//    - top-left: native iOS back button (early-dismiss path);
+//    - top-right: a small `CompactCountdown` ring, white-tinted, that
+//      depletes with the auto-dismiss.
 //
 //  Spec: `50-ios.md` § "UX details" → "Error states".
 //
@@ -19,7 +29,10 @@ public struct ErrorView: View {
     public let onBack: () -> Void
 
     /// Seconds before auto-return to ready.
-    private static let autoDismissSeconds: UInt64 = 10
+    private static let autoDismissSeconds: TimeInterval = 10
+
+    @State private var deadline: Date?
+    @State private var didDismiss: Bool = false
 
     public init(
         error: ScanError,
@@ -63,30 +76,49 @@ public struct ErrorView: View {
 
                 Spacer()
 
-                VStack(spacing: Spacing.sm) {
-                    if info.showsRetry {
-                        PrimaryButton(info.retryLabel, action: onRetry)
-                    }
-
-                    Button("Back", action: onBack)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                if info.showsRetry {
+                    PrimaryButton(info.retryLabel, action: onRetry)
+                        .padding(.horizontal, Spacing.lg)
+                        .padding(.bottom, Spacing.xl)
                 }
-                .padding(.horizontal, Spacing.lg)
-                .padding(.bottom, Spacing.xl)
             }
         }
-        .task {
-            // Auto-dismiss back to ready after 10s. Mirrors the
-            // SuccessView behaviour. The user can still tap the Back
-            // button to dismiss earlier; the manual Retry button (when
-            // shown) re-arms a scan via the coordinator.
-            try? await Task.sleep(
-                nanoseconds: Self.autoDismissSeconds * 1_000_000_000
-            )
-            guard !Task.isCancelled else { return }
-            onBack()
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismissNow()
+                } label: {
+                    Label("Back", systemImage: "chevron.backward")
+                }
+            }
+            if let deadline {
+                ToolbarItem(placement: .topBarTrailing) {
+                    TimelineView(.animation(minimumInterval: 1.0)) { context in
+                        let remaining = max(0, deadline.timeIntervalSince(context.date))
+                        CompactCountdown(
+                            progress: remaining / Self.autoDismissSeconds,
+                            seconds: Int(remaining.rounded(.up)),
+                            tone: .resultDismiss
+                        )
+                        .onChange(of: remaining <= 0) { _, expired in
+                            if expired { dismissNow() }
+                        }
+                    }
+                }
+            }
         }
+        .navigationBarBackButtonHidden(true)
+        .onAppear {
+            if deadline == nil {
+                deadline = Date().addingTimeInterval(Self.autoDismissSeconds)
+            }
+        }
+    }
+
+    private func dismissNow() {
+        guard !didDismiss else { return }
+        didDismiss = true
+        onBack()
     }
 
     private struct Display {
@@ -122,7 +154,7 @@ public struct ErrorView: View {
             return Display(
                 icon: "icloud.slash.fill",
                 tint: ColorPalette.destructiveRose,
-                title: "Couldn't reach ExpresSync",
+                title: "Couldn't reach ExpressCharge",
                 body: "Check your network connection. We'll retry as soon as you're back online.",
                 retryLabel: "Retry",
                 showsRetry: true

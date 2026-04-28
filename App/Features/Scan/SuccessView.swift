@@ -4,12 +4,18 @@
 //
 //  Final "we read the card" screen. Big spring-animated checkmark on
 //  top, customer card below: name, status badge, plan label, renewal
-//  date. Manual dismiss only — NO auto-return per the wireframes.
+//  date.
 //
-//  Skeleton ships layout. E-app-wire passes a real
-//  `EnrichedScanResult` from the coordinator.
+//  Slice N (a640f12) added the matched-geometry icon morph + the 10s
+//  auto-dismiss back to ready.
 //
-//  Spec: `50-ios.md` § "UX details" → "Success".
+//  Slice N+1 adds the chrome:
+//    - top-left: native iOS back button (early-dismiss path that
+//      cancels the auto-dismiss timer);
+//    - top-right: a small `CompactCountdown` ring + remaining-seconds
+//      label, tinted white, that depletes with the auto-dismiss;
+//    - bottom: a footer row with the card ID (left, monospaced) and
+//      the card type (right, friendly-formatted).
 //
 
 import SwiftUI
@@ -20,21 +26,30 @@ public struct SuccessView: View {
 
     public let result: EnrichedScanResult
     public let iconNamespace: Namespace.ID?
-    /// Fired ~10s after the view appears, returning to ready. Replaces
-    /// the manual "Scan another" button per Slice N.
-    public let onAutoDismiss: () -> Void
+    /// Fired ~10s after the view appears (or on back-button tap),
+    /// returning to ready. Replaces the manual "Scan another" button
+    /// per Slice N.
+    public let onDismiss: () -> Void
 
     /// Seconds the result stays on screen before auto-returning.
-    private static let autoDismissSeconds: UInt64 = 10
+    private static let autoDismissSeconds: TimeInterval = 10
+
+    /// Wall-clock deadline at which the view auto-dismisses. Locked to
+    /// `.now + autoDismissSeconds` on first appear so a `TimelineView`
+    /// can drive the visible countdown.
+    @State private var deadline: Date?
+    /// Set true once the view has fired `onDismiss`, to suppress
+    /// duplicate calls when the timer and the back button race.
+    @State private var didDismiss: Bool = false
 
     public init(
         result: EnrichedScanResult,
         iconNamespace: Namespace.ID? = nil,
-        onAutoDismiss: @escaping () -> Void = {}
+        onDismiss: @escaping () -> Void = {}
     ) {
         self.result = result
         self.iconNamespace = iconNamespace
-        self.onAutoDismiss = onAutoDismiss
+        self.onDismiss = onDismiss
     }
 
     public var body: some View {
@@ -54,18 +69,51 @@ public struct SuccessView: View {
                     .padding(.horizontal, Spacing.lg)
 
                 Spacer()
+
+                cardFooter
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.bottom, Spacing.md)
             }
         }
-        .task {
-            // Auto-dismiss timer. Cancelling the task (view dismount,
-            // user navigates elsewhere, coordinator state change)
-            // aborts the sleep before `onAutoDismiss` fires.
-            try? await Task.sleep(
-                nanoseconds: Self.autoDismissSeconds * 1_000_000_000
-            )
-            guard !Task.isCancelled else { return }
-            onAutoDismiss()
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismissNow()
+                } label: {
+                    Label("Back", systemImage: "chevron.backward")
+                }
+            }
+            if let deadline {
+                ToolbarItem(placement: .topBarTrailing) {
+                    TimelineView(.animation(minimumInterval: 1.0)) { context in
+                        let remaining = max(0, deadline.timeIntervalSince(context.date))
+                        CompactCountdown(
+                            progress: remaining / Self.autoDismissSeconds,
+                            seconds: Int(remaining.rounded(.up)),
+                            tone: .resultDismiss
+                        )
+                        .onChange(of: remaining <= 0) { _, expired in
+                            if expired { dismissNow() }
+                        }
+                    }
+                }
+            }
         }
+        .navigationBarBackButtonHidden(true)
+        .onAppear {
+            if deadline == nil {
+                deadline = Date().addingTimeInterval(Self.autoDismissSeconds)
+            }
+        }
+    }
+
+    /// Single dismiss path. Idempotent — both the auto-dismiss
+    /// `TimelineView` callback and the back-button tap go through
+    /// here, but `onDismiss` only fires once.
+    private func dismissNow() {
+        guard !didDismiss else { return }
+        didDismiss = true
+        onDismiss()
     }
 
     /// Maps the enriched result onto the four-way result icon palette.
@@ -133,6 +181,22 @@ public struct SuccessView: View {
         )
     }
 
+    /// Bottom-of-view row: card ID (left, monospaced) and card type
+    /// (right, friendly-formatted). Slice N+1.
+    private var cardFooter: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(result.idTag)
+                .font(.callout.monospaced())
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Card ID \(result.idTag)")
+            Spacer()
+            Text(formattedCardType(result.tag?.tagType))
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Card type \(formattedCardType(result.tag?.tagType))")
+        }
+    }
+
     private func infoColumn(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
@@ -155,5 +219,21 @@ public struct SuccessView: View {
         display.dateStyle = .medium
         display.timeStyle = .none
         return display.string(from: date)
+    }
+
+    /// Maps the wire `tagType` enum strings into the human label shown
+    /// in the footer row. Unknown types fall through unchanged so we
+    /// never silently drop an unfamiliar value on the floor.
+    private func formattedCardType(_ wire: String?) -> String {
+        switch wire {
+        case "ev_card":   return "EV card"
+        case "phone_nfc": return "Phone NFC"
+        case "guest_qr":  return "Guest QR"
+        case .none:       return "Unknown"
+        case .some(let other):
+            return other
+                .replacingOccurrences(of: "_", with: " ")
+                .capitalized
+        }
     }
 }
