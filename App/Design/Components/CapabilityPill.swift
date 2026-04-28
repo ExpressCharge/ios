@@ -42,7 +42,9 @@ public struct CapabilityPill: View {
                 .font(.system(size: 10, weight: .semibold))
             Text(label)
                 .font(.caption2.weight(.semibold))
+                .lineLimit(1)
         }
+        .fixedSize(horizontal: true, vertical: false)
         .foregroundStyle(tone.text)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
