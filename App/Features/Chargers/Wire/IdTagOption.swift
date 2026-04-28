@@ -2,6 +2,10 @@
 //  IdTagOption.swift
 //  ExpresScan
 //
+//  // DEPRECATED Slice S — superseded by `CustomerOption`. The iOS app no
+//  // longer calls `/tags`. Kept compiling for one rolling-deploy window
+//  // so any straggler references (tests, fixtures) still resolve.
+//
 //  Wave 6 / Slice J — wire-shape mirror for the
 //  `GET /api/admin/devices/{chargerId}/tags` response. Backend source:
 //  `expressync/routes/api/admin/devices/[deviceId]/tags.ts`.

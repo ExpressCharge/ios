@@ -2,14 +2,21 @@
 //  ChargerDetailViewModelTests.swift
 //  ExpresScanTests
 //
-//  Wave 6 / Slice J — VM coverage for the customer-style charger detail
-//  screen. Drives the VM via `StubURLProtocol` (same shape as
+//  Wave 6 / Slice J + Slice S — VM coverage for the customer-style
+//  charger detail screen. Slice S replaces the tag picker with a
+//  customer picker; the start endpoint now carries
+//  `lagoCustomerExternalId` (not `idTag`/`tagPk`).
+//
+//  Drives the VM via `StubURLProtocol` (same shape as
 //  ChargerListViewModelTests / ScanResultQueueTests). Covers:
 //   - bootstrap() populates session + reservations
-//   - startCharging() Path A (active reservation → no picker, auto idTag)
+//   - startCharging() Path A (active reservation w/ externalId → no
+//     picker, customer auto-resolved from reservation)
+//   - startCharging() Path A fall-through when reservation lacks an
+//     externalId → picker opens
 //   - startCharging() Path B (no reservation → pickerVisible = true)
-//   - submitStart(tag:) 200 → optimistic state flip
-//   - submitStart(tag:) 409 → "Charger offline" error
+//   - submitStart(customer:) 200 → optimistic state flip
+//   - submitStart(customer:) 409 → "Charger offline" error
 //   - stopCharging(confirmed: true) 200 → optimistic state flip
 //   - cancelReservation removes the row optimistically
 //   - currentReservation derivation (active window covers Date())
@@ -81,11 +88,15 @@ final class ChargerDetailViewModelTests: XCTestCase {
         }
     }
 
-    /// Bootstrap with an active reservation covering "now" with a bound
-    /// idTag — used for Path A start-charging tests.
-    private func installReservedBootstrap(now: Date) {
+    /// Bootstrap with an active reservation covering "now" — Slice S
+    /// reservations carry `lagoCustomerExternalId` for Path A.
+    private func installReservedBootstrap(
+        now: Date,
+        externalId: String? = "lago-alice"
+    ) {
         let startsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(-600))
         let endsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(600))
+        let extIdFragment = externalId.map { "\"\($0)\"" } ?? "null"
         StubURLProtocol.handler = { req in
             let path = req.url?.path ?? ""
             if path.hasSuffix("/session") {
@@ -98,8 +109,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
                 let body = """
                 {"reservations": [
                   {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
-                   "customerLabel":"Alice","isBlackout":false,
-                   "idTag":"ALICE-CARD-1","isCancelable":true}
+                   "customerLabel":"Alice","lagoCustomerExternalId":\(extIdFragment),
+                   "isBlackout":false,"idTag":"ALICE-CARD-1","isCancelable":true}
                 ]}
                 """
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
@@ -130,6 +141,7 @@ final class ChargerDetailViewModelTests: XCTestCase {
                 {"reservations":[
                   {"reservationId":"7","startsAt":"2026-04-28T09:00:00Z",
                    "endsAt":"2026-04-28T10:00:00Z","customerLabel":"Bob",
+                   "lagoCustomerExternalId":"lago-bob",
                    "isBlackout":false,"idTag":"BOB-CARD","isCancelable":true}
                 ]}
                 """#
@@ -146,6 +158,7 @@ final class ChargerDetailViewModelTests: XCTestCase {
         XCTAssertEqual(vm.session?.kwh, 3.5)
         XCTAssertEqual(vm.reservations.count, 1)
         XCTAssertEqual(vm.reservations.first?.customerLabel, "Bob")
+        XCTAssertEqual(vm.reservations.first?.lagoCustomerExternalId, "lago-bob")
     }
 
     // MARK: - currentReservation derivation
@@ -168,9 +181,9 @@ final class ChargerDetailViewModelTests: XCTestCase {
         XCTAssertNil(vm.currentReservation)
     }
 
-    // MARK: - startCharging — Path A (reserved)
+    // MARK: - startCharging — Path A (reserved customer)
 
-    func test_startChargingPathAUsesBoundTagAndSkipsPicker() async {
+    func test_startChargingPathAUsesReservationCustomerAndSkipsPicker() async {
         StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
         let now = Date(timeIntervalSince1970: 1_745_750_000)
 
@@ -182,30 +195,17 @@ final class ChargerDetailViewModelTests: XCTestCase {
                 return (200, ["Content-Type": "application/json"],
                         Data(#"{"operationLogId":1,"taskId":"t","status":"submitted"}"#.utf8))
             }
-            // Path A looks up the reservation's bound idTag in the
-            // tag list to obtain the canonical `tagPk` (the start
-            // schema rejects 0). Stub the tags response so the lookup
-            // succeeds.
-            if path.hasSuffix("/tags") {
-                let body = #"""
-                {"tags":[
-                  {"idTag":"ALICE-CARD-1","tagPk":777,"customerName":"Alice",
-                   "customerId":"cust_alice","isOwn":false,"lastUsedAt":null}
-                ]}
-                """#
-                return (200, ["Content-Type": "application/json"], Data(body.utf8))
-            }
-            // Bootstrap stays "reserved" before/after start.
+            // Slice S: Path A no longer hits /tags or /customers — the
+            // reservation already carries `lagoCustomerExternalId`. If the
+            // VM mistakenly calls /customers, fall back to a 404 so the
+            // test fails noisily.
             let startsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(-600))
             let endsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(600))
             if path.hasSuffix("/session") {
-                // After start the post-success refresh expects the
-                // server to have transitioned to a preparing session;
-                // the test asserts the wire-confirmed state survives.
                 let body = #"""
                 {"session": {
                    "chargerId":"BAY-1","sessionId":null,"state":"preparing",
-                   "startedAt":null,"idTag":"ALICE-CARD-1",
+                   "startedAt":null,"idTag":null,
                    "customerName":"Alice","kwh":null,"kw":null,
                    "elapsedSec":null,"connectorId":null
                  },"state":"preparing","chargerId":"BAY-1"}
@@ -216,8 +216,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
                 let body = """
                 {"reservations":[
                   {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
-                   "customerLabel":"Alice","isBlackout":false,
-                   "idTag":"ALICE-CARD-1","isCancelable":true}
+                   "customerLabel":"Alice","lagoCustomerExternalId":"lago-alice",
+                   "isBlackout":false,"idTag":"ALICE-CARD-1","isCancelable":true}
                 ]}
                 """
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
@@ -230,22 +230,22 @@ final class ChargerDetailViewModelTests: XCTestCase {
         await vm.startCharging()
 
         XCTAssertFalse(vm.pickerVisible, "Path A must not show the picker")
-        // Inspect the captured POST body — should carry idTag from the
-        // reservation AND the canonical tagPk looked up from the tag
-        // list (777, not the rejected sentinel 0).
+        // POST body must carry the reservation's externalId — and only
+        // that + the reservation id. No legacy idTag/tagPk.
         let body = observed.lastBody.flatMap {
             try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
         }
-        XCTAssertEqual(body?["idTag"] as? String, "ALICE-CARD-1")
-        XCTAssertEqual(body?["tagPk"] as? Int, 777)
+        XCTAssertEqual(body?["lagoCustomerExternalId"] as? String, "lago-alice")
         XCTAssertEqual(body?["reservationId"] as? String, "42")
+        XCTAssertNil(body?["idTag"], "Slice S body must not carry legacy idTag")
+        XCTAssertNil(body?["tagPk"], "Slice S body must not carry legacy tagPk")
         XCTAssertEqual(vm.session?.state, .preparing)
     }
 
-    func test_startChargingPathAFallsBackToPickerWhenBoundTagNotInList() async {
-        // Reservation references a tag that's not in the visible tag
-        // list (e.g., privacy scoping for customers we can't otherwise
-        // see). The VM should open the picker rather than fail-closed.
+    func test_startChargingPathAFallsBackToPickerWhenReservationLacksExternalId() async {
+        // Reservation has no `lagoCustomerExternalId` (older server, or
+        // an unmapped tag). The VM should open the customer picker
+        // rather than fail-closed.
         StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
         let now = Date(timeIntervalSince1970: 1_745_750_000)
 
@@ -256,10 +256,11 @@ final class ChargerDetailViewModelTests: XCTestCase {
                 observed.record(req)
                 return (200, [:], Data())
             }
-            if path.hasSuffix("/tags") {
-                // Tag list is empty — bound idTag isn't here.
+            if path.hasSuffix("/customers") {
+                // Customer list comes back empty — Path B picker still
+                // opens; the operator sees an empty-state.
                 return (200, ["Content-Type": "application/json"],
-                        Data(#"{"tags":[]}"#.utf8))
+                        Data(#"{"customers":[]}"#.utf8))
             }
             let startsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(-600))
             let endsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(600))
@@ -268,6 +269,7 @@ final class ChargerDetailViewModelTests: XCTestCase {
                         Data(#"{"session":null,"state":"idle","chargerId":"BAY-1"}"#.utf8))
             }
             if path.hasSuffix("/reservations") {
+                // Reservation has no externalId field (older server).
                 let body = """
                 {"reservations":[
                   {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
@@ -294,10 +296,13 @@ final class ChargerDetailViewModelTests: XCTestCase {
         StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { req in
             let path = req.url?.path ?? ""
-            if path.hasSuffix("/tags") {
+            if path.hasSuffix("/customers") {
                 let body = #"""
-                {"tags":[{"idTag":"T1","tagPk":1,"customerName":"Alice",
-                          "customerId":"c1","isOwn":false,"lastUsedAt":null}]}
+                {"customers":[
+                  {"lagoCustomerExternalId":"lago-alice","userId":"u-1",
+                   "displayName":"Alice","name":"Alice","email":"alice@example.com",
+                   "isOwn":false,"lastUsedAt":null}
+                ]}
                 """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
@@ -318,20 +323,22 @@ final class ChargerDetailViewModelTests: XCTestCase {
         await vm.startCharging()
 
         XCTAssertTrue(vm.pickerVisible, "Path B opens the picker")
-        XCTAssertFalse(vm.tags.isEmpty, "Tags loaded before showing picker")
+        XCTAssertFalse(vm.customers.isEmpty, "Customers loaded before showing picker")
     }
 
     // MARK: - submitStart 200 → optimistic flip
 
-    func test_submitStart200OptimisticallyFlipsToPreparing() async {
+    func test_submitStartCustomer200OptimisticallyFlipsToPreparing() async {
         StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
         // Stub returns idle on bootstrap, then preparing on the
         // post-start refresh — the VM's optimistic flip is observed
         // through the surviving session shape.
         let phase = AtomicCounter()
+        let observed = ObservedRequest()
         StubURLProtocol.handler = { req in
             let path = req.url?.path ?? ""
             if req.httpMethod == "POST", path.hasSuffix("/start") {
+                observed.record(req)
                 phase.bump()
                 return (200, ["Content-Type": "application/json"],
                         Data(#"{"operationLogId":1,"taskId":"t","status":"submitted"}"#.utf8))
@@ -344,7 +351,7 @@ final class ChargerDetailViewModelTests: XCTestCase {
                 let body = #"""
                 {"session": {
                    "chargerId":"BAY-1","sessionId":null,"state":"preparing",
-                   "startedAt":null,"idTag":"T1","customerName":"Alice",
+                   "startedAt":null,"idTag":null,"customerName":"Alice",
                    "kwh":null,"kw":null,"elapsedSec":null,"connectorId":null
                  },"state":"preparing","chargerId":"BAY-1"}
                 """#
@@ -359,19 +366,29 @@ final class ChargerDetailViewModelTests: XCTestCase {
 
         let vm = makeVM()
         await vm.bootstrap()
-        let tag = IdTagOption(
-            idTag: "T1", tagPk: 1,
-            customerName: "Alice", customerId: "c1",
-            isOwn: false, lastUsedAt: nil
+        let customer = CustomerOption(
+            lagoCustomerExternalId: "lago-alice",
+            userId: "u-1",
+            displayName: "Alice",
+            name: "Alice",
+            email: nil,
+            isOwn: false,
+            lastUsedAt: nil
         )
-        await vm.submitStart(tag: tag)
+        await vm.submitStart(customer: customer)
         XCTAssertEqual(vm.session?.state, .preparing)
-        XCTAssertEqual(vm.session?.idTag, "T1")
+        // POST body shape — Slice S contract.
+        let body = observed.lastBody.flatMap {
+            try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
+        }
+        XCTAssertEqual(body?["lagoCustomerExternalId"] as? String, "lago-alice")
+        XCTAssertNil(body?["idTag"])
+        XCTAssertNil(body?["tagPk"])
     }
 
     // MARK: - submitStart 409 → charger offline
 
-    func test_submitStart409SurfacesChargerOffline() async {
+    func test_submitStartCustomer409SurfacesChargerOffline() async {
         StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { req in
             let path = req.url?.path ?? ""
@@ -392,11 +409,16 @@ final class ChargerDetailViewModelTests: XCTestCase {
 
         let vm = makeVM()
         await vm.bootstrap()
-        let tag = IdTagOption(
-            idTag: "T1", tagPk: 1, customerName: nil,
-            customerId: "", isOwn: false, lastUsedAt: nil
+        let customer = CustomerOption(
+            lagoCustomerExternalId: "lago-alice",
+            userId: "u-1",
+            displayName: "Alice",
+            name: nil,
+            email: nil,
+            isOwn: false,
+            lastUsedAt: nil
         )
-        await vm.submitStart(tag: tag)
+        await vm.submitStart(customer: customer)
         switch vm.loadState {
         case .error(let msg):
             XCTAssertTrue(
@@ -440,12 +462,6 @@ final class ChargerDetailViewModelTests: XCTestCase {
         await vm.bootstrap()
         XCTAssertEqual(vm.session?.state, .charging)
         await vm.stopCharging(confirmed: true)
-        // After the optimistic flip + reload (which still returns
-        // charging), session.state ends up at the latest server view.
-        // The optimistic flip is what we're testing — verify that the
-        // intermediate state was `.stopping` by checking that the call
-        // landed (no error) and that the post-call state is one of
-        // stopping/charging.
         XCTAssertNotEqual(vm.loadState, .error("Couldn't stop charging. Try again."))
     }
 
@@ -455,7 +471,6 @@ final class ChargerDetailViewModelTests: XCTestCase {
         let vm = makeVM()
         await vm.bootstrap()
         await vm.stopCharging(confirmed: false)
-        // No POST should have happened — and no error fields set.
         if case .error = vm.loadState { XCTFail("Should not error") }
     }
 
@@ -478,6 +493,7 @@ final class ChargerDetailViewModelTests: XCTestCase {
                 {"reservations":[
                   {"reservationId":"7","startsAt":"2026-04-28T09:00:00Z",
                    "endsAt":"2026-04-28T10:00:00Z","customerLabel":"Bob",
+                   "lagoCustomerExternalId":"lago-bob",
                    "isBlackout":false,"idTag":"BOB","isCancelable":true}
                 ]}
                 """#
@@ -525,8 +541,6 @@ private final class ObservedRequest: @unchecked Sendable {
 
     func record(_ req: URLRequest) {
         lock.lock(); defer { lock.unlock() }
-        // URLProtocol gets the body via httpBodyStream when set on a
-        // mutable request — our stub uses httpBody directly.
         if let data = req.httpBody {
             _lastBody = data
             return
