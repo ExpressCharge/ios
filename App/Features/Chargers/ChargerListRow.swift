@@ -35,6 +35,23 @@ struct ChargerListRow: View {
 
                 Spacer(minLength: 0)
 
+                // Capability pills sit above the state line so the
+                // bottom of the row reads top-down: "what this card
+                // can do" → "what this card is doing right now".
+                // Mobile Start is shown on every charger (all OCPP
+                // chargers support RemoteStartTransaction); NFC is
+                // shown when the charger row carries the `scanner`
+                // capability. The capability set isn't on the iOS
+                // wire today — the NFC pill remains a TODO until
+                // GET /api/devices includes it.
+                HStack(spacing: 6) {
+                    CapabilityPill(
+                        label: "Mobile Start",
+                        systemImage: "bolt.fill",
+                        tone: .mobile
+                    )
+                }
+
                 HStack(spacing: 6) {
                     Image(systemName: entry.state.systemImage)
                         .font(.caption2)
@@ -45,7 +62,7 @@ struct ChargerListRow: View {
                         .lineLimit(1)
                 }
             }
-            .frame(minHeight: 56, alignment: .topLeading)
+            .frame(minHeight: 72, alignment: .topLeading)
             .layoutPriority(1)
 
             Spacer(minLength: 0)
