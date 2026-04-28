@@ -335,12 +335,11 @@ private func envelopeJSON(capabilities: [DeviceCapability]) -> Data {
 
 private func envelopeJSONWithSettings(_ entries: [String: (String, String)]) -> Data {
     var settings: [String] = []
-    // `updatedAt` is `Date` — emit as Foundation's reference-date Double
-    // because the APIClient's decoder uses the default strategy
-    // (`deferredToDate`), which expects a numeric reference-date value.
-    let refDate: Double = 1_700_000_000 - 978_307_200 // 2023-11-14 in NSDate ref
+    // `updatedAt` is encoded as ISO-8601 to match the APIClient decoder's
+    // `dateDecodingStrategy = .iso8601` and the TS server's `toISOString()`.
+    let updatedAt = "2023-11-14T22:13:20.000Z"
     for (key, (value, by)) in entries {
-        settings.append(#""\#(key)": { "value": "\#(value)", "updatedAt": \#(refDate), "updatedBy": "\#(by)" }"#)
+        settings.append(#""\#(key)": { "value": "\#(value)", "updatedAt": "\#(updatedAt)", "updatedBy": "\#(by)" }"#)
     }
     let settingsJSON = settings.joined(separator: ",")
     let json = """
