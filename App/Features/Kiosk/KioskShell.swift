@@ -24,6 +24,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// Chrome-stripped wrapper for kiosk mode. Hides the toolbar,
 /// persistent system overlays, and the status bar. Layers an
@@ -33,13 +34,27 @@ public struct KioskShell<Content: View>: View {
 
     private let content: Content
 
-    /// Top-right corner zone size for the escape gesture. ~60pt is
-    /// large enough to hit reliably with 5 finger-taps but small
-    /// enough to never get hit accidentally during normal use. Sits
-    /// where an unkiosked screen renders the Settings toolbar gear.
-    private static var escapeZoneSide: CGFloat { 60 }
+    /// Top-right corner zone size for the escape gesture. Big enough
+    /// to land 5 finger-taps reliably without micro-aiming.
+    private static var escapeZoneSide: CGFloat { 96 }
+
+    /// Inset from the top edge so the zone clears iOS's reserved
+    /// system-gesture strip at the very top of the screen (pulldown
+    /// control-center / notification-center area). Without this, the
+    /// first tap or two would be eaten by the system.
+    private static var topInset: CGFloat { 20 }
+
+    /// Number of taps required to surface the escape sheet.
+    private static var requiredTaps: Int { 5 }
+
+    /// Window in which taps must accumulate. Resets the counter when
+    /// the user pauses — so a stray tap during normal use doesn't
+    /// half-arm the escape.
+    private static var resetWindow: TimeInterval { 2.0 }
 
     @State private var isShowingSettings: Bool = false
+    @State private var tapCount: Int = 0
+    @State private var resetTask: Task<Void, Never>?
 
     public init(@ViewBuilder content: () -> Content) {
         self.content = content()
@@ -51,15 +66,28 @@ public struct KioskShell<Content: View>: View {
             .persistentSystemOverlays(.hidden)
             .statusBarHidden(true)
             .overlay(alignment: .topTrailing) {
-                Color.clear
+                // A near-zero-alpha fill keeps the overlay
+                // hit-testable on every iOS version (`Color.clear`
+                // can opt out of hit testing in some contexts).
+                Rectangle()
+                    .fill(Color.black.opacity(0.001))
                     .frame(
                         width: Self.escapeZoneSide,
                         height: Self.escapeZoneSide
                     )
                     .contentShape(Rectangle())
-                    .onTapGesture(count: 5) {
-                        isShowingSettings = true
-                    }
+                    // High-priority single-tap gesture wins over any
+                    // tap recognizer the wrapped content might hold.
+                    // We count up to `requiredTaps` ourselves so the
+                    // sheet can be triggered without the recognizer
+                    // having to coalesce 5 taps into one event.
+                    .highPriorityGesture(
+                        TapGesture(count: 1).onEnded {
+                            handleTap()
+                        }
+                    )
+                    .padding(.top, Self.topInset)
+                    .padding(.trailing, 4)
                     .accessibilityHidden(true)
             }
             .sheet(isPresented: $isShowingSettings) {
@@ -73,5 +101,36 @@ public struct KioskShell<Content: View>: View {
                 .presentationBackground(.thinMaterial)
                 .presentationCornerRadius(32)
             }
+    }
+
+    /// Per-tap state machine. Each tap fires a light haptic so the
+    /// operator gets confirmation the zone is registering, and a
+    /// trailing reset timer clears the counter if the user pauses.
+    private func handleTap() {
+        tapCount += 1
+
+        // Light haptic on each accumulating tap; success haptic on
+        // the final tap that opens the sheet.
+        if tapCount >= Self.requiredTaps {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            tapCount = 0
+            resetTask?.cancel()
+            resetTask = nil
+            isShowingSettings = true
+            return
+        }
+
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+        // Reset the counter after a pause so a stray accidental tap
+        // during normal use doesn't get the user one tap closer to
+        // the escape on subsequent days.
+        resetTask?.cancel()
+        resetTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Self.resetWindow))
+            if !Task.isCancelled {
+                tapCount = 0
+            }
+        }
     }
 }
