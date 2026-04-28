@@ -29,7 +29,6 @@ public final class ChargerListViewModel {
     public enum OnlineStatusFilter: String, Sendable, CaseIterable, Identifiable {
         case all = "All"
         case online = "Online"
-        case offline = "Offline"
 
         public var id: String { rawValue }
     }
@@ -44,7 +43,6 @@ public final class ChargerListViewModel {
         switch filter {
         case .all:     return entries
         case .online:  return entries.filter { $0.state.isOnline }
-        case .offline: return entries.filter { !$0.state.isOnline }
         }
     }
 

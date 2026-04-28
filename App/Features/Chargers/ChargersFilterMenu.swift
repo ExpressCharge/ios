@@ -28,14 +28,12 @@ struct ChargersFilterMenu: View {
         .accessibilityLabel("Filter chargers, current: \(filter.rawValue)")
     }
 
-    /// Glyph hints at the active filter without needing to expand the
-    /// menu — `line.3.horizontal.decrease.circle` for All,
-    /// `checkmark.circle` for Online, `xmark.circle` for Offline.
+    /// Glyph hints at the active filter without needing to expand
+    /// the menu.
     private var filterIcon: String {
         switch filter {
-        case .all:     return "line.3.horizontal.decrease.circle"
-        case .online:  return "checkmark.circle"
-        case .offline: return "xmark.circle"
+        case .all:    return "line.3.horizontal.decrease.circle"
+        case .online: return "checkmark.circle"
         }
     }
 }
