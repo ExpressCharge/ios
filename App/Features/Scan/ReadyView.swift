@@ -115,8 +115,16 @@ public struct ReadyView: View {
                 // Inline connection chip — visible only when state ≠
                 // online (per UX research P1-1). Tappable to surface
                 // diagnostics. Hidden when online for clean chrome.
-                if let scan, scan.connectionStatus != .online {
-                    connectionPill(scan: scan)
+                // Inline connection chip — sourced from
+                // `DeviceStateCoordinator` (slice G) when available so
+                // it reflects the consolidated sync's status, not just
+                // the SSE link. Falls back to the scan coordinator's
+                // surface for tests / older transitions.
+                let pillStatus: ConnectionStatus = coordinator.deviceState?.connectionStatus
+                    ?? scan?.connectionStatus
+                    ?? .offline
+                if pillStatus != .online {
+                    connectionPill(status: pillStatus)
                         .onTapGesture { isShowingDiagnostics = true }
                         .accessibilityHint("Tap to open diagnostics")
                 }
@@ -160,9 +168,8 @@ public struct ReadyView: View {
 
     // MARK: - Hero / pill helpers
 
-    private func connectionPill(scan: ScanCoordinator?) -> some View {
-        let status = scan?.connectionStatus ?? .offline
-        return StatusPill(
+    private func connectionPill(status: ConnectionStatus) -> some View {
+        StatusPill(
             label: status.label,
             systemImage: status.systemImage,
             tone: status.tone

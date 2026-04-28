@@ -9,8 +9,8 @@
 //  `AppEnvironment.shared` static.
 //
 //  Wire-in (E-app-wire) will add `ScanCoordinator`, `PushService`,
-//  `NFCService`, `HeartbeatService`, etc. The skeleton wires only the
-//  pieces the auth + onboarding flow needs.
+//  `NFCService`, `DeviceStateCoordinator`, etc. The skeleton wires only
+//  the pieces the auth + onboarding flow needs.
 //
 //  Spec: `50-ios.md` § "Project structure" — `AppEnvironment.swift`.
 //
