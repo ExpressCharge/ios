@@ -16,6 +16,7 @@
 import SwiftUI
 
 import AuthCore
+import Models
 
 /// Top-level routing state. Order matches the user's first-launch path
 /// for readability.
@@ -177,7 +178,11 @@ public struct RootView: View {
                 NotificationPrimingView()
                     .environment(coordinator)
             case .ready:
-                ReadyView()
+                // TODO(slice-g): replace the hard-coded `[.scanner]`
+                // default with a live read from `DeviceStateCoordinator`
+                // (which slice G wires in). Until then, scanner-only
+                // keeps the existing scan flow working unchanged.
+                MainTabContainer(capabilities: [.scanner])
                     .environment(coordinator)
             }
         }
