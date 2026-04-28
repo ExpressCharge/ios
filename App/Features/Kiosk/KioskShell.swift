@@ -10,29 +10,36 @@
 //  Sign-out is impossible from the device under kiosk — the only path
 //  is web-admin remote-deregister.
 //
-//  K3a: a hidden 5-tap-on-top-left-corner gesture surfaces the
-//  Diagnostics sheet. This is **not** a security control — kiosk is
-//  UX simplification, not lockdown. Documented in `60-security.md`
-//  addendum. Without this escape valve a kiosked iPad whose web admin
-//  is unreachable would be bricked from the operator's POV.
+//  K3a: a hidden 5-tap-on-top-right-corner gesture surfaces a sheet
+//  containing `SettingsView`. The corner is the same place an
+//  unkiosked screen renders the Settings toolbar gear, so the escape
+//  reuses muscle memory rather than introducing a new affordance. The
+//  sheet itself is the standard Settings UI (Diagnostics is reachable
+//  from inside Settings → Connectivity → Diagnostics).
+//
+//  This is **not** a security control — kiosk is UX simplification,
+//  not lockdown. Documented in `60-security.md` addendum. Without
+//  this escape valve a kiosked iPad whose web admin is unreachable
+//  would be bricked from the operator's POV.
 //
 
 import SwiftUI
 
 /// Chrome-stripped wrapper for kiosk mode. Hides the toolbar,
 /// persistent system overlays, and the status bar. Layers an
-/// invisible 60×60pt corner tap-target that opens Diagnostics on five
+/// invisible top-right corner tap-target that opens Settings on five
 /// rapid taps — the on-device escape valve.
 public struct KioskShell<Content: View>: View {
 
     private let content: Content
 
-    /// Top-left corner zone size for the escape gesture. ~60pt is
+    /// Top-right corner zone size for the escape gesture. ~60pt is
     /// large enough to hit reliably with 5 finger-taps but small
-    /// enough to never get hit accidentally during normal use.
+    /// enough to never get hit accidentally during normal use. Sits
+    /// where an unkiosked screen renders the Settings toolbar gear.
     private static var escapeZoneSide: CGFloat { 60 }
 
-    @State private var isShowingDiagnostics: Bool = false
+    @State private var isShowingSettings: Bool = false
 
     public init(@ViewBuilder content: () -> Content) {
         self.content = content()
@@ -43,7 +50,7 @@ public struct KioskShell<Content: View>: View {
             .toolbar(.hidden, for: .navigationBar, .tabBar)
             .persistentSystemOverlays(.hidden)
             .statusBarHidden(true)
-            .overlay(alignment: .topLeading) {
+            .overlay(alignment: .topTrailing) {
                 Color.clear
                     .frame(
                         width: Self.escapeZoneSide,
@@ -51,15 +58,20 @@ public struct KioskShell<Content: View>: View {
                     )
                     .contentShape(Rectangle())
                     .onTapGesture(count: 5) {
-                        isShowingDiagnostics = true
+                        isShowingSettings = true
                     }
                     .accessibilityHidden(true)
             }
-            .sheet(isPresented: $isShowingDiagnostics) {
-                DiagnosticsSheet()
-                    .presentationDetents([.medium, .large])
-                    .presentationBackground(.thinMaterial)
-                    .presentationCornerRadius(32)
+            .sheet(isPresented: $isShowingSettings) {
+                // Settings expects a NavigationStack ancestor so its
+                // toolbar back-button + Diagnostics push render
+                // correctly. Wrap the sheet's contents in one.
+                NavigationStack {
+                    SettingsView()
+                }
+                .presentationDetents([.large])
+                .presentationBackground(.thinMaterial)
+                .presentationCornerRadius(32)
             }
     }
 }
