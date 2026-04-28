@@ -13,26 +13,16 @@
 
 import SwiftUI
 
-/// Toolbar entries for every non-kiosk screen:
-///   - top-left: the `BrandLockup(.compact)` (logo + ExpressCharge
-///     wordmark). Rendered as plain `Image`+`Text` so it has no
-///     button affordance — purely a brand mark.
-///   - top-right: a `NavigationLink` rendered as a gear icon that
-///     pushes `SettingsView`.
+/// Top-right toolbar entry: a `NavigationLink` rendered as a gear icon
+/// pushing into `SettingsView`. Used by every non-kiosk screen. The
+/// brand wordmark used to share this toolbar on the leading side; per
+/// user direction it's been removed entirely so the home view's hero
+/// stays uncluttered.
 public struct SettingsToolbarMenuButton: ToolbarContent {
 
     public init() {}
 
     public var body: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            BrandLockup(.compact)
-                // Defensive: ToolbarItem can render its child with a
-                // tappable affordance on some iOS-26 toolbar layouts.
-                // Disabling lets the system know this is a static
-                // brand mark, not an action.
-                .allowsHitTesting(false)
-                .accessibilityAddTraits(.isHeader)
-        }
         ToolbarItem(placement: .topBarTrailing) {
             NavigationLink {
                 SettingsView()
