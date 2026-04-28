@@ -33,6 +33,9 @@ public struct ScanActiveView: View {
     public let request: ScanRequest
     /// 0…1 ring progress; 1 at issuance, 0 at expiry.
     public let progress: Double
+    /// Whole seconds remaining until `request.expiresAtEpochMs`. Used
+    /// by the toolbar `CompactCountdown` indicator.
+    public let secondsRemaining: Int
     /// Namespace from `ReadyView` for the matched-geometry icon morph.
     /// Optional so the type-checker is happy when previewed in isolation.
     public let iconNamespace: Namespace.ID?
@@ -52,11 +55,13 @@ public struct ScanActiveView: View {
     public init(
         request: ScanRequest,
         progress: Double,
+        secondsRemaining: Int,
         iconNamespace: Namespace.ID? = nil,
         onCancel: @escaping () -> Void = {}
     ) {
         self.request = request
         self.progress = progress
+        self.secondsRemaining = secondsRemaining
         self.iconNamespace = iconNamespace
         self.onCancel = onCancel
     }
@@ -97,23 +102,13 @@ public struct ScanActiveView: View {
                 }
                 .frame(height: 110)
 
-                ZStack {
-                    // While `armingComplete == false` the ring tracks
-                    // the wind-up sweep (0 → 1.0); after that, it
-                    // tracks the live `progress` countdown. The
-                    // wind-up sweep reads as "arming the scan."
-                    CountdownRing(
-                        progress: armingComplete ? progress : windUpProgress,
-                        lineWidth: 8,
-                        tone: .positive
-                    )
-                        .frame(width: 160, height: 160)
-                    ScanIconView(
-                        mode: .armed,
-                        size: 96,
-                        namespace: iconNamespace
-                    )
-                }
+                // The countdown moved to the top-right toolbar in
+                // Slice N+1; the center is now just the icon.
+                ScanIconView(
+                    mode: .armed,
+                    size: 96,
+                    namespace: iconNamespace
+                )
                 .accessibilityLabel("Scan a card now")
 
                 VStack(spacing: Spacing.sm) {
@@ -138,6 +133,15 @@ public struct ScanActiveView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .padding(.bottom, Spacing.xl)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                CompactCountdown(
+                    progress: armingComplete ? progress : windUpProgress,
+                    seconds: max(0, secondsRemaining),
+                    tone: .scanArmed
+                )
             }
         }
         .onAppear {

@@ -70,6 +70,10 @@ public struct ReadyView: View {
                             armedAt: scan.armedAt,
                             now: context.date
                         ),
+                        secondsRemaining: secondsRemaining(
+                            for: request,
+                            now: context.date
+                        ),
                         iconNamespace: iconNamespace,
                         onCancel: { scan.cancelActiveScan() }
                     )
@@ -78,7 +82,7 @@ public struct ReadyView: View {
                 SuccessView(
                     result: result,
                     iconNamespace: iconNamespace,
-                    onAutoDismiss: { scan.dismissResult() }
+                    onDismiss: { scan.dismissResult() }
                 )
             case .error(let error):
                 ErrorView(
@@ -235,6 +239,17 @@ public struct ReadyView: View {
         guard total > 0 else { return 0 }
         let elapsed = now.timeIntervalSince(armedAt)
         return max(0, min(1, 1 - elapsed / total))
+    }
+
+    /// Whole seconds left before the server-stamped expiry. Drives the
+    /// `CompactCountdown` toolbar indicator (Slice N+1).
+    private func secondsRemaining(
+        for request: ScanRequest,
+        now: Date
+    ) -> Int {
+        let expires = TimeInterval(request.expiresAtEpochMs) / 1000.0
+        let remaining = expires - now.timeIntervalSince1970
+        return max(0, Int(remaining.rounded(.up)))
     }
 
     private var howThisWorksContent: some View {
