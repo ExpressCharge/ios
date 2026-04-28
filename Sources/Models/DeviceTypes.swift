@@ -10,8 +10,13 @@ import Foundation
 
 /// The kind of device. Mirrors the TS `DEVICE_KINDS` tuple — keep wire values
 /// in sync.
+///
+/// `tabletNFC` is reserved for future iPadOS support — only iPhones register
+/// today, but the kind is wired through types so adding tablet registration
+/// later doesn't require a contract sweep.
 public enum DeviceKind: String, Codable, Sendable, CaseIterable {
     case phoneNFC = "phone_nfc"
+    case tabletNFC = "tablet_nfc"
     case laptopNFC = "laptop_nfc"
 }
 

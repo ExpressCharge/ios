@@ -109,11 +109,10 @@ targets:
         UIStatusBarStyle: UIStatusBarStyleDefault
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # Wave 6 / Slice F2a: iPad tightened to portrait-only matching
+        # iPhone. Landscape-iPad robustness is a follow-up PR.
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationPortraitUpsideDown
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
     entitlements:
       path: App/Resources/ExpresScan.entitlements
       properties:
@@ -160,6 +159,10 @@ targets:
         product: Networking
       - package: ExpresScanCore
         product: AuthCore
+      - package: ExpresScanCore
+        product: Capabilities
+      - package: ExpresScanCore
+        product: DeviceSync
     preBuildScripts:
       - name: "Stamp aps-environment into entitlements"
         # The entitlements file ships with `aps-environment = development`

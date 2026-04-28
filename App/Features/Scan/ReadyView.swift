@@ -22,7 +22,6 @@ public struct ReadyView: View {
 
     @Environment(\.app) private var app
     @Environment(RootCoordinator.self) private var coordinator
-    @State private var isShowingSettings: Bool = false
     @State private var isShowingHow: Bool = false
     @State private var isShowingDiagnostics: Bool = false
 
@@ -32,13 +31,6 @@ public struct ReadyView: View {
         ZStack {
             ColorPalette.background.ignoresSafeArea()
             content
-        }
-        .sheet(isPresented: $isShowingSettings) {
-            SettingsView()
-                .environment(coordinator)
-                .presentationDetents([.medium, .large])
-                .presentationBackground(.thinMaterial)
-                .presentationCornerRadius(32)
         }
         .sheet(isPresented: $isShowingDiagnostics) {
             DiagnosticsSheet()
@@ -98,13 +90,12 @@ public struct ReadyView: View {
 
     private func readyChrome(scan: ScanCoordinator?) -> some View {
         VStack(spacing: Spacing.lg) {
-            // Brand row (top-left lockup, top-right status pill).
+            // Brand row (top-left lockup; top-right is now the toolbar
+            // Settings button — see `.expressScanToolbarMenu()` applied
+            // in `MainTabContainer`).
             HStack {
                 BrandLockup(.compact)
                 Spacer()
-                connectionPill(scan: scan)
-                    .onTapGesture { isShowingDiagnostics = true }
-                    .accessibilityHint("Tap to open diagnostics")
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.top, Spacing.md)
@@ -121,6 +112,14 @@ public struct ReadyView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Spacing.lg)
+                // Inline connection chip — visible only when state ≠
+                // online (per UX research P1-1). Tappable to surface
+                // diagnostics. Hidden when online for clean chrome.
+                if let scan, scan.connectionStatus != .online {
+                    connectionPill(scan: scan)
+                        .onTapGesture { isShowingDiagnostics = true }
+                        .accessibilityHint("Tap to open diagnostics")
+                }
                 if let scan, scan.pendingScanResultCount > 0 {
                     StatusPill(
                         label: "\(scan.pendingScanResultCount) pending upload\(scan.pendingScanResultCount == 1 ? "" : "s")",
@@ -154,18 +153,6 @@ public struct ReadyView: View {
                 RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(ColorPalette.borderSubtle, lineWidth: 1)
             )
-            .padding(.horizontal, Spacing.lg)
-
-            // Footer.
-            HStack {
-                Button {
-                    isShowingSettings = true
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                        .font(.callout)
-                }
-                Spacer()
-            }
             .padding(.horizontal, Spacing.lg)
             .padding(.bottom, Spacing.lg)
         }

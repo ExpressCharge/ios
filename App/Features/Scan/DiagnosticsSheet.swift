@@ -85,25 +85,16 @@ public struct DiagnosticsSheet: View {
         Section("Device") {
             LabeledContent("Push permission", value: pushTokenStatus.diagnosticLabel)
             LabeledContent("APNs environment", value: BuildConfig.apnsEnvironment)
-            HStack {
-                Text("Device ID")
-                Spacer()
-                if let deviceId {
-                    Text(deviceId)
-                        .font(.caption.monospaced())
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Button {
-                        UIPasteboard.general.string = deviceId
-                        showToast("Device ID copied")
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                    }
-                    .buttonStyle(.borderless)
-                } else {
-                    Text("—").foregroundStyle(.secondary)
-                }
-            }
+            CopyableValueRow(
+                "Server",
+                value: app.api.baseURL.absoluteString,
+                onCopy: { _ in showToast("Server URL copied") }
+            )
+            CopyableValueRow(
+                "Device ID",
+                value: deviceId,
+                onCopy: { _ in showToast("Device ID copied") }
+            )
             LabeledContent("Build", value: BuildConfig.appVersion)
         }
     }

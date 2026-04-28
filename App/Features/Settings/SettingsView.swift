@@ -32,34 +32,29 @@ public struct SettingsView: View {
     @State private var viewModel: SettingsViewModel?
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
     @State private var isShowingSignOutConfirm: Bool = false
-    @State private var isShowingDiagnostics: Bool = false
 
     public init() {}
 
     public var body: some View {
-        NavigationStack {
-            Group {
-                if let vm = viewModel {
-                    formContent(vm)
-                } else {
-                    ProgressView().controlSize(.large)
-                }
+        // Settings is now pushed via `NavigationLink` from the toolbar
+        // gear button (see `SettingsToolbarMenuButton`) — the parent
+        // already owns the `NavigationStack`, so no wrapper here.
+        Group {
+            if let vm = viewModel {
+                formContent(vm)
+            } else {
+                ProgressView().controlSize(.large)
             }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
+        }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            if viewModel == nil {
+                let vm = SettingsViewModel(environment: app, router: coordinator)
+                self.viewModel = vm
+                await vm.refreshAccount()
             }
-            .task {
-                if viewModel == nil {
-                    let vm = SettingsViewModel(environment: app, router: coordinator)
-                    self.viewModel = vm
-                    await vm.refreshAccount()
-                }
-                await refreshNotificationStatus()
-            }
+            await refreshNotificationStatus()
         }
     }
 
@@ -68,6 +63,7 @@ public struct SettingsView: View {
         @Bindable var vm = vm
 
         Form {
+            connectivitySection
             deviceSection(vm: vm)
             notificationsSection
             accountSection(vm: vm)
@@ -108,16 +104,34 @@ public struct SettingsView: View {
         } message: {
             Text("This iPhone will stop receiving scan requests. You'll need to sign in again to use ExpresScan.")
         }
-        .sheet(isPresented: $isShowingDiagnostics) {
-            DiagnosticsSheet()
-                .environment(coordinator)
-                .presentationDetents([.medium, .large])
-                .presentationBackground(.thinMaterial)
-                .presentationCornerRadius(32)
-        }
     }
 
     // MARK: - Sections
+
+    /// New top "Connectivity" section — replaces the connection pill
+    /// that used to live in `ReadyView`'s top-right. Surfaces the live
+    /// connection status and pushes Diagnostics. TODO(slice-g): swap
+    /// `ScanCoordinator.connectionStatus` for `DeviceStateCoordinator`.
+    private var connectivitySection: some View {
+        Section("Connectivity") {
+            HStack {
+                Text("Status")
+                Spacer()
+                let status = coordinator.scan?.connectionStatus ?? .offline
+                StatusPill(
+                    label: status.settingsLabel,
+                    systemImage: status.settingsIcon,
+                    tone: status.settingsTone
+                )
+            }
+            NavigationLink {
+                DiagnosticsSheet()
+                    .environment(coordinator)
+            } label: {
+                Label("Diagnostics", systemImage: "wrench.and.screwdriver")
+            }
+        }
+    }
 
     private func deviceSection(vm: SettingsViewModel) -> some View {
         @Bindable var vm = vm
@@ -183,9 +197,13 @@ public struct SettingsView: View {
     }
 
     private var diagnosticsSection: some View {
+        // Footer Diagnostics row — primary entry is now the
+        // Connectivity section at the top of Settings, but the footer
+        // entry stays for muscle-memory continuity.
         Section("Connection") {
-            Button {
-                isShowingDiagnostics = true
+            NavigationLink {
+                DiagnosticsSheet()
+                    .environment(coordinator)
             } label: {
                 Label("Diagnostics", systemImage: "wrench.and.screwdriver")
             }
@@ -210,6 +228,35 @@ public struct SettingsView: View {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         await MainActor.run {
             self.notificationStatus = settings.authorizationStatus
+        }
+    }
+}
+
+// MARK: - ConnectionStatus pill mapping (Settings)
+
+private extension ConnectionStatus {
+    var settingsLabel: String {
+        switch self {
+        case .offline: return "Offline"
+        case .connecting: return "Connecting"
+        case .online: return "Online"
+        case .reconnecting: return "Reconnecting"
+        }
+    }
+    var settingsIcon: String {
+        switch self {
+        case .offline: return "wifi.slash"
+        case .connecting: return "arrow.triangle.2.circlepath"
+        case .online: return "checkmark.circle.fill"
+        case .reconnecting: return "arrow.triangle.2.circlepath.circle"
+        }
+    }
+    var settingsTone: StatusPill.Tone {
+        switch self {
+        case .offline: return .negative
+        case .connecting: return .info
+        case .online: return .positive
+        case .reconnecting: return .warning
         }
     }
 }
