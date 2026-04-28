@@ -45,14 +45,7 @@ struct ChargerListRow: View {
             }
             .layoutPriority(1)
 
-            Spacer(minLength: Spacing.sm)
-
-            StatusPill(
-                label: entry.state.displayLabel,
-                systemImage: entry.state.systemImage,
-                tone: entry.state.pillTone
-            )
-            .fixedSize()
+            Spacer(minLength: 0)
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
