@@ -60,7 +60,7 @@ struct ChargerListRow: View {
                     Image(systemName: entry.state.systemImage)
                         .font(.caption2)
                         .foregroundStyle(stateForeground)
-                    Text(stateLine)
+                    Text(entry.state.displayLabel)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
