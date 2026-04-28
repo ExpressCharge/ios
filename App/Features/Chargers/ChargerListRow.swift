@@ -40,16 +40,20 @@ struct ChargerListRow: View {
                 // can do" → "what this card is doing right now".
                 // Mobile Start is shown on every charger (all OCPP
                 // chargers support RemoteStartTransaction); NFC is
-                // shown when the charger row carries the `scanner`
-                // capability. The capability set isn't on the iOS
-                // wire today — the NFC pill remains a TODO until
-                // GET /api/devices includes it.
+                // shown when the row carries the `scanner` capability.
                 HStack(spacing: 6) {
                     CapabilityPill(
                         label: "Mobile Start",
-                        systemImage: "bolt.fill",
+                        systemImage: "iphone",
                         tone: .mobile
                     )
+                    if hasScannerCapability {
+                        CapabilityPill(
+                            label: "NFC",
+                            systemImage: "wave.3.right.circle.fill",
+                            tone: .scanner
+                        )
+                    }
                 }
 
                 HStack(spacing: 6) {
@@ -61,6 +65,13 @@ struct ChargerListRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                // Inset to align the state-icon with the pill text
+                // (pills carry 8pt internal padding; matching that
+                // here keeps the bottom of the card on a single
+                // visual baseline) and add a small top breathing
+                // room so the line lifts off the pills.
+                .padding(.leading, 4)
+                .padding(.top, 4)
             }
             .frame(minHeight: 72, alignment: .topLeading)
             .layoutPriority(1)
@@ -94,6 +105,13 @@ struct ChargerListRow: View {
         case .outOfService:   return .yellow
         case .offline:        return .secondary
         }
+    }
+
+    /// `true` when the charger advertises the `scanner` capability —
+    /// drives the NFC pill rendering. Tolerates the field being
+    /// missing on older server builds (treated as no NFC).
+    private var hasScannerCapability: Bool {
+        entry.capabilities?.contains("scanner") ?? false
     }
 
     private var captionText: String? {
