@@ -16,6 +16,8 @@
 import SwiftUI
 
 import AuthCore
+import Capabilities
+import DeviceSync
 import Models
 
 /// Top-level routing state. Order matches the user's first-launch path
@@ -59,6 +61,10 @@ public final class RootCoordinator {
     /// user is unauthenticated (welcome/login/registering/priming).
     @ObservationIgnored
     public private(set) var scan: ScanCoordinator?
+    /// Live for the duration of a signed-in session. Drives the 60s
+    /// device-state sync loop that replaced the empty heartbeat, and
+    /// owns the live capability set the SwiftUI shell renders against.
+    public private(set) var deviceState: DeviceStateCoordinator?
     /// Live for the duration of the app process (after `bootstrap`).
     @ObservationIgnored
     public private(set) var push: PushService?
@@ -82,6 +88,7 @@ public final class RootCoordinator {
             ensureScanCoordinator(environment: environment)
             self.route = .ready
             scan?.startConnecting()
+            deviceState?.bootstrap()
         } else {
             self.route = .welcome
         }
@@ -89,10 +96,19 @@ public final class RootCoordinator {
 
     /// Lazy-create or return the existing `ScanCoordinator`. Called on
     /// every `.ready` transition (registration, foreground, sign-in).
+    /// Also lazy-creates the `DeviceStateCoordinator` alongside it; the
+    /// two coordinators have the same signed-in lifetime.
     @discardableResult
     public func ensureScanCoordinator(environment: AppEnvironment) -> ScanCoordinator {
-        if let existing = scan { return existing }
-        let coordinator = ScanCoordinator(environment: environment)
+        if let existing = scan {
+            ensureDeviceStateCoordinator(environment: environment)
+            return existing
+        }
+        ensureDeviceStateCoordinator(environment: environment)
+        let coordinator = ScanCoordinator(
+            environment: environment,
+            deviceState: deviceState
+        )
         coordinator.attach(router: self)
         scan = coordinator
         // Hook the push service to the coordinator now that we have one.
@@ -100,10 +116,39 @@ public final class RootCoordinator {
         return coordinator
     }
 
+    /// Lazy-create the device-state coordinator. Constructed up-front so
+    /// the cold-launch capability cache is consulted before the SwiftUI
+    /// shell renders.
+    @discardableResult
+    public func ensureDeviceStateCoordinator(
+        environment: AppEnvironment
+    ) -> DeviceStateCoordinator {
+        if let existing = deviceState { return existing }
+        // The settings store is process-wide; constructed lazily here.
+        let store: SettingsStore
+        do {
+            store = try SettingsStore()
+        } catch {
+            // Persistence failure is rare (sandbox dir not writable);
+            // fall back to an in-memory store rooted in a temp dir.
+            store = (try? SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
+                ?? (try! SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
+        }
+        let coordinator = DeviceStateCoordinator(
+            api: environment.api,
+            settingsStore: store
+        )
+        coordinator.attach(router: self)
+        deviceState = coordinator
+        return coordinator
+    }
+
     /// Tear down the `ScanCoordinator` on sign-out.
     private func teardownScanCoordinator() {
         scan?.stopConnecting()
         scan = nil
+        deviceState?.stop()
+        deviceState = nil
         push?.coordinator = nil
     }
 
@@ -129,6 +174,7 @@ public final class RootCoordinator {
         if let env = environment {
             ensureScanCoordinator(environment: env)
             scan?.startConnecting()
+            deviceState?.bootstrap()
         }
         route = .ready
     }
@@ -178,12 +224,15 @@ public struct RootView: View {
                 NotificationPrimingView()
                     .environment(coordinator)
             case .ready:
-                // TODO(slice-g): replace the hard-coded `[.scanner]`
-                // default with a live read from `DeviceStateCoordinator`
-                // (which slice G wires in). Until then, scanner-only
-                // keeps the existing scan flow working unchanged.
-                MainTabContainer(capabilities: [.scanner])
-                    .environment(coordinator)
+                // Capabilities sourced from the live
+                // `DeviceStateCoordinator`. Until `bootstrap()` resolves
+                // the first network call, the coordinator surfaces the
+                // cached capability set (or the registration default
+                // `{.scanner, .user}` if no cache exists). SSE-driven
+                // capability changes refresh `coordinator.deviceState`,
+                // which is `@Observable` — the View re-renders
+                // automatically.
+                readyShell
             }
         }
         .background(Theme.color(.background))
@@ -207,14 +256,28 @@ public struct RootView: View {
             switch newPhase {
             case .background:
                 coordinator.scan?.handleEnterBackground()
+                coordinator.deviceState?.handleEnterBackground()
             case .active:
                 coordinator.scan?.handleEnterForeground()
+                coordinator.deviceState?.handleEnterForeground()
             case .inactive:
                 break
             @unknown default:
                 break
             }
         }
+    }
+
+    /// Mounts `MainTabContainer` with a `.id(...)` keyed off the live
+    /// capability set so SSE-driven capability changes re-create the
+    /// shell rather than diff a stale `@State`-cached view-model.
+    @ViewBuilder
+    private var readyShell: some View {
+        let caps = coordinator.deviceState?.capabilities
+            ?? DeviceStateCoordinator.defaultCapabilities
+        MainTabContainer(capabilities: caps)
+            .environment(coordinator)
+            .id(caps.map(\.rawValue).sorted().joined(separator: ","))
     }
 
     private func handleUniversalLink(_ url: URL) {

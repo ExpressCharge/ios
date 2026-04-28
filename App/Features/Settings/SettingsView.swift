@@ -110,14 +110,16 @@ public struct SettingsView: View {
 
     /// New top "Connectivity" section — replaces the connection pill
     /// that used to live in `ReadyView`'s top-right. Surfaces the live
-    /// connection status and pushes Diagnostics. TODO(slice-g): swap
-    /// `ScanCoordinator.connectionStatus` for `DeviceStateCoordinator`.
+    /// connection status from the consolidated `DeviceStateCoordinator`
+    /// (slice G).
     private var connectivitySection: some View {
         Section("Connectivity") {
             HStack {
                 Text("Status")
                 Spacer()
-                let status = coordinator.scan?.connectionStatus ?? .offline
+                let status = coordinator.deviceState?.connectionStatus
+                    ?? coordinator.scan?.connectionStatus
+                    ?? .offline
                 StatusPill(
                     label: status.settingsLabel,
                     systemImage: status.settingsIcon,

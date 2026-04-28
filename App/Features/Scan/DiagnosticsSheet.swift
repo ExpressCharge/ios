@@ -68,11 +68,14 @@ public struct DiagnosticsSheet: View {
     private var connectionSection: some View {
         Section("Connection") {
             if let scan = coordinator.scan {
-                LabeledContent("Status", value: connectionLabel(scan.connectionStatus))
-                LabeledContent("Reconnects", value: "\(scan.reconnectCount)")
+                let status = coordinator.deviceState?.connectionStatus ?? scan.connectionStatus
+                let lastSync = coordinator.deviceState?.lastHeartbeatAt ?? scan.lastHeartbeatAt
+                let reconnects = coordinator.deviceState?.reconnectCount ?? scan.reconnectCount
+                LabeledContent("Status", value: connectionLabel(status))
+                LabeledContent("Reconnects", value: "\(reconnects)")
                 LabeledContent(
-                    "Last heartbeat",
-                    value: scan.lastHeartbeatAt.map { Self.relative(from: $0) } ?? "—"
+                    "Last sync",
+                    value: lastSync.map { Self.relative(from: $0) } ?? "—"
                 )
                 LabeledContent("Pending uploads", value: "\(scan.pendingScanResultCount)")
             } else {
@@ -108,11 +111,11 @@ public struct DiagnosticsSheet: View {
                     if testScanInFlight {
                         ProgressView()
                     }
-                    Text("Run test heartbeat")
+                    Text("Run test sync")
                 }
             }
             .disabled(testScanInFlight)
-            Text("Sends a heartbeat to the backend so QA can confirm bearer auth + connectivity without holding a card.")
+            Text("Forces an immediate device-state sync so QA can confirm bearer auth + connectivity without holding a card.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -150,17 +153,14 @@ public struct DiagnosticsSheet: View {
         testScanInFlight = true
         defer { testScanInFlight = false }
 
-        let endpoint = Endpoint(
-            path: "/api/devices/heartbeat",
-            method: .post,
-            requiresAuth: true
-        )
-        do {
-            try await app.api.send(endpoint)
-            showToast("Heartbeat OK")
-        } catch {
-            showToast("Heartbeat failed")
+        // The `/heartbeat` endpoint was retired in slice C — sync via
+        // the consolidated `/me/state/sync` route instead.
+        guard let dsc = coordinator.deviceState else {
+            showToast("No active session")
+            return
         }
+        let ok = await dsc.syncOnce()
+        showToast(ok ? "Sync OK" : "Sync failed")
     }
 
     private func showToast(_ message: String) {

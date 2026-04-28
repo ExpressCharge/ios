@@ -8,7 +8,8 @@
 //   - `PushService` for APNs-delivered scan requests (out-of-process arrival
 //     path).
 //   - `NFCService` for the actual `NFCTagReaderSession` invocation.
-//   - `HeartbeatService` for the 60-second keep-alive POST.
+//   - `DeviceStateCoordinator` for the consolidated 60-second device-
+//     state sync (replaced the empty-bodied `/heartbeat` endpoint).
 //   - `ScanResultQueue` for offline scan-result retries.
 //
 //  The coordinator is `@MainActor`-isolated so SwiftUI can read its
@@ -89,8 +90,12 @@ public final class ScanCoordinator {
     private let environment: AppEnvironment
     @ObservationIgnored
     private let nfc: NFCService
+    /// Optional reference to the device-state coordinator so SSE event
+    /// routing forwards `device.capabilities.changed` /
+    /// `device.settings.changed` to the right place. `nil` in unit
+    /// tests that don't exercise the consolidated sync.
     @ObservationIgnored
-    private let heartbeat: HeartbeatService
+    private weak var deviceState: DeviceStateCoordinator?
     @ObservationIgnored
     private let queue: ScanResultQueue
     /// Closure injected so unit tests can swap in a stub. In production
@@ -103,8 +108,6 @@ public final class ScanCoordinator {
 
     @ObservationIgnored
     private var streamTask: Task<Void, Never>?
-    @ObservationIgnored
-    private var heartbeatTask: Task<Void, Never>?
     @ObservationIgnored
     private var queueDrainTask: Task<Void, Never>?
     @ObservationIgnored
@@ -125,14 +128,14 @@ public final class ScanCoordinator {
     public init(
         environment: AppEnvironment,
         nfc: NFCService = .init(),
-        heartbeat: HeartbeatService? = nil,
+        deviceState: DeviceStateCoordinator? = nil,
         queue: ScanResultQueue? = nil,
         reconnectorFactory: (@MainActor () -> EventStreamReconnector)? = nil,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.environment = environment
         self.nfc = nfc
-        self.heartbeat = heartbeat ?? HeartbeatService(api: environment.api)
+        self.deviceState = deviceState
         self.queue = queue ?? ScanResultQueue(api: environment.api)
         self.makeReconnector = reconnectorFactory ?? { @MainActor [environment] in
             EventStreamReconnector(environment: environment)
@@ -176,18 +179,6 @@ public final class ScanCoordinator {
             }
         }
 
-        heartbeatTask?.cancel()
-        heartbeatTask = Task { [heartbeat, environment] in
-            await heartbeat.start(
-                deviceTokenAvailable: { [environment] in
-                    (try? await environment.authStore.loadDeviceToken()) != nil
-                },
-                onSuccess: { [weak self] in
-                    Task { @MainActor in self?.lastHeartbeatAt = Date() }
-                }
-            )
-        }
-
         queueDrainTask?.cancel()
         queueDrainTask = Task { [queue, weak self] in
             // Drain any persisted offline scan results.
@@ -203,11 +194,8 @@ public final class ScanCoordinator {
     public func stopConnecting() {
         streamTask?.cancel()
         streamTask = nil
-        heartbeatTask?.cancel()
-        heartbeatTask = nil
         queueDrainTask?.cancel()
         queueDrainTask = nil
-        Task { [heartbeat] in await heartbeat.stop() }
         reconnector = nil
         connectionStatus = .offline
         if case .connecting = state { state = .idle }
@@ -483,8 +471,19 @@ public final class ScanCoordinator {
         switch event.event {
         case "connected":
             connectionStatus = .online
+            deviceState?.noteSSEConnected()
             if case .connecting = state { state = .readyToScan }
             if case .offline = state { state = .readyToScan }
+
+        case "device.capabilities.changed":
+            // Slice G — refresh the live `DeviceState` envelope and the
+            // capability cache; the SwiftUI shell re-renders within ~1s.
+            deviceState?.handleCapabilitiesChanged()
+
+        case "device.settings.changed":
+            // Slice G — pull merged settings; SettingsStore is updated
+            // inside the coordinator's refresh path.
+            deviceState?.handleSettingsChanged()
 
         case "scan.requested":
             guard let data = event.data.data(using: .utf8) else { return }
@@ -564,22 +563,17 @@ public final class ScanCoordinator {
     /// will plug this in). Cancels the heartbeat task; SSE is left
     /// running until iOS suspends us.
     public func handleEnterBackground() {
-        Task { [heartbeat] in await heartbeat.stop() }
+        // Heartbeat is now driven by `DeviceStateCoordinator` and gets
+        // its own background hook from `RootView`. Nothing scan-side
+        // needs to suspend on background — the SSE link stays alive
+        // until iOS suspends the app.
     }
 
-    /// Called from `SceneDelegate.sceneWillEnterForeground`. Re-arms
-    /// the heartbeat + drains any queued scan results.
+    /// Called from `SceneDelegate.sceneWillEnterForeground`. Drains any
+    /// queued scan results; the device-state sync is kicked separately
+    /// by the parallel `DeviceStateCoordinator.handleEnterForeground()`
+    /// call from `RootView`.
     public func handleEnterForeground() {
-        Task { [heartbeat, environment] in
-            await heartbeat.start(
-                deviceTokenAvailable: { [environment] in
-                    (try? await environment.authStore.loadDeviceToken()) != nil
-                },
-                onSuccess: { [weak self] in
-                    Task { @MainActor in self?.lastHeartbeatAt = Date() }
-                }
-            )
-        }
         Task { [queue, weak self] in
             let count = await queue.drain { [weak self] count in
                 Task { @MainActor in self?.pendingScanResultCount = count }
@@ -618,5 +612,6 @@ extension ScanCoordinator {
     public func noteReconnectAttempt() {
         reconnectCount += 1
         connectionStatus = .reconnecting
+        deviceState?.noteReconnectAttempt()
     }
 }
