@@ -24,6 +24,8 @@ let package = Package(
         .library(name: "Crypto", targets: ["Crypto"]),
         .library(name: "Networking", targets: ["Networking"]),
         .library(name: "AuthCore", targets: ["AuthCore"]),
+        .library(name: "Capabilities", targets: ["Capabilities"]),
+        .library(name: "DeviceSync", targets: ["DeviceSync"]),
     ],
     targets: [
         // MARK: - Library targets
@@ -50,6 +52,16 @@ let package = Package(
         .target(
             name: "AuthCore",
             path: "Sources/AuthCore"
+        ),
+        .target(
+            name: "Capabilities",
+            dependencies: ["Models"],
+            path: "Sources/Capabilities"
+        ),
+        .target(
+            name: "DeviceSync",
+            dependencies: ["Models", "Networking", "AuthCore"],
+            path: "Sources/DeviceSync"
         ),
 
         // MARK: - Test targets
@@ -135,6 +147,42 @@ let package = Package(
             name: "AuthCoreTests",
             dependencies: ["AuthCore"],
             path: "Tests/AuthCoreTests",
+            swiftSettings: [
+                .unsafeFlags([
+                    "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                    "-Xfrontend", "-disable-cross-import-overlays",
+                ]),
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                ]),
+            ]
+        ),
+        .testTarget(
+            name: "CapabilitiesTests",
+            dependencies: ["Capabilities", "Models"],
+            path: "Tests/CapabilitiesTests",
+            swiftSettings: [
+                .unsafeFlags([
+                    "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                    "-Xfrontend", "-disable-cross-import-overlays",
+                ]),
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                ]),
+            ]
+        ),
+        .testTarget(
+            name: "DeviceSyncTests",
+            dependencies: ["DeviceSync", "Models", "Networking", "AuthCore"],
+            path: "Tests/DeviceSyncTests",
             swiftSettings: [
                 .unsafeFlags([
                     "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
