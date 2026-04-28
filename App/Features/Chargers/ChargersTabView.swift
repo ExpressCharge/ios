@@ -93,9 +93,7 @@ public struct ChargersTabView: View {
             }
         }
         .navigationDestination(for: ChargerListEntry.self) { entry in
-            // Slice J-iOS owns the real charger detail; this is the
-            // wired-up placeholder until then.
-            ChargerDetailPlaceholderView(entry: entry)
+            ChargerDetailView(entry: entry)
         }
         .refreshable { await vm.refresh() }
         .toolbar {
@@ -106,22 +104,3 @@ public struct ChargersTabView: View {
     }
 }
 
-/// Placeholder destination until Slice J-iOS lands the real detail UI.
-/// Renders enough chrome to confirm navigation works without
-/// pre-empting J-iOS's design.
-struct ChargerDetailPlaceholderView: View {
-    let entry: ChargerListEntry
-
-    var body: some View {
-        ContentUnavailableView(
-            label: {
-                Label(entry.label, systemImage: "ev.charger")
-            },
-            description: {
-                Text("Charger detail coming soon.\nID: \(entry.chargerId)")
-            }
-        )
-        .navigationTitle(entry.label)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
