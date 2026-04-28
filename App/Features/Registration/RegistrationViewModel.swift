@@ -90,7 +90,7 @@ public final class RegistrationViewModel {
             appVersion: Self.shortVersion,
             pushToken: pushToken,
             apnsEnvironment: BuildConfig.apnsEnvironment == "production" ? .production : .sandbox,
-            requestedCapabilities: [.tap]
+            requestedCapabilities: [.scanner]
         )
 
         let endpoint = Endpoint.with(

@@ -16,9 +16,27 @@ public enum DeviceKind: String, Codable, Sendable, CaseIterable {
 }
 
 /// What a device can do. Mirrors `DEVICE_CAPABILITIES`.
+///
+/// - `scanner` (was `tap`): device has an NFC tap reader.
+/// - `charger` (was `ev`): device IS an EV charging station. Auto-managed
+///   on charger rows; never editable; never present on app rows.
+/// - `user`: app device unlocks the Chargers tab (list, charger detail,
+///   start/stop, cancel reservations).
+/// - `kiosk`: app device runs in single-screen appliance mode. Legal only
+///   when the set contains exactly one of `{scanner, user}`.
 public enum DeviceCapability: String, Codable, Sendable, CaseIterable {
-    case tap
-    case ev
+    case scanner
+    case charger
+    case user
+    case kiosk
+}
+
+/// Capabilities the iOS registration picker may offer. Apps can never be
+/// chargers, so `charger` is excluded from the picker.
+public extension DeviceCapability {
+    static let appRegistrationOptions: [DeviceCapability] = [
+        .scanner, .user, .kiosk,
+    ]
 }
 
 /// Why a scan is happening. Mirrors `SCAN_PURPOSES`.
