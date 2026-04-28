@@ -17,8 +17,10 @@ struct ChargerListRow: View {
 
     var body: some View {
         rowContent
-            .padding(.vertical, Spacing.md)
-            .padding(.horizontal, Spacing.md)
+            .padding(.top, Spacing.lg)
+            .padding(.bottom, Spacing.md)
+            .padding(.leading, Spacing.md)
+            .padding(.trailing, Spacing.sm)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(stateBackground)
@@ -45,8 +47,6 @@ struct ChargerListRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-
-                Spacer(minLength: 0)
 
                 // Bottom row: state on the left, capability pills
                 // on the right. The state's icon + label encodes
@@ -78,9 +78,7 @@ struct ChargerListRow: View {
                         )
                     }
                 }
-                .padding(.top, 4)
             }
-            .frame(minHeight: 72, alignment: .topLeading)
             .layoutPriority(1)
 
             Spacer(minLength: 0)
