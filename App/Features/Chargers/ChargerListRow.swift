@@ -64,6 +64,7 @@ struct ChargerListRow: View {
                         )
                     }
                 }
+                .padding(.top, Spacing.sm)
             }
             .layoutPriority(1)
 
