@@ -29,6 +29,8 @@
 import Foundation
 import Observation
 import UIKit
+import UserNotifications
+import CoreNFC
 
 import AuthCore
 import Capabilities
@@ -342,23 +344,135 @@ public final class DeviceStateCoordinator {
 
     // MARK: - Default diagnostics
 
-    /// Fallback diagnostics provider. Reads the OS version + model from
-    /// `UIDevice` + the bundle. The provider is overridable so unit
-    /// tests don't depend on `UIDevice` at all.
+    /// Comprehensive diagnostics provider. Reads everything we can off
+    /// the device synchronously so the web admin has a full readout for
+    /// remote diagnosis (especially for kiosks with no on-device UI).
+    /// Tests can inject a stub via the `diagnosticsProvider` parameter
+    /// on `init`.
     @MainActor
     private static func defaultDiagnostics() async -> SyncRequest.Diagnostics {
         let device = UIDevice.current
-        let appVersion = BuildConfig.appVersion
-        let osVersion = device.systemVersion
-        let model = device.model
+
+        // Battery monitoring needs to be enabled to read level/state.
+        // We re-enable it on every diagnostics tick (idempotent) to
+        // avoid stale `unknown`s if something else turned it off.
+        let prevBatteryMonitoring = device.isBatteryMonitoringEnabled
+        if !prevBatteryMonitoring {
+            device.isBatteryMonitoringEnabled = true
+        }
+        defer {
+            // Leave it on once enabled — re-enabling each tick is cheap
+            // but flapping it can briefly return `unknown`. Only restore
+            // if we're being polite to a test harness that disabled it.
+            if !prevBatteryMonitoring && !device.isBatteryMonitoringEnabled {
+                device.isBatteryMonitoringEnabled = false
+            }
+        }
+
+        let batteryLevel: Double? = {
+            let level = device.batteryLevel
+            // -1 means "unknown" per UIDevice docs.
+            return level >= 0 ? Double(level) : nil
+        }()
+
+        let batteryState: SyncRequest.Diagnostics.BatteryState = {
+            switch device.batteryState {
+            case .unknown: return .unknown
+            case .unplugged: return .unplugged
+            case .charging: return .charging
+            case .full: return .full
+            @unknown default: return .unknown
+            }
+        }()
+
+        let thermalState: SyncRequest.Diagnostics.ThermalState = {
+            switch ProcessInfo.processInfo.thermalState {
+            case .nominal: return .nominal
+            case .fair: return .fair
+            case .serious: return .serious
+            case .critical: return .critical
+            @unknown default: return .nominal
+            }
+        }()
+
+        let diskFreeBytes: Int64? = {
+            do {
+                let url = try FileManager.default.url(
+                    for: .applicationSupportDirectory,
+                    in: .userDomainMask,
+                    appropriateFor: nil,
+                    create: false
+                )
+                let values = try url.resourceValues(
+                    forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+                )
+                if let bytes = values.volumeAvailableCapacityForImportantUsage {
+                    return bytes
+                }
+            } catch {
+                // Best-effort — leave nil.
+            }
+            return nil
+        }()
+
+        // Read UN authorization status. `await` is fine — the call is
+        // cheap and runs once per sync (60s).
+        let pushPermission: SyncRequest.Diagnostics.PushPermission = await {
+            let settings = await UNUserNotificationCenter.current()
+                .notificationSettings()
+            switch settings.authorizationStatus {
+            case .authorized: return .authorized
+            case .denied: return .denied
+            case .notDetermined: return .notDetermined
+            case .provisional: return .provisional
+            case .ephemeral: return .ephemeral
+            @unknown default: return .notDetermined
+            }
+        }()
+
+        let backgroundRefreshStatus: SyncRequest.Diagnostics.BackgroundRefreshState = {
+            switch UIApplication.shared.backgroundRefreshStatus {
+            case .available: return .available
+            case .denied: return .denied
+            case .restricted: return .restricted
+            @unknown default: return .denied
+            }
+        }()
+
+        let nfcAvailable = NFCNDEFReaderSession.readingAvailable
+
         return SyncRequest.Diagnostics(
-            appVersion: appVersion,
-            osVersion: osVersion,
-            model: model,
-            pushPermission: .notDetermined,
-            nfcAvailable: true,
+            appVersion: BuildConfig.appVersion,
+            osVersion: device.systemVersion,
+            model: device.model,
+            pushPermission: pushPermission,
+            nfcAvailable: nfcAvailable,
             pendingUploads: 0,
-            reconnectCount: 0
+            reconnectCount: 0,
+            platform: device.systemName,
+            localizedModel: device.localizedModel,
+            locale: Locale.current.identifier,
+            timezone: TimeZone.current.identifier,
+            apnsEnvironment: BuildConfig.apnsEnvironment,
+            // pushTokenLast8 / network info are best wired by a richer
+            // diagnostics provider that has access to authStore +
+            // NWPathMonitor; the default fallback fills in everything
+            // we can read off the OS without dependencies.
+            pushTokenLast8: nil,
+            // CoreNFC has no separate "permission denied" state — the
+            // user grants per-session at the system sheet. So
+            // `nfcPermission` mirrors `nfcAvailable` for now.
+            nfcPermission: nfcAvailable ? .authorized : .unavailable,
+            backgroundRefreshStatus: backgroundRefreshStatus,
+            localNetworkPermission: nil,
+            batteryLevel: batteryLevel,
+            batteryState: batteryState,
+            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
+            thermalState: thermalState,
+            networkInterface: nil,
+            networkIsConstrained: nil,
+            networkIsExpensive: nil,
+            diskFreeBytes: diskFreeBytes
         )
     }
 }

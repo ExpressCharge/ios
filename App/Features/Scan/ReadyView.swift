@@ -181,9 +181,6 @@ public struct ReadyView: View {
             .padding(.bottom, Spacing.lg)
         }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                BrandLockup(.compact)
-            }
             SettingsToolbarMenuButton()
         }
     }

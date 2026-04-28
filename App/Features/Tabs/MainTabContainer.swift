@@ -77,7 +77,7 @@ public struct MainTabContainer: View {
     @ViewBuilder
     private var liquidGlassTabs: some View {
         TabView {
-            Tab("Scan", systemImage: "nfc") {
+            Tab("Scan", systemImage: "wave.3.right.circle.fill") {
                 NavigationStack {
                     ReadyView()
                 }
