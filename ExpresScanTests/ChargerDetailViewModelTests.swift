@@ -182,6 +182,19 @@ final class ChargerDetailViewModelTests: XCTestCase {
                 return (200, ["Content-Type": "application/json"],
                         Data(#"{"operationLogId":1,"taskId":"t","status":"submitted"}"#.utf8))
             }
+            // Path A looks up the reservation's bound idTag in the
+            // tag list to obtain the canonical `tagPk` (the start
+            // schema rejects 0). Stub the tags response so the lookup
+            // succeeds.
+            if path.hasSuffix("/tags") {
+                let body = #"""
+                {"tags":[
+                  {"idTag":"ALICE-CARD-1","tagPk":777,"customerName":"Alice",
+                   "customerId":"cust_alice","isOwn":false,"lastUsedAt":null}
+                ]}
+                """#
+                return (200, ["Content-Type": "application/json"], Data(body.utf8))
+            }
             // Bootstrap stays "reserved" before/after start.
             let startsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(-600))
             let endsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(600))
@@ -218,13 +231,61 @@ final class ChargerDetailViewModelTests: XCTestCase {
 
         XCTAssertFalse(vm.pickerVisible, "Path A must not show the picker")
         // Inspect the captured POST body — should carry idTag from the
-        // reservation.
+        // reservation AND the canonical tagPk looked up from the tag
+        // list (777, not the rejected sentinel 0).
         let body = observed.lastBody.flatMap {
             try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
         }
         XCTAssertEqual(body?["idTag"] as? String, "ALICE-CARD-1")
+        XCTAssertEqual(body?["tagPk"] as? Int, 777)
         XCTAssertEqual(body?["reservationId"] as? String, "42")
         XCTAssertEqual(vm.session?.state, .preparing)
+    }
+
+    func test_startChargingPathAFallsBackToPickerWhenBoundTagNotInList() async {
+        // Reservation references a tag that's not in the visible tag
+        // list (e.g., privacy scoping for customers we can't otherwise
+        // see). The VM should open the picker rather than fail-closed.
+        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        let now = Date(timeIntervalSince1970: 1_745_750_000)
+
+        let observed = ObservedRequest()
+        StubURLProtocol.handler = { req in
+            let path = req.url?.path ?? ""
+            if req.httpMethod == "POST", path.hasSuffix("/start") {
+                observed.record(req)
+                return (200, [:], Data())
+            }
+            if path.hasSuffix("/tags") {
+                // Tag list is empty — bound idTag isn't here.
+                return (200, ["Content-Type": "application/json"],
+                        Data(#"{"tags":[]}"#.utf8))
+            }
+            let startsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(-600))
+            let endsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(600))
+            if path.hasSuffix("/session") {
+                return (200, ["Content-Type": "application/json"],
+                        Data(#"{"session":null,"state":"idle","chargerId":"BAY-1"}"#.utf8))
+            }
+            if path.hasSuffix("/reservations") {
+                let body = """
+                {"reservations":[
+                  {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
+                   "customerLabel":"Alice","isBlackout":false,
+                   "idTag":"ALICE-CARD-1","isCancelable":true}
+                ]}
+                """
+                return (200, ["Content-Type": "application/json"], Data(body.utf8))
+            }
+            return (404, [:], Data())
+        }
+
+        let vm = makeVM(now: now)
+        await vm.bootstrap()
+        await vm.startCharging()
+
+        XCTAssertTrue(vm.pickerVisible, "Path A fall-through opens the picker")
+        XCTAssertNil(observed.lastBody, "Start endpoint must not have fired")
     }
 
     // MARK: - startCharging — Path B (no reservation)
