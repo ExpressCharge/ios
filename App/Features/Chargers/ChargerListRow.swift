@@ -17,8 +17,7 @@ struct ChargerListRow: View {
 
     var body: some View {
         rowContent
-            .padding(.vertical, Spacing.lg)
-            .padding(.horizontal, Spacing.md)
+            .padding(Spacing.lg)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(stateBackground)
