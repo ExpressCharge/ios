@@ -16,6 +16,20 @@ struct ChargerListRow: View {
     let entry: ChargerListEntry
 
     var body: some View {
+        rowContent
+            .padding(.vertical, Spacing.sm)
+            .padding(.horizontal, Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(stateBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(stateBorderColor, lineWidth: stateBorderWidth)
+            )
+    }
+
+    private var rowContent: some View {
         HStack(alignment: .top, spacing: Spacing.md) {
             ChargerFormFactorIcon(size: 56, haloColor: haloColor)
                 .padding(.top, 2)
@@ -78,9 +92,57 @@ struct ChargerListRow: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilitySummary)
+    }
+
+    // MARK: - Status-reactive card styling
+    //
+    // Per user direction:
+    //   - charging      → voltGreen-tinted bg over the card surface
+    //   - idle/avail.   → standard card bg, primary-cyan accent
+    //                     already lives in the icon halo / state line
+    //   - preparing     → standard card bg (waiting to charge)
+    //   - reserved      → standard card bg, orange halo carries state
+    //   - outOfService  → grey-blue disabled bg with a red border —
+    //                     looks "broken / don't tap"
+    //   - offline       → standard card bg with a darker border so
+    //                     the card reads as inactive without a tinted
+    //                     background
+
+    private var stateBackground: Color {
+        switch entry.state {
+        case .charging:
+            return ColorPalette.voltGreen.opacity(0.12)
+        case .outOfService:
+            return Color(red: 0.16, green: 0.18, blue: 0.22)
+        case .offline:
+            return ColorPalette.card
+        case .idle, .preparing, .reserved:
+            return ColorPalette.card
+        }
+    }
+
+    private var stateBorderColor: Color {
+        switch entry.state {
+        case .charging:
+            return ColorPalette.voltGreen.opacity(0.40)
+        case .outOfService:
+            return Color.red.opacity(0.55)
+        case .offline:
+            return Color.white.opacity(0.18)
+        case .idle, .preparing, .reserved:
+            return ColorPalette.borderSubtle
+        }
+    }
+
+    private var stateBorderWidth: CGFloat {
+        switch entry.state {
+        case .outOfService: return 1.5
+        case .offline:      return 1.5
+        case .charging:     return 1.5
+        default:            return 1
+        }
     }
 
     /// Halo colour mirrors the StatusPill tone — green for charging,
