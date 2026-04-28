@@ -19,17 +19,22 @@ import Models
 public struct SuccessView: View {
 
     public let result: EnrichedScanResult
-    public let onScanAnother: () -> Void
-    public let onBackToReady: () -> Void
+    public let iconNamespace: Namespace.ID?
+    /// Fired ~10s after the view appears, returning to ready. Replaces
+    /// the manual "Scan another" button per Slice N.
+    public let onAutoDismiss: () -> Void
+
+    /// Seconds the result stays on screen before auto-returning.
+    private static let autoDismissSeconds: UInt64 = 10
 
     public init(
         result: EnrichedScanResult,
-        onScanAnother: @escaping () -> Void = {},
-        onBackToReady: @escaping () -> Void = {}
+        iconNamespace: Namespace.ID? = nil,
+        onAutoDismiss: @escaping () -> Void = {}
     ) {
         self.result = result
-        self.onScanAnother = onScanAnother
-        self.onBackToReady = onBackToReady
+        self.iconNamespace = iconNamespace
+        self.onAutoDismiss = onAutoDismiss
     }
 
     public var body: some View {
@@ -39,29 +44,38 @@ public struct SuccessView: View {
             VStack(spacing: Spacing.lg) {
                 Spacer()
 
-                Image(systemName: "checkmark.circle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(ColorPalette.success)
-                    .frame(width: 120, height: 120)
-                    .symbolEffect(.bounce, options: .nonRepeating)
-                    .accessibilityLabel("Scan successful")
+                ScanIconView(
+                    mode: .result(iconResult(for: result)),
+                    size: 120,
+                    namespace: iconNamespace
+                )
 
                 customerCard
                     .padding(.horizontal, Spacing.lg)
 
                 Spacer()
-
-                VStack(spacing: Spacing.sm) {
-                    PrimaryButton("Scan another", action: onScanAnother)
-                    Button("Back to ready", action: onBackToReady)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, Spacing.lg)
-                .padding(.bottom, Spacing.xl)
             }
         }
+        .task {
+            // Auto-dismiss timer. Cancelling the task (view dismount,
+            // user navigates elsewhere, coordinator state change)
+            // aborts the sleep before `onAutoDismiss` fires.
+            try? await Task.sleep(
+                nanoseconds: Self.autoDismissSeconds * 1_000_000_000
+            )
+            guard !Task.isCancelled else { return }
+            onAutoDismiss()
+        }
+    }
+
+    /// Maps the enriched result onto the four-way result icon palette.
+    /// Unknown tag → blue; active sub → green; inactive sub → yellow.
+    /// (Failure isn't reachable from here — that's `ErrorView`'s
+    /// branch.)
+    private func iconResult(for result: EnrichedScanResult) -> ScanIconResult {
+        guard result.found, result.tag != nil else { return .unknown }
+        guard let status = result.subscription?.status else { return .unknown }
+        return status == .active ? .active : .inactive
     }
 
     private var customerCard: some View {
