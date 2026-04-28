@@ -86,10 +86,15 @@ public actor APIClient {
         // Wire is camelCase already (matches TS source of truth) — leave
         // keys untouched.
         encoder.keyEncodingStrategy = .useDefaultKeys
+        // The TS server emits ISO-8601 date strings (Date.toISOString()).
+        // Without explicit strategy, JSONEncoder ships dates as
+        // reference-date doubles, which the server rejects.
+        encoder.dateEncodingStrategy = .iso8601
         self.encoder = encoder
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .useDefaultKeys
+        decoder.dateDecodingStrategy = .iso8601
         self.decoder = decoder
     }
 
