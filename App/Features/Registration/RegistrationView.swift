@@ -3,13 +3,17 @@
 //  ExpresScan
 //
 //  Pre-fills the device label from `UIDevice.current.name`, lets the
-//  user rename it, and submits via `RegistrationViewModel`.
+//  user rename it, lets them pick the capability set this iPhone will
+//  serve (Wave 6 / Slice H), and submits via `RegistrationViewModel`.
 //
 //  Spec: `50-ios.md` § "UX details" → "Register".
 //
 
 import SwiftUI
 import UIKit
+
+import Capabilities
+import Models
 
 public struct RegistrationView: View {
 
@@ -68,59 +72,61 @@ public struct RegistrationView: View {
     private func content(_ vm: RegistrationViewModel) -> some View {
         @Bindable var vm = vm
 
-        VStack(spacing: Spacing.lg) {
-            Spacer()
+        VStack(spacing: 0) {
+            Form {
+                // Header section — visual intro, no inputs.
+                Section {
+                    VStack(spacing: Spacing.md) {
+                        Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                            .resizable()
+                            .scaledToFit()
+                            .foregroundStyle(ColorPalette.primaryCyan)
+                            .frame(height: 56)
+                            .accessibilityHidden(true)
 
-            VStack(spacing: Spacing.md) {
-                Image(systemName: "iphone.gen3.radiowaves.left.and.right")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(ColorPalette.primaryCyan)
-                    .frame(height: 64)
-                    .accessibilityHidden(true)
+                        Text("Register this iPhone")
+                            .font(.title2.weight(.bold))
 
-                Text("Register this iPhone")
-                    .font(.title.weight(.bold))
+                        Text("Give your iPhone a name and pick what it will do. You can change these later.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: Spacing.md, leading: 0, bottom: Spacing.md, trailing: 0))
+                }
 
-                Text("Give your iPhone a name so admins can identify it. You can change it later in Settings.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Spacing.lg)
+                // Label field.
+                Section {
+                    TextField("My iPhone", text: $vm.label)
+                        .submitLabel(.done)
+                        .disableAutocorrection(true)
+                        .textInputAutocapitalization(.words)
+                        .accessibilityIdentifier("registration_labelField")
+                } header: {
+                    Text("Device name")
+                } footer: {
+                    Text("Visible to admins.")
+                }
+
+                // Capability picker.
+                CapabilityPickerSection(selected: $vm.selectedCapabilities)
+
+                // Error.
+                if let error = vm.error {
+                    Section {
+                        ErrorBanner(message: copy(for: error))
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    }
+                }
             }
+            .scrollContentBackground(.hidden)
+            .background(ColorPalette.background)
 
-            // Label field.
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text("Device name")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                TextField("My iPhone", text: $vm.label)
-                    .textFieldStyle(.plain)
-                    .padding(Spacing.md)
-                    .background(
-                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .fill(ColorPalette.card)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .strokeBorder(ColorPalette.borderSubtle, lineWidth: 1)
-                    )
-                    .submitLabel(.done)
-                    .disableAutocorrection(true)
-                    .textInputAutocapitalization(.words)
-            }
-            .padding(.horizontal, Spacing.lg)
-
-            // Error.
-            if let error = vm.error {
-                ErrorBanner(message: copy(for: error))
-                    .padding(.horizontal, Spacing.lg)
-            }
-
-            Spacer()
-
-            // CTA.
+            // CTA pinned to the bottom — reads more natively than the
+            // last `Section` of a Form for an action button.
             PrimaryButton(
                 "Register",
                 state: state(for: vm),
@@ -128,6 +134,7 @@ public struct RegistrationView: View {
             )
             .padding(.horizontal, Spacing.lg)
             .padding(.bottom, Spacing.xl)
+            .padding(.top, Spacing.md)
         }
         .onChange(of: vm.didSucceed) { _, success in
             if success {
@@ -139,6 +146,8 @@ public struct RegistrationView: View {
     private func state(for vm: RegistrationViewModel) -> PrimaryButton.State {
         if vm.isSubmitting { return .loading }
         if vm.label.trimmingCharacters(in: .whitespaces).isEmpty { return .disabled }
+        if vm.selectedCapabilities.isEmpty { return .disabled }
+        if !DeviceCapability.isLegalSet(vm.selectedCapabilities) { return .disabled }
         return .default
     }
 
@@ -156,6 +165,8 @@ public struct RegistrationView: View {
             return "Couldn't save credentials securely on this device."
         case .server:
             return "The server returned an error. Please try again."
+        case .invalidCapabilities:
+            return "That combination of capabilities isn't allowed. Please adjust your selection."
         case .other:
             return "Something went wrong. Please try again."
         }
@@ -186,4 +197,3 @@ private struct ErrorBanner: View {
         .accessibilityElement(children: .combine)
     }
 }
-

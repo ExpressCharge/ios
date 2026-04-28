@@ -23,6 +23,7 @@ import Observation
 import UIKit
 
 import AuthCore
+import Capabilities
 import Models
 import Networking
 
@@ -32,6 +33,11 @@ public final class RegistrationViewModel {
 
     /// User-editable label, defaults to `UIDevice.current.name`.
     public var label: String
+
+    /// Multi-select capability set bound to `CapabilityPickerSection`.
+    /// Defaults to `{.scanner, .user}` per the UX research P1-2
+    /// recommendation (the most common admin combo).
+    public var selectedCapabilities: Set<DeviceCapability>
 
     /// Set while the network call is in flight.
     public private(set) var isSubmitting: Bool = false
@@ -53,12 +59,53 @@ public final class RegistrationViewModel {
         environment: AppEnvironment,
         oneTimeCode: String,
         codeVerifier: String,
-        defaultLabel: String = UIDevice.current.name
+        defaultLabel: String? = nil,
+        deviceName: String = UIDevice.current.name,
+        localizedModel: String = UIDevice.current.localizedModel,
+        deviceIdProvider: () -> String = { UIDevice.current.identifierForVendor?.uuidString ?? "" }
     ) {
         self.environment = environment
         self.oneTimeCode = oneTimeCode
         self.codeVerifier = codeVerifier
-        self.label = defaultLabel
+        self.selectedCapabilities = [.scanner, .user]
+
+        if let provided = defaultLabel, !provided.trimmingCharacters(in: .whitespaces).isEmpty {
+            self.label = provided
+        } else {
+            self.label = Self.resolveDefaultLabel(
+                deviceName: deviceName,
+                localizedModel: localizedModel,
+                deviceIdLast4: Self.last4(of: deviceIdProvider())
+            )
+        }
+    }
+
+    /// Resolves the pre-fill label. When iOS returns the generic
+    /// `"iPhone"` / `"iPad"` (entitlement not yet granted), falls back
+    /// to `"<localizedModel> (<deviceId-last-4>)"` so labels are unique
+    /// and don't impersonate the user. UX research P2-2.
+    static func resolveDefaultLabel(
+        deviceName: String,
+        localizedModel: String,
+        deviceIdLast4: String
+    ) -> String {
+        let trimmed = deviceName.trimmingCharacters(in: .whitespaces)
+        let isGeneric = trimmed.isEmpty
+            || trimmed.caseInsensitiveCompare("iPhone") == .orderedSame
+            || trimmed.caseInsensitiveCompare("iPad") == .orderedSame
+        if isGeneric {
+            if deviceIdLast4.isEmpty {
+                return localizedModel
+            }
+            return "\(localizedModel) (\(deviceIdLast4))"
+        }
+        return trimmed
+    }
+
+    private static func last4(of identifier: String) -> String {
+        let stripped = identifier.replacingOccurrences(of: "-", with: "")
+        guard stripped.count >= 4 else { return stripped }
+        return String(stripped.suffix(4))
     }
 
     // MARK: - Submit
@@ -71,6 +118,17 @@ public final class RegistrationViewModel {
         isSubmitting = true
         error = nil
         defer { isSubmitting = false }
+
+        // Reject illegal capability sets before going to the wire — the
+        // server enforces the same rule, but we surface the failure
+        // inline without a round-trip.
+        guard !selectedCapabilities.isEmpty,
+              DeviceCapability.isLegalSet(selectedCapabilities) else {
+            let capList = self.selectedCapabilities.map(\.rawValue).joined(separator: ",")
+            authLog.error("RegistrationViewModel.submit: illegal capability set \(capList, privacy: .public)")
+            self.error = .invalidCapabilities
+            return
+        }
 
         // Block briefly waiting for the APNs token if it hasn't
         // arrived yet — the priming flow asks for permission ahead of
@@ -90,7 +148,7 @@ public final class RegistrationViewModel {
             appVersion: Self.shortVersion,
             pushToken: pushToken,
             apnsEnvironment: BuildConfig.apnsEnvironment == "production" ? .production : .sandbox,
-            requestedCapabilities: [.scanner]
+            requestedCapabilities: Array(selectedCapabilities).sorted { $0.rawValue < $1.rawValue }
         )
 
         let endpoint = Endpoint.with(
@@ -228,5 +286,8 @@ public enum RegistrationError: Error, Equatable, Sendable {
     case network
     case keychain
     case server(code: String?)
+    /// Selected capability set fails `DeviceCapability.isLegalSet` (e.g.
+    /// kiosk + 2 base capabilities) or is empty.
+    case invalidCapabilities
     case other
 }

@@ -10,5 +10,12 @@
 	<array>
 		<string>TAG</string>
 	</array>
+	<!-- TODO(provisioning): user-assigned-device-name entitlement requested
+	     via https://developer.apple.com/contact/request/personalized-name/.
+	     Without Apple's grant, UIDevice.current.name returns "iPhone" /
+	     "iPad" on iOS 16+; RegistrationView falls back to a model+deviceId
+	     label in that case. -->
+	<key>com.apple.developer.device-information.user-assigned-device-name</key>
+	<true/>
 </dict>
 </plist>

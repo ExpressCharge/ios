@@ -120,6 +120,12 @@ targets:
           - TAG
         com.apple.developer.associated-domains:
           - applinks:manage.polaris.express
+        # TODO(provisioning): user-assigned-device-name entitlement requested
+        # via https://developer.apple.com/contact/request/personalized-name/.
+        # Without Apple's grant, `UIDevice.current.name` returns the generic
+        # "iPhone" / "iPad" on iOS 16+; the registration view falls back to
+        # "<localizedModel> (<deviceId-last-4>)" in that case.
+        com.apple.developer.device-information.user-assigned-device-name: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: gg.vlad.expresscan
