@@ -108,6 +108,14 @@ public final class AppEnvironment: @unchecked Sendable {
     /// + token uploads through this reference.
     @MainActor public weak var pushService: PushService?
 
+    /// Test-only initialiser. Allows unit tests to inject a stubbed
+    /// `APIClient` (and a fresh `AuthStore`) without touching the
+    /// process-wide `.shared` singleton.
+    internal init(api: APIClient, authStore: AuthStore) {
+        self.api = api
+        self.authStore = authStore
+    }
+
     private init() {
         let auth = AuthStore()
         self.authStore = auth
