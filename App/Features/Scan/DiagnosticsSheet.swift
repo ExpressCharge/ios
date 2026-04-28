@@ -63,6 +63,7 @@ public struct DiagnosticsSheet: View {
             }
             .navigationTitle("Diagnostics")
             .navigationBarTitleDisplayMode(.inline)
+            .expressBackground()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }

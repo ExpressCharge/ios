@@ -2,10 +2,11 @@
 //  ChargerListRow.swift
 //  ExpresScan
 //
-//  Wave 6 / Slice I — single row in the Chargers list. Form-factor
-//  icon, label, optional site/kW caption, and a trailing `StatusPill`
-//  for the online state. Sized for native `List` rendering at any
-//  Dynamic Type level.
+//  Wave 6 / Slice I — single row in the Chargers list. Uses the
+//  Wallbox-style `ChargerFormFactorIcon` with a status-coloured halo
+//  (mirroring the web admin's `ChargerCard` icon treatment), plus a
+//  richer two-line caption (site · connector · max kW), an inline
+//  state line, and a trailing `StatusPill` for the online state.
 //
 
 import SwiftUI
@@ -15,18 +16,29 @@ struct ChargerListRow: View {
     let entry: ChargerListEntry
 
     var body: some View {
-        HStack(alignment: .center, spacing: Spacing.md) {
-            iconView
-                .frame(width: 32, height: 32)
+        HStack(alignment: .top, spacing: Spacing.md) {
+            ChargerFormFactorIcon(size: 56, haloColor: haloColor)
+                .padding(.top, 2)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(entry.label)
                     .font(.body.weight(.semibold))
                     .lineLimit(2)
                     .truncationMode(.tail)
+
                 if let caption = captionText {
                     Text(caption)
                         .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                HStack(spacing: 6) {
+                    Image(systemName: entry.state.systemImage)
+                        .font(.caption2)
+                        .foregroundStyle(stateForeground)
+                    Text(stateLine)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -42,40 +54,80 @@ struct ChargerListRow: View {
             )
             .fixedSize()
         }
+        .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilitySummary)
     }
 
-    @ViewBuilder
-    private var iconView: some View {
-        Image(systemName: entry.formFactor.systemImage)
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(ColorPalette.primaryCyan)
-            .font(.system(size: 22, weight: .regular))
+    /// Halo colour mirrors the StatusPill tone — green for charging,
+    /// teal-cyan for available/reserved, amber for stale/preparing,
+    /// red for offline/faulted.
+    private var haloColor: Color {
+        switch entry.state {
+        case .charging:       return ColorPalette.voltGreen
+        case .idle:           return ColorPalette.primaryCyan
+        case .preparing:      return ColorPalette.primaryCyan
+        case .reserved:       return .orange
+        case .outOfService:   return .yellow
+        case .offline:        return .red
+        }
+    }
+
+    private var stateForeground: Color {
+        switch entry.state {
+        case .charging:       return ColorPalette.voltGreen
+        case .idle, .preparing: return ColorPalette.primaryCyan
+        case .reserved:       return .orange
+        case .outOfService:   return .yellow
+        case .offline:        return .secondary
+        }
     }
 
     private var captionText: String? {
         var bits: [String] = []
         if let site = entry.siteName, !site.isEmpty { bits.append(site) }
+        if let connector = entry.connectorType?.displayLabel {
+            bits.append(connector)
+        }
         if let kw = entry.maxKw {
             bits.append(String(format: "%.0f kW", kw))
         }
         return bits.isEmpty ? nil : bits.joined(separator: " · ")
     }
 
+    private var stateLine: String {
+        if let lastSeen = entry.lastSeenAt {
+            let rel = Self.relative.localizedString(for: lastSeen, relativeTo: Date())
+            return "\(entry.state.displayLabel) · \(rel)"
+        }
+        return entry.state.displayLabel
+    }
+
+    private static let relative: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f
+    }()
+
     private var accessibilitySummary: String {
         var bits: [String] = [entry.label, entry.state.displayLabel]
         if let site = entry.siteName { bits.append(site) }
+        if let connector = entry.connectorType?.displayLabel { bits.append(connector) }
         if let kw = entry.maxKw { bits.append("\(Int(kw)) kilowatts") }
         return bits.joined(separator: ", ")
     }
 }
 
-private extension ChargerListEntry.FormFactor {
-    /// SF Symbol shown in the row leading position. iOS 26 doesn't ship
-    /// per-form-factor icons; the generic `ev.charger` reads cleanly
-    /// across all five.
-    var systemImage: String { "ev.charger" }
+private extension ChargerListEntry.ConnectorType {
+    var displayLabel: String {
+        switch self {
+        case .ccs:     return "CCS"
+        case .j1772:   return "J1772"
+        case .nacs:    return "NACS"
+        case .chademo: return "CHAdeMO"
+        case .type2:   return "Type 2"
+        }
+    }
 }
 
 private extension ChargerListEntry.ChargerState {

@@ -33,6 +33,7 @@ struct ChargerDetailView: View {
         }
         .navigationTitle(entry.label)
         .navigationBarTitleDisplayMode(.inline)
+        .expressBackground()
         .task {
             if viewModel == nil {
                 let vm = ChargerDetailViewModel(entry: entry, api: app.api)

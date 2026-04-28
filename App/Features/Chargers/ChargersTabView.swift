@@ -34,6 +34,7 @@ public struct ChargersTabView: View {
         }
         .navigationTitle("Chargers")
         .navigationBarTitleDisplayMode(.inline)
+        .expressBackground()
         .task {
             if viewModel == nil {
                 let vm = ChargerListViewModel(api: app.api)

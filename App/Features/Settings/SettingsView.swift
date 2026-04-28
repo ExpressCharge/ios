@@ -47,6 +47,7 @@ public struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .expressBackground()
         .task {
             if viewModel == nil {
                 let vm = SettingsViewModel(environment: app, router: coordinator)
