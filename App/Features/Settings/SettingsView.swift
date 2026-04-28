@@ -2,17 +2,16 @@
 //  SettingsView.swift
 //  ExpresScan
 //
-//  Form-style settings sheet. Sections:
-//   - Device (label, model, OS, app version)
-//   - Notifications (system permission status, deep-link to Settings)
-//   - Account (Pocket ID display name when available)
-//   - About (privacy policy, terms, build info)
-//   - Sign out (red, confirms; calls DELETE /api/devices/{id} via
-//     E-app-wire and clears Keychain)
+//  Form-style settings page. Sections:
+//   - Connectivity (status pill, last sync, Diagnostics push link)
+//   - Device (name, model, OS, app version)
+//   - Permissions (notifications status; future: camera for QR, etc.)
+//   - About (privacy policy, terms, "Open iOS Settings" link, build)
+//   - Sign out (red, confirms; calls DELETE /api/devices/{id} and
+//     clears Keychain)
 //
-//  Skeleton: layout + actions where possible. The "Sign out" network
-//  call is stubbed to a Keychain wipe + return-to-welcome; E-app-wire
-//  layers in the actual DELETE.
+//  Account (display name, device id, registered) lives inside the
+//  Diagnostics sheet — see `DiagnosticsSheet.swift`.
 //
 //  Spec: `50-ios.md` § "Settings screen" + § "Sign-out = deregister".
 //
@@ -65,9 +64,7 @@ public struct SettingsView: View {
         Form {
             connectivitySection
             deviceSection(vm: vm)
-            notificationsSection
-            accountSection(vm: vm)
-            diagnosticsSection
+            permissionsSection
             aboutSection
 
             Section {
@@ -114,18 +111,24 @@ public struct SettingsView: View {
     /// (slice G).
     private var connectivitySection: some View {
         Section("Connectivity") {
-            HStack {
-                Text("Status")
-                Spacer()
-                let status = coordinator.deviceState?.connectionStatus
-                    ?? coordinator.scan?.connectionStatus
-                    ?? .offline
+            let status = coordinator.deviceState?.connectionStatus
+                ?? coordinator.scan?.connectionStatus
+                ?? .offline
+            LabeledContent("Status") {
                 StatusPill(
                     label: status.settingsLabel,
                     systemImage: status.settingsIcon,
                     tone: status.settingsTone
                 )
             }
+            // Mirrors the Diagnostics-sheet "Last sync" row so the
+            // operator can see freshness without drilling in.
+            let lastSync = coordinator.deviceState?.lastHeartbeatAt
+                ?? coordinator.scan?.lastHeartbeatAt
+            LabeledContent(
+                "Last sync",
+                value: lastSync.map { Self.relativeTime(from: $0) } ?? "—"
+            )
             NavigationLink {
                 DiagnosticsSheet()
                     .environment(coordinator)
@@ -138,76 +141,33 @@ public struct SettingsView: View {
     private func deviceSection(vm: SettingsViewModel) -> some View {
         @Bindable var vm = vm
         return Section("Device") {
-            // The owner-side rename endpoint isn't exposed in v1 — the
-            // admin POST /api/admin/devices/{id}/rename needs a cookie
-            // session. We persist the user's preferred label locally
-            // and surface the limitation honestly.
-            TextField("Device name", text: $vm.label, prompt: Text(UIDevice.current.name))
-                .submitLabel(.done)
-                .onSubmit { vm.commitLocalRename() }
-            Text("Saved on this iPhone. Admins still see the label you registered with.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            // Inline `LabeledContent` so the row's left/right
+            // alignment matches Model / iOS / App. The owner-side
+            // rename endpoint isn't exposed in v1 — we persist the
+            // preferred label locally and let the admin's
+            // server-stored label remain authoritative.
+            LabeledContent("Device Name") {
+                TextField("Device name", text: $vm.label, prompt: Text(UIDevice.current.name))
+                    .multilineTextAlignment(.trailing)
+                    .submitLabel(.done)
+                    .onSubmit { vm.commitLocalRename() }
+            }
             LabeledContent("Model", value: UIDevice.current.model)
             LabeledContent("iOS", value: UIDevice.current.systemVersion)
             LabeledContent("App", value: BuildConfig.appVersion)
         }
     }
 
-    private var notificationsSection: some View {
-        Section("Notifications") {
-            HStack {
-                Text("Permission")
-                Spacer()
+    /// Permissions the app holds (or wants). Today only Notifications;
+    /// future entries (e.g., Camera for QR scanning) slot in here.
+    private var permissionsSection: some View {
+        Section("Permissions") {
+            LabeledContent("Notifications") {
                 StatusPill(
                     label: notificationStatus.label,
                     systemImage: notificationStatus.icon,
                     tone: notificationStatus.tone
                 )
-            }
-            Button("Open iOS Settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
-            }
-        }
-    }
-
-    private func accountSection(vm: SettingsViewModel) -> some View {
-        Section("Account") {
-            if vm.meIsLoading {
-                HStack { ProgressView(); Text("Loading…") }
-            } else if let me = vm.me {
-                LabeledContent(
-                    "Signed in as",
-                    value: me.ownerDisplayName ?? me.ownerUserId ?? "—"
-                )
-                LabeledContent("Device ID", value: me.deviceId)
-                if let registered = me.registeredAtIso {
-                    LabeledContent("Registered", value: registered)
-                }
-            } else if let err = vm.meError {
-                Text(err).font(.caption).foregroundStyle(.secondary)
-                Button("Retry") {
-                    Task { await vm.refreshAccount() }
-                }
-            } else {
-                LabeledContent("Signed in as", value: "—")
-            }
-            LabeledContent("Bearer token", value: "Stored securely")
-        }
-    }
-
-    private var diagnosticsSection: some View {
-        // Footer Diagnostics row — primary entry is now the
-        // Connectivity section at the top of Settings, but the footer
-        // entry stays for muscle-memory continuity.
-        Section("Connection") {
-            NavigationLink {
-                DiagnosticsSheet()
-                    .environment(coordinator)
-            } label: {
-                Label("Diagnostics", systemImage: "wrench.and.screwdriver")
             }
         }
     }
@@ -220,8 +180,25 @@ public struct SettingsView: View {
             Link(destination: URL(string: "https://manage.example.com/terms")!) {
                 Label("Terms of service", systemImage: "doc.text")
             }
+            Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                // Same `Label` style as the links above so the row
+                // reads as a sibling. Icon is the system-Settings gear.
+                Label("Open iOS Settings", systemImage: "gear")
+            }
             LabeledContent("Build", value: BuildConfig.appVersion)
         }
+    }
+
+    // MARK: - Date helpers
+
+    private static func relativeTime(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 
     // MARK: - Actions

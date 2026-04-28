@@ -28,6 +28,28 @@ public struct DiagnosticsSheet: View {
     @State private var deviceId: String? = nil
     @State private var copyToast: String? = nil
     @State private var testScanInFlight: Bool = false
+    /// Account info loaded from `GET /api/devices/me`. Lives here
+    /// rather than in `SettingsViewModel` because the UI it backs
+    /// (Diagnostics → Account section) lives in this sheet.
+    @State private var accountInfo: AccountInfo? = nil
+    @State private var accountLoading: Bool = false
+    @State private var accountError: String? = nil
+
+    /// Trimmed view-model for the Account section. Mirrors the
+    /// `DeviceMeResponse` shape returned by `GET /api/devices/me`.
+    private struct AccountInfo: Sendable {
+        /// Server-side resolved label (priority: name → email → user
+        /// id). The view falls back to `name`/`email`/`userId` only
+        /// for older server builds that don't ship `ownerDisplayName`.
+        let displayName: String?
+        /// `users.name` from BetterAuth (may be null).
+        let name: String?
+        /// `users.email` from BetterAuth (may be null on
+        /// auto-provisioned rows).
+        let email: String?
+        let userId: String?
+        let registeredAtIso: String?
+    }
 
     public init() {}
 
@@ -36,6 +58,7 @@ public struct DiagnosticsSheet: View {
             Form {
                 connectionSection
                 deviceSection
+                accountSection
                 testSection
             }
             .navigationTitle("Diagnostics")
@@ -45,7 +68,10 @@ public struct DiagnosticsSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .task { await loadDiagnostics() }
+            .task {
+                await loadDiagnostics()
+                await loadAccount()
+            }
             .overlay(alignment: .bottom) {
                 if let copyToast {
                     Text(copyToast)
@@ -102,6 +128,41 @@ public struct DiagnosticsSheet: View {
         }
     }
 
+    /// Account info that used to live on the Settings page. Moved
+    /// here so Settings stays focused on user-mutable state — account
+    /// metadata is read-only context that QA / support need at hand.
+    @ViewBuilder
+    private var accountSection: some View {
+        Section("Account") {
+            if let me = accountInfo {
+                // Priority: name → email → user id (matches the
+                // server's `ownerDisplayName` resolver). The server
+                // already collapses these in `ownerDisplayName`; we
+                // re-derive locally only as a defense for older
+                // server builds that don't yet ship the field.
+                let label = me.displayName
+                    ?? me.name
+                    ?? me.email
+                    ?? me.userId
+                    ?? "—"
+                LabeledContent("Signed in as", value: label)
+                if let email = me.email, email != label {
+                    LabeledContent("Email", value: email)
+                }
+                if let registered = me.registeredAtIso {
+                    LabeledContent("Registered", value: Self.formattedRegistered(registered))
+                }
+            } else if accountLoading {
+                HStack { ProgressView().controlSize(.small); Text("Loading…") }
+            } else if let err = accountError {
+                Text(err).font(.caption).foregroundStyle(.secondary)
+                Button("Retry") { Task { await loadAccount() } }
+            } else {
+                LabeledContent("Signed in as", value: "—")
+            }
+        }
+    }
+
     private var testSection: some View {
         Section("Test") {
             Button {
@@ -147,6 +208,40 @@ public struct DiagnosticsSheet: View {
         await MainActor.run {
             self.deviceId = deviceId
         }
+    }
+
+    /// Calls `GET /api/devices/me` and populates the Account section.
+    /// Mirrors the SettingsViewModel.refreshAccount logic so the row
+    /// renders the same display-name / userId / registered triple
+    /// that used to live on the Settings page.
+    private func loadAccount() async {
+        accountLoading = true
+        accountError = nil
+        defer { accountLoading = false }
+        let endpoint = Endpoint(path: "/api/devices/me", method: .get)
+        do {
+            let me: DeviceMeResponse = try await app.api.request(endpoint)
+            accountInfo = AccountInfo(
+                displayName: me.ownerDisplayName,
+                name: me.ownerName,
+                email: me.ownerEmail,
+                userId: me.ownerUserId,
+                registeredAtIso: me.registeredAtIso
+            )
+        } catch {
+            accountError = "Couldn't load account."
+        }
+    }
+
+    private static func formattedRegistered(_ iso: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = formatter.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+        guard let date else { return iso }
+        let display = DateFormatter()
+        display.dateStyle = .medium
+        display.timeStyle = .short
+        return display.string(from: date)
     }
 
     private func runTestScan() async {
