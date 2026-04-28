@@ -124,27 +124,30 @@ public final class ChargerDetailViewModel {
 
     /// Start charging. Two paths:
     ///   - **A:** charger has an active reservation with a bound idTag
-    ///     → call start with that idTag, no picker shown.
+    ///     → look the bound `idTag` up in the tag list to obtain its
+    ///       `tagPk` (the backend's start schema requires a positive
+    ///       int), then call start with no picker shown. If the
+    ///       reservation's idTag isn't in the picker list (privacy
+    ///       scoping etc.), fall through to Path B.
     ///   - **B:** unreserved → open the tag picker; the picker's
     ///     `onPick` calls `submitStart(tag:)` once the operator picks.
     public func startCharging() async {
         guard !actionInFlight else { return }
-        if let res = currentReservation, let tag = res.idTag {
-            // Path A: synthesize an IdTagOption from the reservation's
-            // bound tag. We don't have the full IdTagOption envelope —
-            // the start endpoint only needs `idTag` + `tagPk`, and
-            // tagPk for the bound tag is held server-side. Server
-            // accepts a sentinel tagPk = 0 with the matching idTag.
-            // (Backend resolves the canonical tagPk from the idTag.)
-            let synthesized = IdTagOption(
-                idTag: tag,
-                tagPk: 0,
-                customerName: res.customerLabel,
-                customerId: "",
-                isOwn: false,
-                lastUsedAt: nil
-            )
-            await submitStart(tag: synthesized)
+        if let res = currentReservation, let boundTag = res.idTag {
+            // Path A: load tags and look up the bound tag's full
+            // `IdTagOption` (we need the real `tagPk` — the backend's
+            // start schema is `tagPk: positive int`, so synthesizing
+            // a 0 sentinel would fail-closed at validation time).
+            await ensureTagsLoaded()
+            if let match = tags.first(where: { $0.idTag == boundTag }) {
+                await submitStart(tag: match)
+                return
+            }
+            // Fall-through: bound idTag isn't in the visible tag list
+            // (the reservation's tag belongs to a customer the caller
+            // can't otherwise see). Show the picker so the operator
+            // can pick something else, or escalate via the web admin.
+            pickerVisible = true
         } else {
             // Path B: load tags lazily before showing the picker.
             await ensureTagsLoaded()
