@@ -36,6 +36,15 @@ public final class ReachabilityMonitor {
     }
 
     public private(set) var state: State = .online
+    /// Wall-clock time of the next scheduled probe. The overlay
+    /// reads this to render a countdown ring while we're waiting
+    /// for backoff to elapse.
+    public private(set) var nextProbeAt: Date?
+    /// Backoff window in seconds for the *current* sleep interval
+    /// — used by the overlay to compute progress (`remaining /
+    /// currentBackoffSeconds`). Always > 0 when `nextProbeAt` is
+    /// set; `nil` when no backoff is pending.
+    public private(set) var currentBackoffSeconds: Int?
 
     private let healthURL: URL
     private let session: URLSession
@@ -135,6 +144,16 @@ public final class ReachabilityMonitor {
             case .serverUnreachable:
                 let idx = min(streakOfFailures, Self.backoffSeconds.count - 1)
                 nap = Self.backoffSeconds[idx]
+            }
+            // Publish countdown info so the overlay can show "next
+            // attempt in Xs" with a ring. Only meaningful while
+            // we're not online.
+            if state != .online {
+                currentBackoffSeconds = Int(nap)
+                nextProbeAt = Date().addingTimeInterval(TimeInterval(nap))
+            } else {
+                currentBackoffSeconds = nil
+                nextProbeAt = nil
             }
             try? await Task.sleep(nanoseconds: nap * 1_000_000_000)
             await probeOnce(reason: "scheduled")

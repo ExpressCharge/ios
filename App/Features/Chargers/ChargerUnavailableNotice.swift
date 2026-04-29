@@ -4,7 +4,8 @@
 //
 //  Replacement body for the charger detail screen when the charger
 //  is offline or out of service. Hides reservations + start/stop CTA
-//  and explains the state with a refresh affordance.
+//  and explains the state. Refresh is available from the nav-bar
+//  toolbar button — no in-card refresh affordance.
 //
 
 import SwiftUI
@@ -12,12 +13,11 @@ import SwiftUI
 struct ChargerUnavailableNotice: View {
 
     enum Reason: Equatable, Sendable {
-        case offline(lastSeen: Date?)
+        case offline
         case outOfService
     }
 
     let reason: Reason
-    let onRefresh: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
@@ -28,16 +28,10 @@ struct ChargerUnavailableNotice: View {
                 Text(title)
                     .font(.headline)
             }
-            Text(body(now: Date()))
+            Text(bodyText)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button(action: onRefresh) {
-                Label("Refresh", systemImage: "arrow.clockwise")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
         }
         .padding(Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -67,27 +61,17 @@ struct ChargerUnavailableNotice: View {
 
     private var toneColor: Color {
         switch reason {
-        case .offline:      return ColorPalette.mutedForeground
-        case .outOfService: return ColorPalette.destructiveRose
+        case .offline:      return ColorPalette.destructiveRose
+        case .outOfService: return ColorPalette.warningAmber
         }
     }
 
-    private func body(now: Date) -> String {
+    private var bodyText: String {
         switch reason {
-        case .offline(let lastSeen):
-            if let lastSeen {
-                let rel = Self.relative.localizedString(for: lastSeen, relativeTo: now)
-                return "We haven't heard from this charger \(rel). It can't accept commands until it reconnects."
-            }
-            return "This charger isn't reachable right now. Try again in a moment."
+        case .offline:
+            return "This charger is currently offline. Wait for it to come back online and refresh to check its status."
         case .outOfService:
             return "This charger is reporting a fault. Reservations and remote starts are paused. Contact your site admin if this persists."
         }
     }
-
-    private static let relative: RelativeDateTimeFormatter = {
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .full
-        return f
-    }()
 }
