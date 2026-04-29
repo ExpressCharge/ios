@@ -88,63 +88,40 @@ struct ChargerListRow: View {
     //                     the card reads as inactive without a tinted
     //                     background
 
+    /// Coarse status used to look up tone/glow via the central
+    /// `ChargerStatusVisuals` helper — keeps list and detail aligned.
+    private var status: ChargerStatusVisuals.Status {
+        ChargerStatusVisuals.status(from: entry.state)
+    }
+
     private var stateBackground: Color {
-        switch entry.state {
-        case .charging:
-            return ColorPalette.voltGreen.opacity(0.12)
-        case .outOfService:
-            return Color(red: 0.16, green: 0.18, blue: 0.22)
-        case .offline:
-            return ColorPalette.card
-        case .idle, .preparing, .reserved:
+        switch status {
+        case .charging:    return ColorPalette.voltGreen.opacity(0.12)
+        case .unavailable: return Color(red: 0.16, green: 0.18, blue: 0.22)
+        case .available, .reserved, .offline:
             return ColorPalette.card
         }
     }
 
     private var stateBorderColor: Color {
-        switch entry.state {
-        case .charging:
-            return ColorPalette.voltGreen.opacity(0.40)
-        case .outOfService:
-            return Color.red.opacity(0.55)
-        case .offline:
-            return Color.white.opacity(0.18)
-        case .idle, .preparing, .reserved:
+        switch status {
+        case .charging:    return ColorPalette.voltGreen.opacity(0.40)
+        case .unavailable: return ColorPalette.destructiveRose.opacity(0.55)
+        case .offline:     return Color.white.opacity(0.18)
+        case .available, .reserved:
             return ColorPalette.borderSubtle
         }
     }
 
     private var stateBorderWidth: CGFloat {
-        switch entry.state {
-        case .outOfService: return 1.5
-        case .offline:      return 1.5
-        case .charging:     return 1.5
-        default:            return 1
+        switch status {
+        case .unavailable, .offline, .charging: return 1.5
+        case .available, .reserved:             return 1
         }
     }
 
-    /// Halo colour mirrors the StatusPill tone — green for charging,
-    /// teal-cyan for available/reserved, amber for stale/preparing,
-    /// red for offline/faulted.
     private var haloColor: Color {
-        switch entry.state {
-        case .charging:       return ColorPalette.voltGreen
-        case .idle:           return ColorPalette.primaryCyan
-        case .preparing:      return ColorPalette.primaryCyan
-        case .reserved:       return .orange
-        case .outOfService:   return .yellow
-        case .offline:        return .red
-        }
-    }
-
-    private var stateForeground: Color {
-        switch entry.state {
-        case .charging:       return ColorPalette.voltGreen
-        case .idle, .preparing: return ColorPalette.primaryCyan
-        case .reserved:       return .orange
-        case .outOfService:   return .yellow
-        case .offline:        return .secondary
-        }
+        ChargerStatusVisuals.tone(for: status)
     }
 
     /// `true` when the charger advertises the `scanner` capability —

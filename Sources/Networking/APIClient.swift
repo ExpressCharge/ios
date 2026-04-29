@@ -56,6 +56,9 @@ public actor APIClient {
     private let decoder: JSONDecoder
     private let userAgent: String?
     private let idempotencyKeyFactory: @Sendable () -> String
+    /// Invoked on transport errors and sustained 5xx so a connectivity
+    /// monitor can react immediately. Optional — tests pass nothing.
+    private let failureReporter: (@Sendable () -> Void)?
 
     /// Designated initialiser.
     ///
@@ -74,13 +77,15 @@ public actor APIClient {
         transport: HTTPTransport = URLSession.shared,
         tokenSource: @escaping @Sendable () async -> String?,
         userAgent: String? = nil,
-        idempotencyKeyFactory: @escaping @Sendable () -> String = { UUID().uuidString }
+        idempotencyKeyFactory: @escaping @Sendable () -> String = { UUID().uuidString },
+        failureReporter: (@Sendable () -> Void)? = nil
     ) {
         self.baseURL = baseURL
         self.transport = transport
         self.tokenSource = tokenSource
         self.userAgent = userAgent
         self.idempotencyKeyFactory = idempotencyKeyFactory
+        self.failureReporter = failureReporter
 
         let encoder = JSONEncoder()
         // Wire is camelCase already (matches TS source of truth) — leave
@@ -132,11 +137,13 @@ public actor APIClient {
             (data, response) = try await transport.data(for: urlRequest)
         } catch {
             netLog.error("APIClient.rawRequest: transport failed for \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public): \(String(describing: error), privacy: .public)")
+            failureReporter?()
             throw APIError.network
         }
 
         guard let http = response as? HTTPURLResponse else {
             netLog.error("APIClient.rawRequest: non-HTTP response for \(endpoint.path, privacy: .public)")
+            failureReporter?()
             throw APIError.network
         }
 
@@ -176,6 +183,7 @@ public actor APIClient {
             throw APIError.rateLimited
         case 500..<600:
             let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data)
+            failureReporter?()
             throw APIError.server(statusCode: http.statusCode, errorCode: envelope?.error)
         default:
             throw APIError.server(statusCode: http.statusCode, errorCode: nil)

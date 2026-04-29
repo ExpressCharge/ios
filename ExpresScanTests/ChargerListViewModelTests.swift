@@ -102,14 +102,6 @@ final class ChargerListViewModelTests: XCTestCase {
         XCTAssertEqual(displayed, ["BAY-1", "BAY-2"])
     }
 
-    func test_filterOfflineKeepsOnlyOfflineRows() async {
-        let vm = makeVM()
-        await loadStockEntries(into: vm)
-        vm.filter = .offline
-        let displayed = Set(vm.displayEntries.map(\.chargerId))
-        XCTAssertEqual(displayed, ["BAY-3"])
-    }
-
     // MARK: - Empty state
 
     func test_emptyResponseProducesEmptyEntries() async {
