@@ -237,7 +237,14 @@ public struct RootView: View {
         }
         .background(Theme.color(.background))
         .preferredColorScheme(nil) // honor system setting
+        .fullScreenCover(isPresented: connectivityOverlayBinding) {
+            OfflineOverlay(state: app.reachability.state) {
+                app.reachability.retryNow()
+            }
+            .interactiveDismissDisabled(true)
+        }
         .task {
+            app.reachability.start()
             await coordinator.bootstrap(environment: app)
         }
         .onOpenURL { url in
@@ -266,6 +273,19 @@ public struct RootView: View {
                 break
             }
         }
+    }
+
+    /// Bindings into the reachability monitor — `true` whenever the
+    /// monitor is reporting anything other than `.online`. Suppress
+    /// during cold launch so we don't fight the auth gate.
+    private var connectivityOverlayBinding: Binding<Bool> {
+        Binding(
+            get: {
+                guard coordinator.route != .launching else { return false }
+                return app.reachability.state != .online
+            },
+            set: { _ in /* dismissal driven by the monitor itself */ }
+        )
     }
 
     /// Mounts `MainTabContainer` with a `.id(...)` keyed off the live

@@ -3,15 +3,13 @@
 //  ExpresScan
 //
 //  Wave 6 / Slice I — the Chargers tab content. Parent (`MainTabContainer`)
-//  already owns the `NavigationStack` and toolbar Settings menu, so this
-//  view only contributes the title + filter Menu + list.
+//  owns the `NavigationStack` and toolbar Settings menu, so this view
+//  only contributes the title + filter Menu + list.
 //
-//  States:
-//   - Loading: `ProgressView` while the first fetch is in flight.
-//   - Error:   `ContentUnavailableView` with a Retry button.
-//   - Empty:   `ContentUnavailableView` ("No chargers yet").
-//   - Loaded:  native `List` of `ChargerListRow` with `.refreshable`
-//              pull-to-refresh.
+//  Single-charger fast path: the first time the list resolves to
+//  exactly one charger, we auto-push its detail screen so the user
+//  doesn't have to tap a list of one. Tapping back returns to the
+//  list (so users can still see "other" chargers as the fleet grows).
 //
 
 import SwiftUI
@@ -20,6 +18,8 @@ public struct ChargersTabView: View {
 
     @Environment(\.app) private var app
     @State private var viewModel: ChargerListViewModel?
+    @State private var pushedEntry: ChargerListEntry?
+    @State private var hasAutoPushed: Bool = false
 
     public init() {}
 
@@ -35,12 +35,18 @@ public struct ChargersTabView: View {
         .navigationTitle("Chargers")
         .navigationBarTitleDisplayMode(.inline)
         .expressBackground()
+        .navigationDestination(item: $pushedEntry) { entry in
+            ChargerDetailView(entry: entry)
+        }
         .task {
             if viewModel == nil {
                 let vm = ChargerListViewModel(api: app.api)
                 self.viewModel = vm
                 await vm.refresh()
             }
+        }
+        .onChange(of: viewModel?.displayEntries ?? []) { _, newValue in
+            maybeAutoPush(newValue)
         }
     }
 
@@ -85,14 +91,10 @@ public struct ChargersTabView: View {
             } else {
                 List {
                     ForEach(vm.displayEntries) { entry in
-                        NavigationLink(value: entry) {
+                        Button { pushedEntry = entry } label: {
                             ChargerListRow(entry: entry)
                         }
-                        // The row carries its own card chrome (bg
-                        // + border per status) so the List's
-                        // default row background must get out of
-                        // the way. Insets reduced to 6/horizontal
-                        // so cards align with the page padding.
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(
                             top: 4, leading: 16,
                             bottom: 4, trailing: 16
@@ -104,9 +106,6 @@ public struct ChargersTabView: View {
                 .listStyle(.plain)
             }
         }
-        .navigationDestination(for: ChargerListEntry.self) { entry in
-            ChargerDetailView(entry: entry)
-        }
         .refreshable { await vm.refresh() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -114,5 +113,17 @@ public struct ChargersTabView: View {
             }
         }
     }
-}
 
+    /// First time the list resolves to a single charger, push its
+    /// detail screen automatically. `hasAutoPushed` latches so backing
+    /// out leaves the user on the list, even if a refresh re-evaluates
+    /// the same single-entry response.
+    private func maybeAutoPush(_ entries: [ChargerListEntry]) {
+        guard !hasAutoPushed,
+              entries.count == 1,
+              let only = entries.first
+        else { return }
+        pushedEntry = only
+        hasAutoPushed = true
+    }
+}

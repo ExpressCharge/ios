@@ -35,6 +35,16 @@ public struct ChargerSession: Codable, Sendable, Equatable {
     public let customerName: String?
     public let kwh: Double?
     public let kw: Double?
+    /// Whole-amp current draw, derived server-side from `kw` assuming
+    /// a 240 V single-phase circuit. Optional on the wire for backward
+    /// compatibility with older server builds — when `nil`, the iOS
+    /// active card derives it locally.
+    public let amps: Int?
+    /// Customer's plan max-amp cap (`ev.max_amps` Lago entitlement).
+    /// Surfaced so the active card can render `{amps}/{maxAmps} A`
+    /// rather than just `{amps} A`. `nil` when the customer has no
+    /// active subscription, no plan, or the entitlement is missing.
+    public let maxAmps: Int?
     public let elapsedSec: Int?
     public let connectorId: Int?
 
@@ -47,6 +57,8 @@ public struct ChargerSession: Codable, Sendable, Equatable {
         customerName: String? = nil,
         kwh: Double? = nil,
         kw: Double? = nil,
+        amps: Int? = nil,
+        maxAmps: Int? = nil,
         elapsedSec: Int? = nil,
         connectorId: Int? = nil
     ) {
@@ -58,6 +70,8 @@ public struct ChargerSession: Codable, Sendable, Equatable {
         self.customerName = customerName
         self.kwh = kwh
         self.kw = kw
+        self.amps = amps
+        self.maxAmps = maxAmps
         self.elapsedSec = elapsedSec
         self.connectorId = connectorId
     }

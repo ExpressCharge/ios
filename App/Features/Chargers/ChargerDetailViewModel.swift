@@ -106,6 +106,36 @@ public final class ChargerDetailViewModel {
         entry.state == .offline
     }
 
+    /// High-level availability of the charger for user actions. Drives
+    /// whether the detail screen renders the reservations card +
+    /// start/stop CTA (`.ready`) or replaces them with an explanatory
+    /// notice (`.offline` / `.outOfService`).
+    public enum Availability: Equatable, Sendable {
+        case ready
+        case offline
+        case outOfService
+    }
+
+    public var availability: Availability {
+        if isOffline { return .offline }
+        if heroState == .outOfService { return .outOfService }
+        return .ready
+    }
+
+    /// Connectors associated with this charger. The wire model only
+    /// reports the one connector type the row already knows about,
+    /// so for now this is a single-element list — sized as a
+    /// collection so `ChargerHero` can grow to multi-connector
+    /// hardware without re-plumbing.
+    public struct ConnectorDescriptor: Equatable, Sendable {
+        public let connectorType: ChargerListEntry.ConnectorType?
+        public let maxKw: Double?
+    }
+
+    public var connectors: [ConnectorDescriptor] {
+        [ConnectorDescriptor(connectorType: entry.connectorType, maxKw: entry.maxKw)]
+    }
+
     // MARK: - Public methods
 
     /// Initial bootstrap — parallel-load `session` + `reservations`.
@@ -219,6 +249,8 @@ public final class ChargerDetailViewModel {
                     customerName: existing.customerName,
                     kwh: existing.kwh,
                     kw: existing.kw,
+                    amps: existing.amps,
+                    maxAmps: existing.maxAmps,
                     elapsedSec: existing.elapsedSec,
                     connectorId: existing.connectorId
                 )

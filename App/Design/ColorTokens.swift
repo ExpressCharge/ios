@@ -27,6 +27,7 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case info = "Info"
     case warningAmber = "WarningAmber"
     case destructiveRose = "DestructiveRose"
+    case reservedViolet = "ReservedViolet"
 
     // MARK: Surface
     case background = "Background"
@@ -68,6 +69,7 @@ public enum ColorPalette {
     public static var info: Color { .token(.info) }
     public static var warningAmber: Color { .token(.warningAmber) }
     public static var destructiveRose: Color { .token(.destructiveRose) }
+    public static var reservedViolet: Color { .token(.reservedViolet) }
     public static var background: Color { .token(.background) }
     public static var card: Color { .token(.card) }
     public static var muted: Color { .token(.muted) }

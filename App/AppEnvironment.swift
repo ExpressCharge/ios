@@ -102,6 +102,9 @@ public final class AppEnvironment: @unchecked Sendable {
 
     public let authStore: AuthStore
     public let api: APIClient
+    /// Process-wide reachability monitor. Started by `RootView` once
+    /// the SwiftUI hierarchy is up.
+    public let reachability: ReachabilityMonitor
 
     /// Set by `RootCoordinator.bootstrap(...)` once the SwiftUI
     /// hierarchy is up. The `AppDelegate` then forwards APNs payloads
@@ -114,20 +117,28 @@ public final class AppEnvironment: @unchecked Sendable {
     internal init(api: APIClient, authStore: AuthStore) {
         self.api = api
         self.authStore = authStore
+        self.reachability = ReachabilityMonitor(apiBaseURL: BuildConfig.apiBaseURL)
     }
 
     private init() {
         let auth = AuthStore()
         self.authStore = auth
+        let monitor = ReachabilityMonitor(apiBaseURL: BuildConfig.apiBaseURL)
+        self.reachability = monitor
         // The `tokenSource` closure runs on every request — pulling
         // straight from the keychain means token rotation after a
         // re-register Just Works without re-creating the client.
+        // `failureReporter` lets the reachability monitor react to
+        // real request failures without waiting for its periodic poll.
         self.api = APIClient(
             baseURL: BuildConfig.apiBaseURL,
             tokenSource: { [auth] in
                 (try? await auth.loadDeviceToken()) ?? nil
             },
-            userAgent: "ExpresScan/\(BuildConfig.appVersion) (iOS)"
+            userAgent: "ExpresScan/\(BuildConfig.appVersion) (iOS)",
+            failureReporter: { [weak monitor] in
+                monitor?.reportTransportFailure()
+            }
         )
     }
 }

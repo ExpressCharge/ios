@@ -54,7 +54,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
             connectorType: .ccs,
             maxKw: 22,
             state: state,
-            lastSeenAt: nil
+            lastSeenAt: nil,
+            capabilities: ["charger"]
         )
     }
 

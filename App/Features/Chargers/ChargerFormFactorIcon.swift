@@ -24,10 +24,15 @@ struct ChargerFormFactorIcon: View {
     let size: CGFloat
     /// Status-bearing halo colour. Defaults to the Pulsar Plus teal.
     let haloColor: Color
+    /// Optional soft outer-bleed colour rendered as a blurred halo
+    /// behind the body — used by `ChargerHero` to make the charging
+    /// state pop. Pass `nil` for the standard list-row treatment.
+    let glow: Color?
 
-    init(size: CGFloat = 48, haloColor: Color = .teal) {
+    init(size: CGFloat = 48, haloColor: Color = .teal, glow: Color? = nil) {
         self.size = size
         self.haloColor = haloColor
+        self.glow = glow
     }
 
     var body: some View {
@@ -73,7 +78,19 @@ struct ChargerFormFactorIcon: View {
             ctx.fill(face, with: .color(Self.faceColor))
         }
         .frame(width: size, height: size)
+        .background(glowHalo)
         .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var glowHalo: some View {
+        if let glow {
+            RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
+                .fill(glow.opacity(0.55))
+                .blur(radius: size * 0.18)
+                .scaleEffect(1.18)
+                .accessibilityHidden(true)
+        }
     }
 
     // Approximations of the web's oklch values picked by eye against

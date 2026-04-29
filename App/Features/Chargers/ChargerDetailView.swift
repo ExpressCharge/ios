@@ -2,14 +2,15 @@
 //  ChargerDetailView.swift
 //  ExpresScan
 //
-//  Wave 6 / Slice J — the customer-style charger detail screen. Hero
-//  layout: identity row → big StatusHero with a hero-sized
-//  Start/Stop CTA → live telemetry while charging → reservations card
-//  (hidden during charging; replaced by a "Next: …" pill on the hero).
+//  Customer-style charger detail screen. Top-level body switches on
+//  `vm.availability`:
+//    * `.ready`         → hero + (active-session card | reservations)
+//                         + inline Start/Stop CTA
+//    * `.offline` /
+//      `.outOfService` → hero + `ChargerUnavailableNotice` (no CTA)
 //
-//  Layout invariant: this is `ScrollView { LazyVStack(...) }` — never a
-//  plain `VStack`. At AX5 / Slide-Over the hero alone exceeds the
-//  visible safe area.
+//  Layout invariant: `ScrollView { LazyVStack(...) }` — at AX5 the
+//  hero alone exceeds the visible safe area.
 //
 
 import SwiftUI
@@ -48,30 +49,32 @@ struct ChargerDetailView: View {
         @Bindable var bound = vm
 
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: Spacing.lg) {
-                identityRow
+            LazyVStack(alignment: .leading, spacing: Spacing.xl) {
+                pageTitle
 
-                heroSection(vm: vm)
+                ChargerHero(
+                    heroState: vm.heroState,
+                    isOffline: vm.isOffline,
+                    connectors: vm.connectors
+                )
 
-                if vm.isCharging {
-                    telemetrySection(vm: vm)
-                }
-
-                if !vm.isCharging && !vm.reservations.isEmpty {
-                    ReservationsCard(
-                        reservations: vm.reservations,
-                        actionInFlight: vm.actionInFlight,
-                        onCancel: { res in
-                            Task { await vm.cancelReservation(res.reservationId, confirmed: true) }
-                        }
+                switch vm.availability {
+                case .ready:
+                    readyBody(vm: vm)
+                case .offline:
+                    ChargerUnavailableNotice(
+                        reason: .offline(lastSeen: entry.lastSeenAt),
+                        onRefresh: { Task { await vm.refresh() } }
+                    )
+                case .outOfService:
+                    ChargerUnavailableNotice(
+                        reason: .outOfService,
+                        onRefresh: { Task { await vm.refresh() } }
                     )
                 }
 
                 if case .error(let message) = vm.loadState {
-                    Label(message, systemImage: "exclamationmark.triangle")
-                        .font(.subheadline)
-                        .foregroundStyle(ColorPalette.warningAmber)
-                        .padding(.horizontal, Spacing.base)
+                    errorBanner(message: message)
                 }
             }
             .padding(.horizontal, Spacing.base)
@@ -100,64 +103,56 @@ struct ChargerDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func readyBody(vm: ChargerDetailViewModel) -> some View {
+        if vm.isCharging, let session = vm.session {
+            TimelineView(.animation(minimumInterval: 1.0)) { context in
+                ActiveSessionCard(session: session, now: context.date)
+            }
+        } else if !vm.reservations.isEmpty {
+            ReservationsCard(
+                reservations: vm.reservations,
+                actionInFlight: vm.actionInFlight,
+                onCancel: { res in
+                    Task { await vm.cancelReservation(res.reservationId, confirmed: true) }
+                }
+            )
+        }
+
+        primaryCTA(vm: vm)
+    }
+
     // MARK: - Sections
 
-    private var identityRow: some View {
-        HStack(spacing: Spacing.xs) {
-            Text(identityLine)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            Spacer()
-        }
+    private var pageTitle: some View {
+        Text(entry.label)
+            .font(.largeTitle.weight(.bold))
+            .lineLimit(2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
     }
 
     @ViewBuilder
-    private func heroSection(vm: ChargerDetailViewModel) -> some View {
-        VStack(spacing: Spacing.md) {
-            StatusHero(
-                state: vm.heroState,
-                title: heroTitle(vm: vm),
-                secondary: heroSecondary(vm: vm)
-            )
-
-            if vm.isCharging, let next = nextReservationPill(vm: vm) {
-                Text(next)
-                    .font(.caption.weight(.medium))
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.xs)
-                    .background(
-                        Capsule().fill(ColorPalette.muted)
-                    )
-            }
-
-            if !vm.isOffline {
-                primaryCTA(vm: vm)
-            } else {
-                PrimaryButton(
-                    "Charger offline",
-                    systemImage: "wifi.slash",
-                    variant: .destructive,
-                    state: .disabled,
-                    size: .hero,
-                    action: {}
-                )
-            }
+    private func errorBanner(message: String) -> some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(message)
+                .font(.subheadline)
         }
+        .foregroundStyle(ColorPalette.destructiveRose)
+        .padding(Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(ColorPalette.destructiveRose.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .strokeBorder(ColorPalette.destructiveRose.opacity(0.4), lineWidth: 1)
+        )
     }
 
-    @ViewBuilder
-    private func telemetrySection(vm: ChargerDetailViewModel) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0)) { context in
-            LiveTelemetryRow(
-                kwh: kwhDisplay(vm.session?.kwh),
-                kw: kwDisplay(vm.session?.kw),
-                elapsed: elapsedDisplay(vm.session?.startedAt, fallback: vm.session?.elapsedSec, now: context.date)
-            )
-        }
-    }
-
-    // MARK: - Hero copy + CTA
+    // MARK: - CTA
 
     @ViewBuilder
     private func primaryCTA(vm: ChargerDetailViewModel) -> some View {
@@ -191,108 +186,12 @@ struct ChargerDetailView: View {
         return "Start charging"
     }
 
-    private func heroTitle(vm: ChargerDetailViewModel) -> String {
-        switch vm.heroState {
-        case .idle:         return "Idle"
-        case .plugged:      return "Plugged in"
-        case .charging:     return vm.session?.state == .stopping ? "Stopping" : "Charging"
-        case .reserved:     return "Reserved"
-        case .outOfService: return vm.isOffline ? "Charger offline" : "Out of service"
-        }
-    }
-
-    private func heroSecondary(vm: ChargerDetailViewModel) -> String? {
-        switch vm.heroState {
-        case .reserved:
-            guard let res = vm.currentReservation else { return nil }
-            let label = res.isBlackout ? "Blackout" : (res.customerLabel ?? "Reserved")
-            let until = Self.timeFormatter.string(from: res.endsAt)
-            return "Reserved by \(label) — Until \(until)"
-        case .charging:
-            if let name = vm.session?.customerName { return "Powering \(name)" }
-            return nil
-        case .outOfService:
-            if vm.isOffline, let last = entry.lastSeenAt {
-                return "Last seen \(Self.timeFormatter.string(from: last))"
-            }
-            return nil
-        case .idle, .plugged:
-            return nil
-        }
-    }
-
-    private func nextReservationPill(vm: ChargerDetailViewModel) -> String? {
-        guard let next = vm.reservations.first else { return nil }
-        let label = next.isBlackout ? "Blackout" : (next.customerLabel ?? "Reserved")
-        return "Next: \(label) \(Self.timeFormatter.string(from: next.startsAt))"
-    }
-
     @ViewBuilder
     private func stopConfirmMessage(vm: ChargerDetailViewModel) -> some View {
         if let kwh = vm.session?.kwh {
             Text(String(format: "Stop the session at %.1f kWh delivered?", kwh))
         } else {
             Text("Stop the in-progress session?")
-        }
-    }
-
-    // MARK: - Identity
-
-    private var identityLine: String {
-        var bits: [String] = [entry.label]
-        bits.append(entry.connectorType?.displayLabel ?? "—")
-        bits.append(entry.maxKw.map { String(format: "%.0f kW", $0) } ?? "— kW")
-        return bits.joined(separator: " · ")
-    }
-
-    // MARK: - Display helpers
-
-    private func kwhDisplay(_ value: Double?) -> String {
-        guard let v = value else { return "–" }
-        return String(format: "%.1f", v)
-    }
-
-    private func kwDisplay(_ value: Double?) -> String {
-        guard let v = value else { return "–" }
-        return String(format: "%.1f", v)
-    }
-
-    private func elapsedDisplay(_ startedAt: Date?, fallback: Int?, now: Date) -> String {
-        let seconds: Int
-        if let started = startedAt {
-            seconds = max(0, Int(now.timeIntervalSince(started)))
-        } else if let fb = fallback {
-            seconds = fb
-        } else {
-            return "–"
-        }
-        return Self.elapsedFormatter.string(from: TimeInterval(seconds)) ?? "–"
-    }
-
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateStyle = .none
-        f.timeStyle = .short
-        return f
-    }()
-
-    private static let elapsedFormatter: DateComponentsFormatter = {
-        let f = DateComponentsFormatter()
-        f.unitsStyle = .positional
-        f.allowedUnits = [.hour, .minute, .second]
-        f.zeroFormattingBehavior = .pad
-        return f
-    }()
-}
-
-private extension ChargerListEntry.ConnectorType {
-    var displayLabel: String {
-        switch self {
-        case .ccs:     return "CCS"
-        case .j1772:   return "J1772"
-        case .nacs:    return "NACS"
-        case .chademo: return "CHAdeMO"
-        case .type2:   return "Type 2"
         }
     }
 }
