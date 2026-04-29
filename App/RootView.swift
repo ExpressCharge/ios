@@ -238,9 +238,11 @@ public struct RootView: View {
         .background(Theme.color(.background))
         .preferredColorScheme(nil) // honor system setting
         .fullScreenCover(isPresented: connectivityOverlayBinding) {
-            OfflineOverlay(state: app.reachability.state) {
-                app.reachability.retryNow()
-            }
+            OfflineOverlay(
+                state: app.reachability.state,
+                nextProbeAt: app.reachability.nextProbeAt,
+                currentBackoffSeconds: app.reachability.currentBackoffSeconds
+            )
             .interactiveDismissDisabled(true)
         }
         .task {

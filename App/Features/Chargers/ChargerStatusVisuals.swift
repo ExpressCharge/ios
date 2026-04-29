@@ -24,14 +24,16 @@ enum ChargerStatusVisuals {
     }
 
     /// Status color used for icon halos, status pills, and the
-    /// active-card tint. Values mirror the web's `device-visuals.ts`.
+    /// active-card tint. Values mirror the web's `device-visuals.ts`
+    /// (`STATUS_HALO`): azure available, green charging, amber for
+    /// both reserved + unavailable, red for offline + faulted.
     static func tone(for status: Status) -> Color {
         switch status {
         case .available:   return ColorPalette.primaryCyan
         case .charging:    return ColorPalette.voltGreen
-        case .reserved:    return ColorPalette.reservedViolet
-        case .unavailable: return ColorPalette.destructiveRose
-        case .offline:     return ColorPalette.mutedForeground
+        case .reserved:    return ColorPalette.warningAmber
+        case .unavailable: return ColorPalette.warningAmber
+        case .offline:     return ColorPalette.destructiveRose
         }
     }
 
@@ -40,10 +42,9 @@ enum ChargerStatusVisuals {
     /// statuses without a dedicated glow asset.
     static func glow(for status: Status) -> Color {
         switch status {
-        case .charging: return ColorPalette.glowGreen
+        case .charging:  return ColorPalette.glowGreen
         case .available: return ColorPalette.glowCyan
-        case .reserved: return ColorPalette.glowViolet
-        default:        return tone(for: status).opacity(0.5)
+        default:         return tone(for: status).opacity(0.5)
         }
     }
 

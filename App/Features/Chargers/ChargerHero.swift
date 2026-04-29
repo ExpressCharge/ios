@@ -3,13 +3,13 @@
 //  ExpresScan
 //
 //  Customer-facing hero for the charger detail screen. Composes the
-//  Wallbox glyph with one or more connector glyphs, drawing a curved
-//  cable between them and showing each connector's type + max-kW.
+//  Wallbox glyph with one or more connector glyphs, drawing a squared
+//  cable between them (down out of the charger's bottom, across, then
+//  up to the connector port).
 //
-//  Mirrors the Figma direction (`J7H1XfKeTfnaqPF1nFF1fx`) while
-//  reusing the iOS design system: status colour comes from
-//  `ChargerStatusVisuals` (so the list and detail never drift), and
-//  the surface is the same iOS-26 glass-tint hero used elsewhere.
+//  Status colour comes from `ChargerStatusVisuals` (matches the web
+//  admin's `device-visuals.ts`). The hero itself has no background —
+//  it sits transparently on the page chrome.
 //
 
 import SwiftUI
@@ -28,9 +28,10 @@ struct ChargerHero: View {
     private var glow: Color { ChargerStatusVisuals.glow(for: status) }
 
     /// Hero artwork sizing. The charger glyph reads as the dominant
-    /// element; the connector(s) sit smaller and to the right.
-    private static let chargerSize: CGFloat = 128
-    private static let connectorSize: CGFloat = 56
+    /// element; the connector(s) sit alongside.
+    private static let chargerSize: CGFloat = 132
+    private static let connectorSize: CGFloat = 88
+    private static let cableLineWidth: CGFloat = 8
 
     var body: some View {
         VStack(spacing: Spacing.md) {
@@ -38,138 +39,120 @@ struct ChargerHero: View {
             statusLine
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.lg)
-        .padding(.horizontal, Spacing.base)
-        .background(heroBackground)
+        .padding(.vertical, Spacing.md)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
 
-    private var heroBackground: some View {
-        RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
-            .glassEffect(.regular.tint(tone.opacity(0.15)))
-    }
-
-    /// The charger + cable + connector composition. We use a relative
-    /// `GeometryReader` layout so connector placement scales with
-    /// Dynamic Type without absolute pixel coordinates leaking out.
+    /// Charger + cable + connector. Layout uses fixed proportions so
+    /// the cable's right-angle turns line up with the charger's
+    /// bottom edge and the connector's left edge regardless of
+    /// container width.
     private var artwork: some View {
         GeometryReader { geo in
             let width = geo.size.width
             let height = geo.size.height
-            let chargerOrigin = CGPoint(
-                x: width * 0.18,
-                y: height * 0.5
+            // Charger anchored upper-left.
+            let chargerCenter = CGPoint(
+                x: max(Self.chargerSize / 2 + 4, width * 0.22),
+                y: Self.chargerSize / 2 + 4
             )
-            let connectorRow = connectors.enumerated().map { index, connector in
-                ConnectorPlacement(
-                    descriptor: connector,
-                    center: connectorCenter(
-                        index: index,
-                        count: connectors.count,
-                        width: width,
-                        height: height
-                    )
-                )
-            }
+            // Connector anchored lower-right.
+            let connectorCenter = CGPoint(
+                x: min(width - Self.connectorSize / 2 - 4, width * 0.78),
+                y: height - Self.connectorSize / 2 - 4
+            )
 
             ZStack(alignment: .topLeading) {
-                // Cables drawn first so the glyphs sit on top.
-                Canvas { ctx, _ in
-                    for placement in connectorRow {
-                        let cable = cablePath(
-                            from: chargerOrigin,
-                            to: placement.center
-                        )
-                        ctx.stroke(
-                            cable,
-                            with: .color(cableColor),
-                            style: StrokeStyle(
-                                lineWidth: 3,
-                                lineCap: .round,
-                                lineJoin: .round
-                            )
-                        )
-                    }
-                }
+                // Cable — drawn first so the glyphs sit on top.
+                cableShape(
+                    chargerCenter: chargerCenter,
+                    connectorCenter: connectorCenter
+                )
+                .stroke(
+                    cableColor,
+                    style: StrokeStyle(
+                        lineWidth: Self.cableLineWidth,
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
+                )
 
                 ChargerFormFactorIcon(
                     size: Self.chargerSize,
                     haloColor: tone,
-                    glow: glow.opacity(0.55)
+                    glow: glow.opacity(0.45)
                 )
-                .position(chargerOrigin)
+                .position(chargerCenter)
 
-                ForEach(Array(connectorRow.enumerated()), id: \.offset) { _, placement in
-                    connectorTile(placement: placement, width: width)
-                }
+                J1772Icon(
+                    size: Self.connectorSize,
+                    haloColor: tone
+                )
+                .position(connectorCenter)
+
+                connectorLabel(at: connectorCenter, in: width)
             }
         }
         .frame(height: heroArtworkHeight)
     }
 
     private var heroArtworkHeight: CGFloat {
-        let perConnector: CGFloat = Self.connectorSize + Spacing.sm
-        let needed = max(Self.chargerSize, perConnector * CGFloat(max(connectors.count, 1)))
-        return needed + Spacing.lg
+        // Tall enough to hold the charger up top and the connector
+        // down-right with a sensible cable run between them.
+        Self.chargerSize + Self.connectorSize + Spacing.lg + Spacing.lg
     }
 
-    private func connectorCenter(
-        index: Int,
-        count: Int,
-        width: CGFloat,
-        height: CGFloat
-    ) -> CGPoint {
-        let column = width * 0.62
-        guard count > 1 else {
-            return CGPoint(x: column, y: height * 0.32)
-        }
-        let bandTop = height * 0.18
-        let bandBottom = height * 0.82
-        let step = (bandBottom - bandTop) / CGFloat(count - 1)
-        return CGPoint(x: column, y: bandTop + step * CGFloat(index))
-    }
-
-    @ViewBuilder
-    private func connectorTile(
-        placement: ConnectorPlacement,
-        width: CGFloat
-    ) -> some View {
-        HStack(spacing: Spacing.md) {
-            J1772Icon(size: Self.connectorSize, haloColor: tone)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(kWLabel(for: placement.descriptor))
-                    .font(.callout.weight(.semibold))
-                Text(typeLabel(for: placement.descriptor))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .position(
-            x: placement.center.x + (width - placement.center.x) / 2 - Spacing.sm,
-            y: placement.center.y
-        )
-    }
-
-    private func cablePath(from a: CGPoint, to b: CGPoint) -> Path {
+    /// Squared cable: out the bottom of the charger, down a bit, 90°
+    /// turn toward the connector's column, then 90° turn up to the
+    /// connector's top edge.
+    private func cableShape(
+        chargerCenter: CGPoint,
+        connectorCenter: CGPoint
+    ) -> Path {
         var p = Path()
-        // Pull the start to the right edge of the charger plate and
-        // the end to the left edge of the connector plate so the
-        // cable doesn't overlap the glyphs.
-        let start = CGPoint(x: a.x + Self.chargerSize * 0.32, y: a.y)
-        let end = CGPoint(x: b.x - Self.connectorSize * 0.42, y: b.y)
-        let mid1 = CGPoint(x: (start.x + end.x) / 2, y: start.y + 18)
-        let mid2 = CGPoint(x: (start.x + end.x) / 2, y: end.y + 18)
-        p.move(to: start)
-        p.addCurve(to: end, control1: mid1, control2: mid2)
+        let chargerBottom = CGPoint(
+            x: chargerCenter.x,
+            y: chargerCenter.y + Self.chargerSize / 2
+        )
+        let connectorTop = CGPoint(
+            x: connectorCenter.x,
+            y: connectorCenter.y - Self.connectorSize / 2
+        )
+        // Mid-point Y where the horizontal run lives — sits between
+        // the charger's bottom and the connector's top so the cable
+        // makes its turn cleanly.
+        let midY = (chargerBottom.y + connectorTop.y) / 2 + 12
+
+        p.move(to: chargerBottom)
+        p.addLine(to: CGPoint(x: chargerBottom.x, y: midY))
+        p.addLine(to: CGPoint(x: connectorTop.x, y: midY))
+        p.addLine(to: connectorTop)
         return p
     }
 
     private var cableColor: Color {
         switch status {
-        case .charging: return tone.opacity(0.55)
-        case .offline:  return ColorPalette.borderSubtle.opacity(0.5)
-        default:        return ColorPalette.borderSubtle.opacity(0.85)
+        case .charging: return tone.opacity(0.85)
+        case .offline:  return ColorPalette.mutedForeground.opacity(0.7)
+        default:        return tone.opacity(0.7)
+        }
+    }
+
+    @ViewBuilder
+    private func connectorLabel(at center: CGPoint, in width: CGFloat) -> some View {
+        if let descriptor = connectors.first {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(kWLabel(for: descriptor))
+                    .font(.headline)
+                Text(typeLabel(for: descriptor))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .position(
+                x: center.x - Self.connectorSize / 2 - 56,
+                y: center.y
+            )
         }
     }
 
@@ -206,11 +189,6 @@ struct ChargerHero: View {
             bits.append("\(typeLabel(for: c)) \(kWLabel(for: c))")
         }
         return bits.joined(separator: ", ")
-    }
-
-    private struct ConnectorPlacement {
-        let descriptor: ChargerDetailViewModel.ConnectorDescriptor
-        let center: CGPoint
     }
 }
 

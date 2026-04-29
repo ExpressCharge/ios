@@ -2,15 +2,16 @@
 //  J1772Icon.swift
 //  ExpresScan
 //
-//  SwiftUI rendering of an SAE J1772 connector silhouette. The icon
-//  shares the same chrome as `ChargerFormFactorIcon` (rounded-square
-//  plate with an inset status halo + recessed face) so the charger
-//  and connector visually rhyme in `ChargerHero`.
+//  SwiftUI rendering of the SAE J1772 connector inlet face — the
+//  round port with five contact holes that drivers see on the EV
+//  side. Wrapped in the same rounded-square chrome as
+//  `ChargerFormFactorIcon` so the charger and connector visually
+//  rhyme in `ChargerHero`.
 //
-//  The J1772 silhouette inside the face plate consists of:
-//    * a round contact disk (the body),
-//    * a small rectangular locking tab on top,
-//    * a short tail flowing into the cable.
+//  The five-hole layout is canonical for J1772:
+//   * Two large pilot/control contacts on top (L1, L2)
+//   * Two large power contacts in the middle (CP, CS / N)
+//   * One large ground contact at the bottom (PE)
 //
 
 import SwiftUI
@@ -22,7 +23,7 @@ struct J1772Icon: View {
     /// Status-bearing halo colour.
     let haloColor: Color
 
-    init(size: CGFloat = 56, haloColor: Color = .teal) {
+    init(size: CGFloat = 88, haloColor: Color = .teal) {
         self.size = size
         self.haloColor = haloColor
     }
@@ -32,7 +33,7 @@ struct J1772Icon: View {
             let scale = min(canvasSize.width, canvasSize.height) / 100.0
             ctx.scaleBy(x: scale, y: scale)
 
-            // Outer body — rounded square.
+            // Outer body — rounded square plate.
             let body = Path(roundedRect: CGRect(x: 8, y: 8, width: 84, height: 84),
                             cornerRadius: 19)
             ctx.fill(body, with: .color(Self.bodyColor))
@@ -50,60 +51,50 @@ struct J1772Icon: View {
                             cornerRadius: 13)
             ctx.stroke(halo, with: .color(haloColor.opacity(0.95)), lineWidth: 5)
 
-            // Recessed face.
-            let face = Path(roundedRect: CGRect(x: 24, y: 24, width: 52, height: 52),
-                            cornerRadius: 10)
+            // J1772 connector face — large outer ring.
+            let face = Path(ellipseIn: CGRect(x: 26, y: 26, width: 48, height: 48))
             ctx.fill(face, with: .color(Self.faceColor))
+            ctx.stroke(face, with: .color(haloColor.opacity(0.95)), lineWidth: 2.5)
 
-            // J1772 silhouette — drawn on top of the face. Coordinates
-            // are tuned so the connector reads at small sizes.
-            let glyph = Self.j1772Path()
-            ctx.fill(glyph, with: .color(haloColor.opacity(0.92)))
-
-            // Five recessed contact pins on the disk so the connector is
-            // recognisable at hero sizes (24/24/24 across, plus two on
-            // the bottom). Tiny — they vanish below ~32pt without
-            // muddying the silhouette at hero sizes.
+            // Five contact holes laid out in the canonical J1772 face.
+            // Coordinates are tuned for the 100×100 viewBox; the
+            // outer face is centered at (50, 50) with radius 24.
+            let pinRadius: CGFloat = 5.6
             let pin: (CGFloat, CGFloat) -> Path = { x, y in
-                Path(ellipseIn: CGRect(x: x - 1.6, y: y - 1.6, width: 3.2, height: 3.2))
+                Path(ellipseIn: CGRect(
+                    x: x - pinRadius,
+                    y: y - pinRadius,
+                    width: pinRadius * 2,
+                    height: pinRadius * 2
+                ))
             }
-            ctx.fill(pin(43, 47), with: .color(Self.faceColor))
-            ctx.fill(pin(50, 47), with: .color(Self.faceColor))
-            ctx.fill(pin(57, 47), with: .color(Self.faceColor))
-            ctx.fill(pin(46, 56), with: .color(Self.faceColor))
-            ctx.fill(pin(54, 56), with: .color(Self.faceColor))
+            // Top pair (L1, L2) — large power contacts.
+            ctx.fill(pin(40, 38), with: .color(Self.holeColor))
+            ctx.fill(pin(60, 38), with: .color(Self.holeColor))
+            // Middle pair (CP / CS / Neutral) — slightly smaller in
+            // real life, here normalised for legibility.
+            ctx.fill(pin(38, 52), with: .color(Self.holeColor))
+            ctx.fill(pin(62, 52), with: .color(Self.holeColor))
+            // Bottom (PE / ground) — single hole.
+            ctx.fill(pin(50, 65), with: .color(Self.holeColor))
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 
-    /// Canonical J1772 silhouette inside a 100×100 viewBox. The disk is
-    /// centered around (50, 52); the locking tab pokes up from the top.
-    private static func j1772Path() -> Path {
-        var p = Path()
-        // Locking tab.
-        p.addRoundedRect(in: CGRect(x: 45, y: 32, width: 10, height: 7),
-                         cornerSize: CGSize(width: 1.5, height: 1.5))
-        // Circular contact disk.
-        p.addEllipse(in: CGRect(x: 36, y: 39, width: 28, height: 28))
-        // Short tail flowing into the cable.
-        p.addRoundedRect(in: CGRect(x: 47, y: 65, width: 6, height: 6),
-                         cornerSize: CGSize(width: 1.5, height: 1.5))
-        return p
-    }
-
     private static let bodyColor      = Color(red: 0.20, green: 0.21, blue: 0.24)
     private static let bodyHighlight  = Color(red: 0.36, green: 0.37, blue: 0.40)
     private static let faceColor      = Color(red: 0.10, green: 0.11, blue: 0.13)
+    private static let holeColor      = Color(red: 0.04, green: 0.04, blue: 0.06)
 }
 
 #if DEBUG
 #Preview("J1772 states") {
     HStack(spacing: 16) {
-        J1772Icon(size: 56, haloColor: .green)
-        J1772Icon(size: 56, haloColor: .cyan)
-        J1772Icon(size: 56, haloColor: .orange)
-        J1772Icon(size: 56, haloColor: .red)
+        J1772Icon(size: 88, haloColor: .green)
+        J1772Icon(size: 88, haloColor: .cyan)
+        J1772Icon(size: 88, haloColor: .orange)
+        J1772Icon(size: 88, haloColor: .red)
     }
     .padding()
     .background(Color.black)

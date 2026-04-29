@@ -32,8 +32,21 @@ struct ChargerDetailView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle(entry.label)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    if let vm = viewModel {
+                        Task { await vm.refresh() }
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .accessibilityLabel("Refresh")
+                }
+                .disabled(viewModel?.loadState == .loading)
+            }
+        }
         .expressBackground()
         .task {
             if viewModel == nil {
@@ -62,15 +75,9 @@ struct ChargerDetailView: View {
                 case .ready:
                     readyBody(vm: vm)
                 case .offline:
-                    ChargerUnavailableNotice(
-                        reason: .offline(lastSeen: entry.lastSeenAt),
-                        onRefresh: { Task { await vm.refresh() } }
-                    )
+                    ChargerUnavailableNotice(reason: .offline)
                 case .outOfService:
-                    ChargerUnavailableNotice(
-                        reason: .outOfService,
-                        onRefresh: { Task { await vm.refresh() } }
-                    )
+                    ChargerUnavailableNotice(reason: .outOfService)
                 }
 
                 if case .error(let message) = vm.loadState {
