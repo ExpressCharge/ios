@@ -69,9 +69,9 @@ struct ChargerUnavailableNotice: View {
     private var bodyText: String {
         switch reason {
         case .offline:
-            return "This charger is currently offline. Wait for it to come back online and refresh to check its status."
+            return "Wait for it to come back online and refresh to check its status."
         case .outOfService:
-            return "This charger is reporting a fault. Reservations and remote starts are paused. Contact your site admin if this persists."
+            return "Reservations and remote starts are paused. Contact your site admin if this persists."
         }
     }
 }
