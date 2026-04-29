@@ -109,17 +109,54 @@ struct ChargerDetailView: View {
             TimelineView(.animation(minimumInterval: 1.0)) { context in
                 ActiveSessionCard(session: session, now: context.date)
             }
-        } else if !vm.reservations.isEmpty {
-            ReservationsCard(
-                reservations: vm.reservations,
-                actionInFlight: vm.actionInFlight,
-                onCancel: { res in
-                    Task { await vm.cancelReservation(res.reservationId, confirmed: true) }
-                }
-            )
+        } else {
+            if !vm.reservations.isEmpty {
+                ReservationsCard(
+                    reservations: vm.reservations,
+                    actionInFlight: vm.actionInFlight,
+                    onCancel: { res in
+                        Task { await vm.cancelReservation(res.reservationId, confirmed: true) }
+                    }
+                )
+            }
+            if hasNFCCapability {
+                nfcAvailableNotice
+            }
         }
 
         primaryCTA(vm: vm)
+    }
+
+    private var hasNFCCapability: Bool {
+        entry.capabilities?.contains("scanner") ?? false
+    }
+
+    private var nfcAvailableNotice: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+            Image(systemName: "wave.3.right.circle.fill")
+                .font(.title3)
+                .foregroundStyle(ColorPalette.primaryCyan)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Tap your card")
+                    .font(.subheadline.weight(.semibold))
+                Text("This charger reads RFID cards — tap one to start without using the app.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Spacing.base)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(ColorPalette.primaryCyan.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .strokeBorder(ColorPalette.primaryCyan.opacity(0.35), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Sections
