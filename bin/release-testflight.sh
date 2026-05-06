@@ -41,7 +41,7 @@ ASC_API_KEY_ID="3QASFD6K93"
 ASC_API_ISSUER_ID="69a6de71-4cb4-47e3-e053-5b8c7c11a4d1"
 ASC_APP_ID="6766818991"
 
-DEVELOPER_DIR_OVERRIDE="/Applications/Xcode-beta.app/Contents/Developer"
+DEVELOPER_DIR_OVERRIDE="${DEVELOPER_DIR_OVERRIDE:-/Applications/Xcode-beta.app/Contents/Developer}"
 DEVICE_ID="984F8C13-6E62-5A85-A9CC-8AFC97AC1CC9"   # Vladosaurus
 
 # --- Args -------------------------------------------------------------------
@@ -137,7 +137,7 @@ DEVELOPER_DIR="$DEVELOPER_DIR_OVERRIDE" xcodebuild \
 echo "  ✓ upload succeeded"
 
 # --- 5. Wait for processing -------------------------------------------------
-echo "→ waiting for App Store Connect to finish processing build $NEXT…"
+echo "→ waiting for App Store Connect to finish processing build ${NEXT}…"
 ASC_API_KEY_PATH="$ASC_API_KEY_PATH" \
 ASC_API_KEY_ID="$ASC_API_KEY_ID" \
 ASC_API_ISSUER_ID="$ASC_API_ISSUER_ID" \
