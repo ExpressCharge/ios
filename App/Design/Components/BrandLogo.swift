@@ -8,11 +8,12 @@
 //
 //   - A continuous-curvature `RoundedRectangle` (corner radius 30 % of
 //     the side length, matching the web's `rounded-[30%]`).
-//   - A linear gradient fill cycling cyan → green → violet → cyan
-//     whose endpoints flow on an 8 s loop driven by `TimelineView`.
-//   - A white thunderbolt SF Symbol with `.symbolEffect(.pulse)` so it
-//     pulses gently — the iOS-native equivalent of the web's
-//     BorderBeam.
+//   - A linear gradient fill cycling cyan → green → cyan whose endpoints
+//     flow on an 8 s loop driven by `TimelineView`.
+//   - A white Lucide Zap glyph (custom `ZapShape`) — the SAME path the
+//     app icon uses (`expresscharge/static/logo-app.svg`) — filled white
+//     and outlined with a matching rounded-join stroke so the corners
+//     are softened identically.
 //   - A soft outer glow built from a second copy of the squircle at
 //     `.scaleEffect(1.15)` / `.opacity(0.35)` / `.blur(radius: 8)`,
 //     mirroring the `blur-md animate-pulse` halo at line 104 of the
@@ -39,7 +40,13 @@ public struct BrandLogo: View {
             }
         }
 
-        var iconDimension: CGFloat { dimension * 0.55 }
+        // Sized so the visible Zap path matches the app icon's bolt
+        // proportions: SVG bolt occupies 18/24 of its 0.45-of-canvas
+        // bounding box, i.e. 33.75 % of the canvas wide. Reverse-solving:
+        // visible-width = iconDimension * 18/24 = 0.34 → iconDimension
+        // ≈ 0.45 × dimension. This bumps the bolt to feel as prominent
+        // on the splash screen as it does on the home-screen icon.
+        var iconDimension: CGFloat { dimension * 0.56 }
         var cornerRadius: CGFloat { dimension * 0.30 }
         var glowBlur: CGFloat { dimension * 0.10 }
     }
@@ -84,15 +91,22 @@ public struct BrandLogo: View {
             .fill(gradient)
             .frame(width: size.dimension, height: size.dimension)
             .overlay(
-                Image(systemName: "bolt.fill")
-                    .resizable()
-                    .scaledToFit()
+                ZapShape()
+                    .fill(.white)
+                    .overlay(
+                        ZapShape().stroke(
+                            .white,
+                            style: StrokeStyle(
+                                lineWidth: size.iconDimension / 24 * 2,
+                                lineCap: .round,
+                                lineJoin: .round
+                            )
+                        )
+                    )
                     .frame(
                         width: size.iconDimension,
                         height: size.iconDimension
                     )
-                    .foregroundStyle(.white)
-                    .symbolEffect(.pulse, isActive: !reduceMotion)
                     .shadow(color: .white.opacity(0.5), radius: 4)
             )
     }
@@ -142,6 +156,31 @@ public struct BrandLogo: View {
             startPoint: UnitPoint(x: phase, y: 0),
             endPoint: UnitPoint(x: phase + 1, y: 1)
         )
+    }
+}
+
+// MARK: - Bolt path
+
+/// Lucide Zap thunderbolt — the exact path used by the app icon source
+/// (`expresscharge/static/logo-app.svg`). Drawn in a 24×24 viewBox and
+/// scaled to fit `rect`.
+private struct ZapShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 24
+        let dx = (rect.width - 24 * s) / 2
+        let dy = (rect.height - 24 * s) / 2
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: dx + x * s, y: dy + y * s)
+        }
+        var path = Path()
+        path.move(to: p(13, 2))
+        path.addLine(to: p(3, 14))
+        path.addLine(to: p(12, 14))
+        path.addLine(to: p(11, 22))
+        path.addLine(to: p(21, 10))
+        path.addLine(to: p(12, 10))
+        path.closeSubpath()
+        return path
     }
 }
 
