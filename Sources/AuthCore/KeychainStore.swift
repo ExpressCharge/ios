@@ -47,7 +47,7 @@ public struct KeychainStore: Sendable {
     /// Default service identifier. Production callers MUST use
     /// `KeychainStore.production` (or the convenience initialiser); the
     /// raw initialiser exists so tests can use a unique service id.
-    public static let productionService = "gg.vlad.expresscan"
+    public static let productionService = "express.polaris.ios"
 
     public init(service: String) {
         self.service = service

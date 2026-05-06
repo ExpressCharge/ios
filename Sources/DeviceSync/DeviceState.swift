@@ -29,6 +29,12 @@ public struct DeviceState: Sendable, Equatable, Codable {
     /// `nil` when the device has no APNs token registered.
     public var pushToken: PushTokenInfo?
     public var connectivity: Connectivity
+    /// Server hint that it has no APNs token for this device but the
+    /// device last reported notifications as authorized / provisional /
+    /// ephemeral. When `true`, the client should call
+    /// `registerForRemoteNotifications()` to re-deliver the token.
+    /// Optional so older servers that don't emit the field still decode.
+    public var needsPushToken: Bool?
 
     public init(
         device: DeviceSummary,
@@ -38,7 +44,8 @@ public struct DeviceState: Sendable, Equatable, Codable {
         settings: [String: DeviceSettingValue],
         scanStatus: ScanStatus?,
         pushToken: PushTokenInfo?,
-        connectivity: Connectivity
+        connectivity: Connectivity,
+        needsPushToken: Bool? = nil
     ) {
         self.device = device
         self.capabilities = capabilities
@@ -48,6 +55,7 @@ public struct DeviceState: Sendable, Equatable, Codable {
         self.scanStatus = scanStatus
         self.pushToken = pushToken
         self.connectivity = connectivity
+        self.needsPushToken = needsPushToken
     }
 
     // MARK: - Nested

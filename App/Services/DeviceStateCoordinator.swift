@@ -330,6 +330,13 @@ public final class DeviceStateCoordinator {
         // a failure here doesn't fail the sync (the next tick retries
         // via the LWW path).
         try? await settingsStore.applyMerged(envelope.settings)
+        // Server-driven self-healing: if the server has no APNs token
+        // stored but the device thinks notifications are authorized,
+        // it sets `needsPushToken`. Re-register to make iOS re-fire the
+        // AppDelegate callback, which PUTs the token via PushService.
+        if envelope.needsPushToken == true {
+            UIApplication.shared.registerForRemoteNotifications()
+        }
     }
 
     private func routeRevocation() async {

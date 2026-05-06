@@ -26,10 +26,10 @@ import Networking
 /// for any state transition or failure path. The `subsystem` matches
 /// our App ID so OSLogStore queries (and the QA Console.app filter)
 /// pick up everything in one place.
-public let scanLog = Logger(subsystem: "gg.vlad.expresscan", category: "scan")
-public let netLog = Logger(subsystem: "gg.vlad.expresscan", category: "network")
-public let nfcLog = Logger(subsystem: "gg.vlad.expresscan", category: "nfc")
-public let authLog = Logger(subsystem: "gg.vlad.expresscan", category: "auth")
+public let scanLog = Logger(subsystem: "express.polaris.ios", category: "scan")
+public let netLog = Logger(subsystem: "express.polaris.ios", category: "network")
+public let nfcLog = Logger(subsystem: "express.polaris.ios", category: "nfc")
+public let authLog = Logger(subsystem: "express.polaris.ios", category: "auth")
 
 /// Per-build constants that can't be discovered at runtime. Single
 /// source of truth for the API base URL and APNs environment. The
@@ -37,7 +37,7 @@ public let authLog = Logger(subsystem: "gg.vlad.expresscan", category: "auth")
 /// active compilation conditions per-config.
 public enum BuildConfig {
     /// HTTPS base URL of the expressync backend. The Fresh monolith
-    /// serves both the admin web UI (`/admin/*`, `/expresscan/*`) and
+    /// serves both the admin web UI (`/admin/*`, `/app/*`) and
     /// the iOS-facing API (`/api/devices/*`) from the SAME host —
     /// `manage.polaris.express`. There is no separate `api.` subdomain.
     /// (See `expressync/.env.example` `ADMIN_BASE_URL` line and the
@@ -64,22 +64,19 @@ public enum BuildConfig {
     public static let universalLinkHost = "manage.polaris.express"
 
     /// Path prefix on the universal-link host that we react to.
-    public static let registrationCallbackPath = "/expresscan/register/callback"
+    public static let registrationCallbackPath = "/app/register/callback"
 
     /// Custom URL scheme that `ASWebAuthenticationSession` is registered
     /// to intercept. The web admin's POST handler 302s the in-session
-    /// browser to `expresscan://register/callback?code=…`; iOS sees the
+    /// browser to `expchg://register/callback?code=…`; iOS sees the
     /// scheme match the session's `callbackURLScheme`, dismisses the
-    /// auth view, and delivers the URL to the completion handler. Not
-    /// registered in `Info.plist` `CFBundleURLTypes` — Apple does not
-    /// require that for the auth-session path, and skipping it avoids
-    /// dispatching stray `expresscan://` URLs from elsewhere.
-    public static let callbackURLScheme = "expresscan"
+    /// auth view, and delivers the URL to the completion handler.
+    public static let callbackURLScheme = "expchg"
 
     /// Web-side login starting point for the PKCE-protected
     /// registration flow. Always lives on the production host because
     /// the web admin UI is single-environment.
-    public static let registrationStartURL = URL(string: "https://manage.polaris.express/expresscan/register")!
+    public static let registrationStartURL = URL(string: "https://manage.polaris.express/app/register")!
 
     /// User-facing app version, sourced from the bundle.
     public static var appVersion: String {

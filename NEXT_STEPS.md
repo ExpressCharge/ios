@@ -76,7 +76,7 @@ xcodebuild test -scheme ExpresScan-Debug \
 
 ### 4. Register the App ID
 
-- Bundle ID: `gg.vlad.expresscan`
+- Bundle ID: `express.polaris.ios`
 - Team: `48H7CLBV8Y`
 - Capabilities: **Near Field Communication Tag Reading**, **Push
   Notifications**, **Associated Domains**
@@ -89,7 +89,7 @@ Add to the **backend** env vars (in `expressync`):
 APNS_KEY_ID=…       # 10-char Apple-issued key id
 APNS_TEAM_ID=48H7CLBV8Y
 APNS_KEY_BASE64=…   # base64 of the .p8 PEM
-APNS_TOPIC=gg.vlad.expresscan
+APNS_TOPIC=express.polaris.ios
 ```
 
 Recipe for the base64 step: `base64 -i AuthKey_<KEYID>.p8`.

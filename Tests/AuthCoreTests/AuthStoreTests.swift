@@ -3,7 +3,7 @@
 //  AuthCoreTests
 //
 //  End-to-end Keychain round-trip on a *temporary* service identifier so
-//  we don't pollute the real `gg.vlad.expresscan` keychain. These tests
+//  we don't pollute the real `express.polaris.ios` keychain. These tests
 //  require macOS (no Linux Keychain shim), which is fine for the team
 //  machine — the orchestrator skips them on Linux CI.
 //
@@ -57,7 +57,7 @@ private func keychainAvailable(service: String) -> Bool {
 }
 
 private let keychainIsAvailable: Bool = {
-    keychainAvailable(service: "gg.vlad.expresscan.probe.\(UUID().uuidString)")
+    keychainAvailable(service: "express.polaris.ios.probe.\(UUID().uuidString)")
 }()
 
 @Suite("AuthStore")
@@ -68,7 +68,7 @@ struct AuthStoreTests {
     let store: KeychainStore
 
     init() {
-        let testService = "gg.vlad.expresscan.tests.\(UUID().uuidString)"
+        let testService = "express.polaris.ios.tests.\(UUID().uuidString)"
         self.store = KeychainStore(service: testService)
         try? store.deleteAll()
     }

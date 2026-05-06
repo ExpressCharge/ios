@@ -27,7 +27,7 @@ import Models
 /// Module-private logger. Mirrors the App target's `netLog` subsystem so
 /// requests + responses land in the same Console.app stream as the app's
 /// own networking events.
-private let netLog = Logger(subsystem: "gg.vlad.expresscan", category: "network")
+private let netLog = Logger(subsystem: "express.polaris.ios", category: "network")
 
 // MARK: - HTTP transport abstraction
 
