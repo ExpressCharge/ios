@@ -8,9 +8,9 @@
 //      `codeChallenge` = base64url(SHA-256(codeVerifier)).
 //   2. Open `ASWebAuthenticationSession` to the registration URL with
 //      `codeChallenge` + a label hint as query items. The session is
-//      configured with `callbackURLScheme: "expresscan"`; the web
+//      configured with `callbackURLScheme: "expchg"`; the web
 //      admin's POST handler 302s the in-session browser to
-//      `expresscan://register/callback?code=…`, AuthServices matches
+//      `expchg://register/callback?code=…`, AuthServices matches
 //      the scheme, dismisses the auth UI, and hands us the URL via
 //      the completion handler.
 //   3. We extract the `code` query parameter from the callback URL,
@@ -112,7 +112,7 @@ public final class LoginViewModel: NSObject {
         }
 
         // The server's POST handler 302s the in-session web view to
-        // `expresscan://register/callback?code=…`. AuthServices matches
+        // `expchg://register/callback?code=…`. AuthServices matches
         // the redirect's scheme against the session's callback and —
         // when they match — dismisses the auth UI and delivers the URL
         // to the completion handler.
@@ -215,10 +215,10 @@ public final class LoginViewModel: NSObject {
         // Two valid shapes:
         //  - Custom-scheme callback delivered by ASWebAuthenticationSession
         //    after the server's 302 inside the auth view:
-        //    `expresscan://register/callback?code=…`.
+        //    `expchg://register/callback?code=…`.
         //  - HTTPS Universal Link (legacy / belt-and-braces) delivered
         //    via `RootView.onOpenURL` if a stale link is tapped from
-        //    elsewhere: `https://manage.example.com/expresscan/
+        //    elsewhere: `https://manage.example.com/app/
         //    register/callback?code=…`.
         let isCustomScheme = components.scheme == BuildConfig.callbackURLScheme
         let isUniversalLink = components.scheme == "https"

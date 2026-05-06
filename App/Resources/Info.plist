@@ -24,10 +24,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>None</string>
 			<key>CFBundleURLName</key>
-			<string>gg.vlad.expresscan.callback</string>
+			<string>com.example.expresscharge.ios.callback</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>expresscan</string>
+				<string>expchg</string>
 			</array>
 		</dict>
 	</array>

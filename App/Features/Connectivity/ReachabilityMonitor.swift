@@ -20,7 +20,7 @@ import Network
 import Observation
 import os
 
-private let reachLog = Logger(subsystem: "gg.vlad.expresscan", category: "reachability")
+private let reachLog = Logger(subsystem: "com.example.expresscharge.ios", category: "reachability")
 
 /// Source of truth for whether the app can talk to the backend. Pulls
 /// from two probes — device path and server health — and exposes a

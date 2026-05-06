@@ -4,7 +4,7 @@
 //
 //  Tests the static PKCE primitives owned by `LoginViewModel`. The
 //  end-to-end ASWebAuthenticationSession flow (custom-scheme callback,
-//  `expresscan://register/callback?code=…` matched via the session's
+//  `expchg://register/callback?code=…` matched via the session's
 //  `callbackURLScheme`) is covered by on-device manual QA; unit tests
 //  can't exercise AuthServices without a real UIScene host. These
 //  tests pin down the spec-compliance of the inputs we hand to
