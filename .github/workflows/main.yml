@@ -104,6 +104,7 @@ jobs:
           echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "DEVELOPER_DIR=$PICK/Contents/Developer" >> "$GITHUB_ENV"
           echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: swift-format lint
         run: |
@@ -168,6 +169,7 @@ jobs:
           echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "DEVELOPER_DIR=$PICK/Contents/Developer" >> "$GITHUB_ENV"
           echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: swift-format idempotency
         run: |
@@ -227,6 +229,7 @@ jobs:
           echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "DEVELOPER_DIR=$PICK/Contents/Developer" >> "$GITHUB_ENV"
           echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: Install xcodegen + xcbeautify
         run: brew install xcodegen xcbeautify
@@ -302,6 +305,7 @@ jobs:
           echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "DEVELOPER_DIR=$PICK/Contents/Developer" >> "$GITHUB_ENV"
           echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: Install xcbeautify
         run: brew install xcbeautify
@@ -382,6 +386,7 @@ jobs:
           echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "DEVELOPER_DIR=$PICK/Contents/Developer" >> "$GITHUB_ENV"
           echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: Install xcbeautify
         run: brew install xcbeautify
@@ -470,6 +475,7 @@ jobs:
           echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "DEVELOPER_DIR=$PICK/Contents/Developer" >> "$GITHUB_ENV"
           echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
 
       - name: Install tooling
