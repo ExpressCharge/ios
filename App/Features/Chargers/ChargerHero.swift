@@ -19,6 +19,7 @@ struct ChargerHero: View {
     let heroState: StatusHero.State
     let isOffline: Bool
     let connectors: [ChargerDetailViewModel.ConnectorDescriptor]
+    let formFactor: ChargerListEntry.FormFactor
 
     private var status: ChargerStatusVisuals.Status {
         ChargerStatusVisuals.status(for: heroState, isOffline: isOffline)
@@ -31,6 +32,12 @@ struct ChargerHero: View {
     private static let chargerSize: CGFloat = 132
     private static let connectorSize: CGFloat = 96
     private static let cableLineWidth: CGFloat = 8
+    private static let cableHighlightLineWidth: CGFloat = 3
+    private static let cableHighlightOpacity: Double = 0.22
+    private static let cableBendRadius: CGFloat = 14
+    private static let chargerBootSize = CGSize(width: 18, height: 10)
+    private static let connectorBootSize = CGSize(width: 14, height: 8)
+    private static let bootCornerRadius: CGFloat = 3
 
     var body: some View {
         VStack(spacing: Spacing.sm) {
@@ -49,7 +56,6 @@ struct ChargerHero: View {
     private var artwork: some View {
         GeometryReader { geo in
             let width = geo.size.width
-            let height = geo.size.height
 
             // Vertical centre line for both glyphs.
             let centerY = (Self.chargerSize / 2) + Spacing.sm
@@ -62,13 +68,22 @@ struct ChargerHero: View {
                 y: centerY
             )
 
+            let chargerBottom = CGPoint(
+                x: chargerCenter.x,
+                y: chargerCenter.y + Self.chargerSize / 2
+            )
+            let connectorBottom = CGPoint(
+                x: connectorCenter.x,
+                y: connectorCenter.y + Self.connectorSize / 2 - 4
+            )
+
             ZStack(alignment: .topLeading) {
-                cableShape(
-                    chargerCenter: chargerCenter,
-                    connectorCenter: connectorCenter,
-                    canvasHeight: height
+                let cable = cableShape(
+                    chargerBottom: chargerBottom,
+                    connectorBottom: connectorBottom
                 )
-                .stroke(
+
+                cable.stroke(
                     cableColor,
                     style: StrokeStyle(
                         lineWidth: Self.cableLineWidth,
@@ -77,14 +92,36 @@ struct ChargerHero: View {
                     )
                 )
 
+                cable.stroke(
+                    Color.white.opacity(Self.cableHighlightOpacity),
+                    style: StrokeStyle(
+                        lineWidth: Self.cableHighlightLineWidth,
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
+                )
+
+                strainReliefBoot(size: Self.chargerBootSize)
+                    .position(
+                        x: chargerBottom.x,
+                        y: chargerBottom.y + Self.chargerBootSize.height / 2 - 2
+                    )
+
+                strainReliefBoot(size: Self.connectorBootSize)
+                    .position(
+                        x: connectorBottom.x,
+                        y: connectorBottom.y + Self.connectorBootSize.height / 2 - 2
+                    )
+
                 ChargerFormFactorIcon(
                     size: Self.chargerSize,
+                    formFactor: formFactor,
                     haloColor: tone,
                     glow: glow.opacity(0.45)
                 )
                 .position(chargerCenter)
 
-                J1772Icon(size: Self.connectorSize)
+                connectorGlyph
                     .position(connectorCenter)
 
                 connectorMeta(at: connectorCenter)
@@ -93,38 +130,66 @@ struct ChargerHero: View {
         .frame(height: heroArtworkHeight)
     }
 
+    /// Connector silhouette chosen from the first descriptor's
+    /// `connectorType`. NACS renders as a smooth circle; everything
+    /// else (including unknown / nil) falls back to the J1772
+    /// silhouette since J1772 is the most common physical connector
+    /// in the fleet today.
+    @ViewBuilder
+    private var connectorGlyph: some View {
+        switch connectors.first?.connectorType {
+        case .nacs:
+            NACSIcon(size: Self.connectorSize)
+        default:
+            J1772Icon(size: Self.connectorSize)
+        }
+    }
+
     private var heroArtworkHeight: CGFloat {
         // Tall enough to hold the charger + connector at one
         // vertical centre plus the cable U beneath them.
         Self.chargerSize + Self.connectorSize / 2 + Spacing.xl + Spacing.lg
     }
 
-    /// Squared cable: out the bottom of the charger, down a bit,
-    /// 90° turn toward the connector, then 90° turn up to the
-    /// connector's bottom edge.
+    /// Squared cable with filleted bend corners: out the bottom of
+    /// the charger, down to the run, gentle 90° fillet toward the
+    /// connector, gentle 90° fillet up to the connector's bottom
+    /// edge. `addArc(tangent1End:tangent2End:radius:)` keeps the
+    /// straight legs straight and only rounds the corner geometry.
     private func cableShape(
-        chargerCenter: CGPoint,
-        connectorCenter: CGPoint,
-        canvasHeight: CGFloat
+        chargerBottom: CGPoint,
+        connectorBottom: CGPoint
     ) -> Path {
-        var p = Path()
-        let chargerBottom = CGPoint(
-            x: chargerCenter.x,
-            y: chargerCenter.y + Self.chargerSize / 2
-        )
-        let connectorBottom = CGPoint(
-            x: connectorCenter.x,
-            y: connectorCenter.y + Self.connectorSize / 2 - 4
-        )
         // Run the horizontal segment beneath both glyphs so the
         // turns sit clear of the artwork.
         let runY = max(chargerBottom.y, connectorBottom.y) + Spacing.lg
+        let chargerCorner = CGPoint(x: chargerBottom.x, y: runY)
+        let connectorCorner = CGPoint(x: connectorBottom.x, y: runY)
+        let radius = Self.cableBendRadius
 
+        var p = Path()
         p.move(to: chargerBottom)
-        p.addLine(to: CGPoint(x: chargerBottom.x, y: runY))
-        p.addLine(to: CGPoint(x: connectorBottom.x, y: runY))
+        p.addArc(
+            tangent1End: chargerCorner,
+            tangent2End: connectorCorner,
+            radius: radius
+        )
+        p.addArc(
+            tangent1End: connectorCorner,
+            tangent2End: connectorBottom,
+            radius: radius
+        )
         p.addLine(to: connectorBottom)
         return p
+    }
+
+    /// Strain-relief boot rendered at each cable terminus — a small
+    /// filled rounded rect in the cable color, sized to read as a
+    /// grommet where the cable enters each device.
+    private func strainReliefBoot(size: CGSize) -> some View {
+        RoundedRectangle(cornerRadius: Self.bootCornerRadius, style: .continuous)
+            .fill(cableColor)
+            .frame(width: size.width, height: size.height)
     }
 
     private var cableColor: Color {
