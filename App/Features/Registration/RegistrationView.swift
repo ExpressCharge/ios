@@ -9,11 +9,10 @@
 //  Spec: `50-ios.md` § "UX details" → "Register".
 //
 
-import SwiftUI
-import UIKit
-
 import Capabilities
 import Models
+import SwiftUI
+import UIKit
 
 public struct RegistrationView: View {
 
@@ -87,14 +86,17 @@ public struct RegistrationView: View {
                         Text("Register this iPhone")
                             .font(.title2.weight(.bold))
 
-                        Text("Give your iPhone a name and pick what it will do. You can change these later.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
+                        Text(
+                            "Give your iPhone a name and pick what it will do. You can change these later."
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: Spacing.md, leading: 0, bottom: Spacing.md, trailing: 0))
+                    .listRowInsets(
+                        EdgeInsets(top: Spacing.md, leading: 0, bottom: Spacing.md, trailing: 0))
                 }
 
                 // Label field.

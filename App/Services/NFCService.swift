@@ -28,10 +28,9 @@
 //    - `50-ios.md` § "Card support matrix"
 //
 
-import Foundation
 import CoreNFC
-
 import Crypto
+import Foundation
 
 /// Errors emitted from `NFCService.scan(...)`.
 public enum NFCError: Error, Equatable, Sendable {
@@ -313,8 +312,8 @@ extension NFCService: NFCTagReaderSessionDelegate {
             case .readerSessionInvalidationErrorUserCanceled:
                 return .userCanceled
             case .readerSessionInvalidationErrorSystemIsBusy,
-                 .readerSessionInvalidationErrorFirstNDEFTagRead,
-                 .readerSessionInvalidationErrorSessionTerminatedUnexpectedly:
+                .readerSessionInvalidationErrorFirstNDEFTagRead,
+                .readerSessionInvalidationErrorSessionTerminatedUnexpectedly:
                 return .underlying(code: nsError.code, message: nsError.localizedDescription)
             default:
                 return .underlying(code: nsError.code, message: nsError.localizedDescription)

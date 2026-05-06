@@ -8,8 +8,9 @@
 //  exercise a different code path inside the components).
 //
 
-import XCTest
 import SwiftUI
+import XCTest
+
 @testable import ExpresScan
 
 @MainActor

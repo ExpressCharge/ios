@@ -13,12 +13,11 @@
 //  is its own `Feature*View`.
 //
 
-import SwiftUI
-
 import AuthCore
 import Capabilities
 import DeviceSync
 import Models
+import SwiftUI
 
 /// Top-level routing state. Order matches the user's first-launch path
 /// for readability.
@@ -131,7 +130,8 @@ public final class RootCoordinator {
         } catch {
             // Persistence failure is rare (sandbox dir not writable);
             // fall back to an in-memory store rooted in a temp dir.
-            store = (try? SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
+            store =
+                (try? SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
                 ?? (try! SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
         }
         let coordinator = DeviceStateCoordinator(
@@ -219,7 +219,7 @@ public struct RootView: View {
                     oneTimeCode: code,
                     codeVerifier: verifier
                 )
-                    .environment(coordinator)
+                .environment(coordinator)
             case .priming:
                 NotificationPrimingView()
                     .environment(coordinator)
@@ -236,7 +236,7 @@ public struct RootView: View {
             }
         }
         .background(Theme.color(.background))
-        .preferredColorScheme(nil) // honor system setting
+        .preferredColorScheme(nil)  // honor system setting
         .fullScreenCover(isPresented: connectivityOverlayBinding) {
             OfflineOverlay(
                 state: app.reachability.state,
@@ -295,7 +295,8 @@ public struct RootView: View {
     /// shell rather than diff a stale `@State`-cached view-model.
     @ViewBuilder
     private var readyShell: some View {
-        let caps = coordinator.deviceState?.capabilities
+        let caps =
+            coordinator.deviceState?.capabilities
             ?? DeviceStateCoordinator.defaultCapabilities
         MainTabContainer(capabilities: caps)
             .environment(coordinator)
@@ -304,12 +305,14 @@ public struct RootView: View {
 
     private func handleUniversalLink(_ url: URL) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.host == BuildConfig.universalLinkHost,
-              components.path == BuildConfig.registrationCallbackPath else {
+            components.host == BuildConfig.universalLinkHost,
+            components.path == BuildConfig.registrationCallbackPath
+        else {
             return
         }
         guard let code = components.queryItems?.first(where: { $0.name == "code" })?.value,
-              !code.isEmpty else {
+            !code.isEmpty
+        else {
             return
         }
         NotificationCenter.default.post(

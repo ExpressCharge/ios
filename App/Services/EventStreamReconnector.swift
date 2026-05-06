@@ -17,14 +17,13 @@
 //  Spec: `50-ios.md` § "SSE client"
 //
 
+import AuthCore
 import Foundation
+import Networking
 
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
-
-import AuthCore
-import Networking
 
 @MainActor
 public final class EventStreamReconnector {
@@ -97,7 +96,7 @@ public final class EventStreamReconnector {
             do {
                 for try await event in stream {
                     if let id = event.id { lastEventID = id }
-                    attempt = 0 // any successful event resets backoff
+                    attempt = 0  // any successful event resets backoff
                     continuation.yield(event)
                 }
                 // Stream finished cleanly (server closed).

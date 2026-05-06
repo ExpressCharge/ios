@@ -29,8 +29,8 @@ public struct PrimaryButton: View {
 
         var tint: Color {
             switch self {
-            case .primary:     return ColorPalette.primaryCyan
-            case .success:     return ColorPalette.success
+            case .primary: return ColorPalette.primaryCyan
+            case .success: return ColorPalette.success
             case .destructive: return ColorPalette.destructiveRose
             }
         }
@@ -58,28 +58,28 @@ public struct PrimaryButton: View {
         var minHeight: CGFloat {
             switch self {
             case .standard: return 44
-            case .hero:     return 80
+            case .hero: return 80
             }
         }
 
         var labelFont: Font {
             switch self {
             case .standard: return .headline
-            case .hero:     return .title2.weight(.semibold)
+            case .hero: return .title2.weight(.semibold)
             }
         }
 
         var iconFont: Font {
             switch self {
             case .standard: return .body
-            case .hero:     return .system(size: 28, weight: .semibold)
+            case .hero: return .system(size: 28, weight: .semibold)
             }
         }
 
         var hSpacing: CGFloat {
             switch self {
             case .standard: return Spacing.sm
-            case .hero:     return Spacing.md
+            case .hero: return Spacing.md
             }
         }
     }

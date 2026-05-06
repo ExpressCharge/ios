@@ -7,8 +7,9 @@
 //  bar hidden) are deferred to slice K's UI tests.
 //
 
-import XCTest
 import SwiftUI
+import XCTest
+
 @testable import ExpresScan
 
 @MainActor

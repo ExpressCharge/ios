@@ -32,7 +32,7 @@ struct ChargersFilterMenu: View {
     /// the menu.
     private var filterIcon: String {
         switch filter {
-        case .all:    return "line.3.horizontal.decrease.circle"
+        case .all: return "line.3.horizontal.decrease.circle"
         case .online: return "checkmark.circle"
         }
     }

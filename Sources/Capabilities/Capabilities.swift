@@ -16,14 +16,14 @@ import Models
 
 // MARK: - Derivation + legality
 
-public extension DeviceCapability {
+extension DeviceCapability {
 
     /// Whether this set has at least one of the elements that gates the
     /// lone "main" screen of the app — `.scanner`, `.user`, or `.kiosk`.
-    var isAppCanonicalCapability: Bool {
+    public var isAppCanonicalCapability: Bool {
         switch self {
         case .scanner, .user, .kiosk: return true
-        case .charger:                return false
+        case .charger: return false
         }
     }
 
@@ -32,7 +32,7 @@ public extension DeviceCapability {
     /// - When `.kiosk ∈ caps`, exactly one of `{.scanner, .user}` must
     ///   also be in `caps`. (Kiosk is "single-purpose appliance" mode.)
     /// - Otherwise any non-empty subset is legal at this level.
-    static func isLegalSet(_ caps: Set<DeviceCapability>) -> Bool {
+    public static func isLegalSet(_ caps: Set<DeviceCapability>) -> Bool {
         if caps.contains(.kiosk) {
             let pair: Set<DeviceCapability> = [.scanner, .user]
             return caps.intersection(pair).count == 1
@@ -41,24 +41,24 @@ public extension DeviceCapability {
     }
 
     /// `true` iff `caps` contains `.user` — which gates the Chargers tab.
-    static func canSeeChargersTab(_ caps: Set<DeviceCapability>) -> Bool {
+    public static func canSeeChargersTab(_ caps: Set<DeviceCapability>) -> Bool {
         caps.contains(.user)
     }
 
     /// `true` iff `caps` contains `.scanner`.
-    static func canScan(_ caps: Set<DeviceCapability>) -> Bool {
+    public static func canScan(_ caps: Set<DeviceCapability>) -> Bool {
         caps.contains(.scanner)
     }
 
     /// `true` iff `caps` contains `.kiosk`.
-    static func isKiosk(_ caps: Set<DeviceCapability>) -> Bool {
+    public static func isKiosk(_ caps: Set<DeviceCapability>) -> Bool {
         caps.contains(.kiosk)
     }
 
     /// Whether the bottom tab bar is visible — visible iff the device has
     /// **both** `.scanner` and `.user`. A single-capability device has no
     /// tab bar (just the one screen).
-    static func tabBarVisible(_ caps: Set<DeviceCapability>) -> Bool {
+    public static func tabBarVisible(_ caps: Set<DeviceCapability>) -> Bool {
         caps.contains(.scanner) && caps.contains(.user)
     }
 }

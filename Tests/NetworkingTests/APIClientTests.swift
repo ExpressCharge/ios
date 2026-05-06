@@ -8,8 +8,9 @@
 
 import Foundation
 import Testing
-@testable import Networking
+
 @testable import Models
+@testable import Networking
 
 private struct Echo: Decodable, Equatable {
     let ok: Bool
@@ -110,8 +111,10 @@ struct APIClientTests {
     @Test func maps400ClockSkew() async {
         defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { _ in
-            (400, ["Content-Type": "application/json"],
-             Data(#"{"error":"clock_skew"}"#.utf8))
+            (
+                400, ["Content-Type": "application/json"],
+                Data(#"{"error":"clock_skew"}"#.utf8)
+            )
         }
         let client = makeClient(session: makeSession())
         await #expect(throws: APIError.clockSkew) {
@@ -122,8 +125,10 @@ struct APIClientTests {
     @Test func maps401InvalidNonce() async {
         defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { _ in
-            (401, ["Content-Type": "application/json"],
-             Data(#"{"error":"invalid_nonce"}"#.utf8))
+            (
+                401, ["Content-Type": "application/json"],
+                Data(#"{"error":"invalid_nonce"}"#.utf8)
+            )
         }
         let client = makeClient(session: makeSession())
         await #expect(throws: APIError.invalidNonce) {
@@ -159,7 +164,7 @@ struct APIClientTests {
 
         #expect(
             captured.get()?.value(forHTTPHeaderField: "Authorization")
-            == "Bearer dev_xyz"
+                == "Bearer dev_xyz"
         )
     }
 
@@ -201,11 +206,11 @@ struct APIClientTests {
         let _: Echo = try await client.request(endpoint)
         #expect(
             captured.get()?.value(forHTTPHeaderField: "Idempotency-Key")
-            == "fixed-uuid-1234"
+                == "fixed-uuid-1234"
         )
         #expect(
             captured.get()?.value(forHTTPHeaderField: "Content-Type")
-            == "application/json"
+                == "application/json"
         )
     }
 
@@ -237,7 +242,7 @@ struct APIClientTests {
         let _: Echo = try await client.request(endpoint)
         #expect(
             captured.get()?.value(forHTTPHeaderField: "Idempotency-Key")
-            == "explicit-key"
+                == "explicit-key"
         )
     }
 
@@ -260,12 +265,14 @@ final class LockBox<T>: @unchecked Sendable {
     init(_ initial: T) { self.value = initial }
 
     func get() -> T {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return value
     }
 
     func set(_ new: T) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         value = new
     }
 }
@@ -278,7 +285,8 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         case networkError
     }
 
-    nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> (Int, [String: String], Data))?
+    nonisolated(unsafe) static var handler:
+        (@Sendable (URLRequest) -> (Int, [String: String], Data))?
     nonisolated(unsafe) static var failureMode: FailureMode = .none
 
     static func reset() {

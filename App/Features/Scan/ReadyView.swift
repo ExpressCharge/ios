@@ -14,9 +14,8 @@
 //  Spec: `50-ios.md` § "UX details" → "Ready home".
 //
 
-import SwiftUI
-
 import Models
+import SwiftUI
 
 public struct ReadyView: View {
 
@@ -136,7 +135,8 @@ public struct ReadyView: View {
                 // it reflects the consolidated sync's status, not just
                 // the SSE link. Falls back to the scan coordinator's
                 // surface for tests / older transitions.
-                let pillStatus: ConnectionStatus = coordinator.deviceState?.connectionStatus
+                let pillStatus: ConnectionStatus =
+                    coordinator.deviceState?.connectionStatus
                     ?? scan?.connectionStatus
                     ?? .offline
                 if pillStatus != .online {
@@ -146,7 +146,8 @@ public struct ReadyView: View {
                 }
                 if let scan, scan.pendingScanResultCount > 0 {
                     StatusPill(
-                        label: "\(scan.pendingScanResultCount) pending upload\(scan.pendingScanResultCount == 1 ? "" : "s")",
+                        label:
+                            "\(scan.pendingScanResultCount) pending upload\(scan.pendingScanResultCount == 1 ? "" : "s")",
                         systemImage: "clock.fill",
                         tone: .warning
                     )
@@ -198,8 +199,8 @@ public struct ReadyView: View {
     private func heroTitle(scan: ScanCoordinator?) -> String {
         switch scan?.state {
         case .connecting?: return "Connecting…"
-        case .offline?:    return "Offline"
-        default:           return "Ready to Scan"
+        case .offline?: return "Offline"
+        default: return "Ready to Scan"
         }
     }
 
@@ -220,9 +221,9 @@ public struct ReadyView: View {
 
     private func heroTone(scan: ScanCoordinator?) -> StatusPill.Tone {
         switch scan?.state {
-        case .offline?:    return .neutral
+        case .offline?: return .neutral
         case .connecting?: return .info
-        default:           return .info
+        default: return .info
         }
     }
 
@@ -252,9 +253,15 @@ public struct ReadyView: View {
 
     private var howThisWorksContent: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            Bullet(symbol: "1.circle.fill", text: "Stay signed in. The app keeps a secure, low-power link to ExpressCharge.")
-            Bullet(symbol: "2.circle.fill", text: "When a charging station or admin starts a scan, your iPhone vibrates.")
-            Bullet(symbol: "3.circle.fill", text: "Hold the card to the top of your iPhone. The result appears on screen.")
+            Bullet(
+                symbol: "1.circle.fill",
+                text: "Stay signed in. The app keeps a secure, low-power link to ExpressCharge.")
+            Bullet(
+                symbol: "2.circle.fill",
+                text: "When a charging station or admin starts a scan, your iPhone vibrates.")
+            Bullet(
+                symbol: "3.circle.fill",
+                text: "Hold the card to the top of your iPhone. The result appears on screen.")
         }
         .padding(.top, Spacing.sm)
     }
@@ -276,8 +283,8 @@ private struct Bullet: View {
 
 // MARK: - ConnectionStatus pill mapping
 
-private extension ConnectionStatus {
-    var label: String {
+extension ConnectionStatus {
+    fileprivate var label: String {
         switch self {
         case .offline: return "Offline"
         case .connecting: return "Connecting"
@@ -286,7 +293,7 @@ private extension ConnectionStatus {
         }
     }
 
-    var systemImage: String {
+    fileprivate var systemImage: String {
         switch self {
         case .offline: return "wifi.slash"
         case .connecting: return "arrow.triangle.2.circlepath"
@@ -295,7 +302,7 @@ private extension ConnectionStatus {
         }
     }
 
-    var tone: StatusPill.Tone {
+    fileprivate var tone: StatusPill.Tone {
         switch self {
         case .offline: return .negative
         case .connecting: return .info

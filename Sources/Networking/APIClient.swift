@@ -16,13 +16,12 @@
 //
 
 import Foundation
+import Models
 import os
 
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
-
-import Models
 
 /// Module-private logger. Mirrors the App target's `netLog` subsystem so
 /// requests + responses land in the same Console.app stream as the app's
@@ -114,7 +113,9 @@ public actor APIClient {
             // Surface the underlying DecodingError before flattening to
             // APIError.decode — without this, response-shape drift is
             // invisible to anyone reading the console.
-            netLog.error("APIClient.request: decode failed for \(endpoint.path, privacy: .public): \(String(describing: error), privacy: .public)")
+            netLog.error(
+                "APIClient.request: decode failed for \(endpoint.path, privacy: .public): \(String(describing: error), privacy: .public)"
+            )
             throw APIError.decode
         }
     }
@@ -136,18 +137,23 @@ public actor APIClient {
         do {
             (data, response) = try await transport.data(for: urlRequest)
         } catch {
-            netLog.error("APIClient.rawRequest: transport failed for \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public): \(String(describing: error), privacy: .public)")
+            netLog.error(
+                "APIClient.rawRequest: transport failed for \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public): \(String(describing: error), privacy: .public)"
+            )
             failureReporter?()
             throw APIError.network
         }
 
         guard let http = response as? HTTPURLResponse else {
-            netLog.error("APIClient.rawRequest: non-HTTP response for \(endpoint.path, privacy: .public)")
+            netLog.error(
+                "APIClient.rawRequest: non-HTTP response for \(endpoint.path, privacy: .public)")
             failureReporter?()
             throw APIError.network
         }
 
-        netLog.debug("APIClient.rawRequest: \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public) → \(http.statusCode, privacy: .public)")
+        netLog.debug(
+            "APIClient.rawRequest: \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public) → \(http.statusCode, privacy: .public)"
+        )
 
         switch http.statusCode {
         case 200..<300:
@@ -169,7 +175,8 @@ public actor APIClient {
         case 401:
             // 401 with `error: "invalid_nonce"` should map to .invalidNonce.
             if let envelope = try? decoder.decode(APIErrorEnvelope.self, from: data),
-               envelope.error == "invalid_nonce" {
+                envelope.error == "invalid_nonce"
+            {
                 throw APIError.invalidNonce
             }
             throw APIError.unauthorized

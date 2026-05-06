@@ -10,9 +10,8 @@
 //  Spec: `50-ios.md` § "UX details" → "Welcome".
 //
 
-import SwiftUI
-
 import AuthCore
+import SwiftUI
 
 public struct WelcomeView: View {
 
@@ -43,18 +42,21 @@ public struct WelcomeView: View {
                 BrandLockup(.login)
 
                 // Subhead body copy.
-                Text("Welcome to ExpressCharge. Sign in to control your chargers and use this iPhone as an NFC tap reader.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Spacing.lg)
+                Text(
+                    "Welcome to ExpressCharge. Sign in to control your chargers and use this iPhone as an NFC tap reader."
+                )
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.lg)
 
                 Spacer()
 
                 // CTA.
                 PrimaryButton(
                     "Sign in",
-                    state: (showingLoginActivity || loginViewModel.isPresenting) ? .loading : .default,
+                    state: (showingLoginActivity || loginViewModel.isPresenting)
+                        ? .loading : .default,
                     action: handleSignInTapped
                 )
                 .padding(.horizontal, Spacing.lg)
@@ -75,7 +77,9 @@ public struct WelcomeView: View {
         .onChange(of: loginViewModel.isPresenting) { _, presenting in
             if presenting {
                 coordinator.startLogin()
-            } else if !presenting && coordinator.route == .loggingIn && loginViewModel.deliveredCode == nil {
+            } else if !presenting && coordinator.route == .loggingIn
+                && loginViewModel.deliveredCode == nil
+            {
                 // User cancelled the web sheet.
                 coordinator.cancelLogin()
             }

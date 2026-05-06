@@ -36,8 +36,8 @@ public struct CompactCountdown: View {
 
         var ringColor: Color {
             switch self {
-            case .scanArmed:      return ColorPalette.voltGreen
-            case .resultDismiss:  return Color.white
+            case .scanArmed: return ColorPalette.voltGreen
+            case .resultDismiss: return Color.white
             }
         }
         var trackColor: Color { ringColor.opacity(0.20) }

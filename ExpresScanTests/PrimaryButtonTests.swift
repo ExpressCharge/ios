@@ -13,8 +13,9 @@
 //     surfaces.
 //
 
-import XCTest
 import SwiftUI
+import XCTest
+
 @testable import ExpresScan
 
 @MainActor

@@ -7,13 +7,14 @@
 //  cadence, and the soft-deleted-device 410 → revocation route.
 //
 
-import XCTest
-@testable import ExpresScan
 import AuthCore
 import Capabilities
 import DeviceSync
 import Models
 import Networking
+import XCTest
+
+@testable import ExpresScan
 
 @MainActor
 final class DeviceStateCoordinatorTests: XCTestCase {
@@ -37,7 +38,7 @@ final class DeviceStateCoordinatorTests: XCTestCase {
         // session's known-good capability set.
         cache.write([.user])
 
-        let api = makeStubAPI(handler: nil) // never called in this test
+        let api = makeStubAPI(handler: nil)  // never called in this test
         let store = try! makeIsolatedStore()
         let dsc = DeviceStateCoordinator(
             api: api,
@@ -51,7 +52,7 @@ final class DeviceStateCoordinatorTests: XCTestCase {
     }
 
     func testNoCacheFallsBackToRegistrationDefault() {
-        let defaults = makeIsolatedDefaults() // empty
+        let defaults = makeIsolatedDefaults()  // empty
         let cache = CapabilityCache(defaults: defaults)
         let api = makeStubAPI(handler: nil)
         let store = try! makeIsolatedStore()
@@ -80,7 +81,9 @@ final class DeviceStateCoordinatorTests: XCTestCase {
             if let body = bodyData(from: request) {
                 captured.set(body)
             }
-            return (200, ["Content-Type": "application/json"], envelopeJSON(capabilities: [.scanner]))
+            return (
+                200, ["Content-Type": "application/json"], envelopeJSON(capabilities: [.scanner])
+            )
         }
         let api = makeStubAPI(handler: nil)
         let dsc = DeviceStateCoordinator(
@@ -98,8 +101,9 @@ final class DeviceStateCoordinatorTests: XCTestCase {
         // Assert the flushed POST body had our pending key.
         let body = try XCTUnwrap(captured.get())
         let bodyString = String(decoding: body, as: UTF8.self)
-        XCTAssertTrue(bodyString.contains("device.label"),
-                      "Expected POST body to contain pending setting key. Body: \(bodyString)")
+        XCTAssertTrue(
+            bodyString.contains("device.label"),
+            "Expected POST body to contain pending setting key. Body: \(bodyString)")
     }
 
     func testSyncWritesCacheOnSuccess() async throws {
@@ -107,7 +111,10 @@ final class DeviceStateCoordinatorTests: XCTestCase {
         let cache = CapabilityCache(defaults: defaults)
         let store = try makeIsolatedStore()
         StubURLProtocol.handler = { _ in
-            (200, ["Content-Type": "application/json"], envelopeJSON(capabilities: [.scanner, .user]))
+            (
+                200, ["Content-Type": "application/json"],
+                envelopeJSON(capabilities: [.scanner, .user])
+            )
         }
         let api = makeStubAPI(handler: nil)
         let dsc = DeviceStateCoordinator(
@@ -127,9 +134,12 @@ final class DeviceStateCoordinatorTests: XCTestCase {
         // Local pending edit — should be replaced after merge.
         try await store.setLocal(key: "device.label", value: .string("local"))
         StubURLProtocol.handler = { _ in
-            (200, ["Content-Type": "application/json"], envelopeJSONWithSettings([
-                "device.label": ("server-value", "admin"),
-            ]))
+            (
+                200, ["Content-Type": "application/json"],
+                envelopeJSONWithSettings([
+                    "device.label": ("server-value", "admin")
+                ])
+            )
         }
         let api = makeStubAPI(handler: nil)
         let dsc = DeviceStateCoordinator(
@@ -176,9 +186,12 @@ final class DeviceStateCoordinatorTests: XCTestCase {
         let cache = CapabilityCache(defaults: defaults)
         let store = try makeIsolatedStore()
         StubURLProtocol.handler = { _ in
-            (200, ["Content-Type": "application/json"], envelopeJSONWithSettings([
-                "notifications.scanRequest": ("true", "admin"),
-            ]))
+            (
+                200, ["Content-Type": "application/json"],
+                envelopeJSONWithSettings([
+                    "notifications.scanRequest": ("true", "admin")
+                ])
+            )
         }
         let api = makeStubAPI(handler: nil)
         let dsc = DeviceStateCoordinator(
@@ -228,7 +241,9 @@ final class DeviceStateCoordinatorTests: XCTestCase {
         calls.set(0)
         StubURLProtocol.handler = { _ in
             calls.set((calls.get() ?? 0) + 1)
-            return (200, ["Content-Type": "application/json"], envelopeJSON(capabilities: [.scanner]))
+            return (
+                200, ["Content-Type": "application/json"], envelopeJSON(capabilities: [.scanner])
+            )
         }
         let api = makeStubAPI(handler: nil)
         let dsc = DeviceStateCoordinator(
@@ -237,8 +252,8 @@ final class DeviceStateCoordinatorTests: XCTestCase {
             cache: cache,
             diagnosticsProvider: { Self.fakeDiagnostics() }
         )
-        dsc.handleEnterBackground() // suspends cadence
-        dsc.handleEnterForeground() // kicks immediate sync
+        dsc.handleEnterBackground()  // suspends cadence
+        dsc.handleEnterForeground()  // kicks immediate sync
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertGreaterThanOrEqual(calls.get() ?? 0, 1)
     }
@@ -290,7 +305,9 @@ final class DeviceStateCoordinatorTests: XCTestCase {
         return try SettingsStore(directoryURL: dir)
     }
 
-    private func makeStubAPI(handler: (@Sendable (URLRequest) -> (Int, [String: String], Data))?) -> APIClient {
+    private func makeStubAPI(handler: (@Sendable (URLRequest) -> (Int, [String: String], Data))?)
+        -> APIClient
+    {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubURLProtocol.self]
         let session = URLSession(configuration: config)
@@ -311,25 +328,25 @@ final class DeviceStateCoordinatorTests: XCTestCase {
 private func envelopeJSON(capabilities: [DeviceCapability]) -> Data {
     let caps = capabilities.map { "\"\($0.rawValue)\"" }.joined(separator: ",")
     let json = """
-    {
-      "device": {
-        "id": "dev_test",
-        "label": "Test iPhone",
-        "kind": "phone_nfc",
-        "ownerUserId": "usr_1",
-        "siteId": null,
-        "registeredAt": "2026-04-27T12:00:00Z",
-        "lastSeenAt": "2026-04-27T12:00:00Z"
-      },
-      "capabilities": [\(caps)],
-      "kioskAllowed": false,
-      "ownerUser": { "id": "usr_1", "role": "admin", "displayName": "Test" },
-      "settings": {},
-      "scanStatus": null,
-      "pushToken": null,
-      "connectivity": { "online": true, "lastSyncAt": null, "reconnectCount": 0, "pendingUploads": 0 }
-    }
-    """
+        {
+          "device": {
+            "id": "dev_test",
+            "label": "Test iPhone",
+            "kind": "phone_nfc",
+            "ownerUserId": "usr_1",
+            "siteId": null,
+            "registeredAt": "2026-04-27T12:00:00Z",
+            "lastSeenAt": "2026-04-27T12:00:00Z"
+          },
+          "capabilities": [\(caps)],
+          "kioskAllowed": false,
+          "ownerUser": { "id": "usr_1", "role": "admin", "displayName": "Test" },
+          "settings": {},
+          "scanStatus": null,
+          "pushToken": null,
+          "connectivity": { "online": true, "lastSyncAt": null, "reconnectCount": 0, "pendingUploads": 0 }
+        }
+        """
     return Data(json.utf8)
 }
 
@@ -339,29 +356,31 @@ private func envelopeJSONWithSettings(_ entries: [String: (String, String)]) -> 
     // `dateDecodingStrategy = .iso8601` and the TS server's `toISOString()`.
     let updatedAt = "2023-11-14T22:13:20.000Z"
     for (key, (value, by)) in entries {
-        settings.append(#""\#(key)": { "value": "\#(value)", "updatedAt": "\#(updatedAt)", "updatedBy": "\#(by)" }"#)
+        settings.append(
+            #""\#(key)": { "value": "\#(value)", "updatedAt": "\#(updatedAt)", "updatedBy": "\#(by)" }"#
+        )
     }
     let settingsJSON = settings.joined(separator: ",")
     let json = """
-    {
-      "device": {
-        "id": "dev_test",
-        "label": "Test iPhone",
-        "kind": "phone_nfc",
-        "ownerUserId": "usr_1",
-        "siteId": null,
-        "registeredAt": "2026-04-27T12:00:00Z",
-        "lastSeenAt": "2026-04-27T12:00:00Z"
-      },
-      "capabilities": ["scanner"],
-      "kioskAllowed": false,
-      "ownerUser": { "id": "usr_1", "role": "admin", "displayName": "Test" },
-      "settings": { \(settingsJSON) },
-      "scanStatus": null,
-      "pushToken": null,
-      "connectivity": { "online": true, "lastSyncAt": null, "reconnectCount": 0, "pendingUploads": 0 }
-    }
-    """
+        {
+          "device": {
+            "id": "dev_test",
+            "label": "Test iPhone",
+            "kind": "phone_nfc",
+            "ownerUserId": "usr_1",
+            "siteId": null,
+            "registeredAt": "2026-04-27T12:00:00Z",
+            "lastSeenAt": "2026-04-27T12:00:00Z"
+          },
+          "capabilities": ["scanner"],
+          "kioskAllowed": false,
+          "ownerUser": { "id": "usr_1", "role": "admin", "displayName": "Test" },
+          "settings": { \(settingsJSON) },
+          "scanStatus": null,
+          "pushToken": null,
+          "connectivity": { "online": true, "lastSyncAt": null, "reconnectCount": 0, "pendingUploads": 0 }
+        }
+        """
     return Data(json.utf8)
 }
 
@@ -389,6 +408,14 @@ private func bodyData(from request: URLRequest) -> Data? {
 final class ConfinedBox<T>: @unchecked Sendable {
     private var value: T?
     private let lock = NSLock()
-    func set(_ v: T) { lock.lock(); defer { lock.unlock() }; value = v }
-    func get() -> T? { lock.lock(); defer { lock.unlock() }; return value }
+    func set(_ v: T) {
+        lock.lock()
+        defer { lock.unlock() }
+        value = v
+    }
+    func get() -> T? {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
 }

@@ -24,13 +24,12 @@
 //    - `60-security.md` § 6 (HMAC nonce)
 //
 
-import Foundation
-import Observation
-
 import AuthCore
 import Crypto
+import Foundation
 import Models
 import Networking
+import Observation
 
 /// Source attribution for an incoming `ScanRequest` — used for
 /// debouncing (push + SSE both deliver the same request) and for
@@ -137,9 +136,10 @@ public final class ScanCoordinator {
         self.nfc = nfc
         self.deviceState = deviceState
         self.queue = queue ?? ScanResultQueue(api: environment.api)
-        self.makeReconnector = reconnectorFactory ?? { @MainActor [environment] in
-            EventStreamReconnector(environment: environment)
-        }
+        self.makeReconnector =
+            reconnectorFactory ?? { @MainActor [environment] in
+                EventStreamReconnector(environment: environment)
+            }
         self.now = now
         loadRecentPairings()
     }
@@ -216,7 +216,7 @@ public final class ScanCoordinator {
         recentPairings = recentPairings.filter { $0.value > cutoff }
 
         if recentPairings[request.pairingCode] != nil {
-            return // Coalesced: already handled within the window.
+            return  // Coalesced: already handled within the window.
         }
         recentPairings[request.pairingCode] = now()
         persistRecentPairings()
@@ -510,7 +510,8 @@ public final class ScanCoordinator {
             default: return
             }
             if let payload, let active = activePairingCode,
-               payload.pairingCode != active {
+                payload.pairingCode != active
+            {
                 // Cancel for a different pairing — ignore. Shouldn't
                 // happen (server filters by deviceId), belt-and-braces.
                 return
@@ -553,7 +554,7 @@ public final class ScanCoordinator {
         // The reconnector itself does the loop; if we got here it
         // surfaced a non-recoverable cancellation.
         connectionStatus = .offline
-        if case .scanRequested = state { return } // keep card visible
+        if case .scanRequested = state { return }  // keep card visible
         state = .offline
     }
 
@@ -592,7 +593,8 @@ public final class ScanCoordinator {
             return
         }
         let cutoff = now().addingTimeInterval(-Self.pairingCoalesceWindow)
-        recentPairings = raw
+        recentPairings =
+            raw
             .compactMapValues { Date(timeIntervalSince1970: $0) }
             .filter { $0.value > cutoff }
     }

@@ -15,9 +15,8 @@
 //
 
 import Foundation
-import Observation
-
 import Networking
+import Observation
 
 @MainActor
 @Observable
@@ -78,9 +77,9 @@ public final class ChargerDetailViewModel {
     public var heroState: StatusHero.State {
         if let s = session?.state {
             switch s {
-            case .charging:     return .charging
-            case .preparing:    return .plugged
-            case .stopping:     return .charging
+            case .charging: return .charging
+            case .preparing: return .plugged
+            case .stopping: return .charging
             case .outOfService: return .outOfService
             case .idle:
                 return currentReservation != nil ? .reserved : .idle
@@ -88,11 +87,11 @@ public final class ChargerDetailViewModel {
         }
         // Fall back to the row state until `session` loads.
         switch entry.state {
-        case .charging:     return .charging
-        case .preparing:    return .plugged
-        case .reserved:     return .reserved
+        case .charging: return .charging
+        case .preparing: return .plugged
+        case .reserved: return .reserved
         case .outOfService: return .outOfService
-        case .offline:      return .outOfService
+        case .offline: return .outOfService
         case .idle:
             return currentReservation != nil ? .reserved : .idle
         }
@@ -364,11 +363,11 @@ public final class ChargerDetailViewModel {
 
     private func messageForLoad(_ error: APIError) -> String {
         switch error {
-        case .unauthorized:                    return "Sign in again."
-        case .forbidden:                       return "Access denied."
-        case .gone:                            return "This iPhone was deregistered."
-        case .network:                         return "Connect to Wi-Fi or cellular and try again."
-        default:                               return "Couldn't load charger details."
+        case .unauthorized: return "Sign in again."
+        case .forbidden: return "Access denied."
+        case .gone: return "This iPhone was deregistered."
+        case .network: return "Connect to Wi-Fi or cellular and try again."
+        default: return "Couldn't load charger details."
         }
     }
 

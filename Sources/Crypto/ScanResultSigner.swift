@@ -10,8 +10,8 @@
 //  for any other HMAC purpose.
 //
 
-import Foundation
 import CryptoKit
+import Foundation
 
 /// Errors thrown by `ScanResultSigner`'s initializer.
 public enum ScanResultSignerError: Error, Equatable, Sendable {

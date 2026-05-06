@@ -15,12 +15,11 @@
 //  Spec: `50-ios.md` § "Project structure" — `AppEnvironment.swift`.
 //
 
+import AuthCore
 import Foundation
+import Networking
 import SwiftUI
 import os
-
-import AuthCore
-import Networking
 
 /// App-wide loggers, scoped by category. Use these instead of `print`
 /// for any state transition or failure path. The `subsystem` matches
@@ -76,7 +75,8 @@ public enum BuildConfig {
     /// Web-side login starting point for the PKCE-protected
     /// registration flow. Always lives on the production host because
     /// the web admin UI is single-environment.
-    public static let registrationStartURL = URL(string: "https://manage.example.com/app/register")!
+    public static let registrationStartURL = URL(
+        string: "https://manage.example.com/app/register")!
 
     /// User-facing app version, sourced from the bundle.
     public static var appVersion: String {

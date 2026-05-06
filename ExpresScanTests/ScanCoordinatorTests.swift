@@ -9,9 +9,10 @@
 //  Spec: `50-ios.md` § "State machine".
 //
 
-import XCTest
-@testable import ExpresScan
 import Models
+import XCTest
+
+@testable import ExpresScan
 
 @MainActor
 final class ScanCoordinatorTests: XCTestCase {
@@ -51,10 +52,14 @@ final class ScanCoordinatorTests: XCTestCase {
 
         scan.handleIncomingScanRequest(request, source: .push)
 
-        if case .scanRequested(let armed) = scan.state {
+        // `handleIncomingScanRequest` arms via `.scanRequested` and
+        // then synchronously calls `beginScan()`, which transitions
+        // to `.scanning(request)` so the iOS NFC reader sheet fires
+        // immediately. Tests assert the post-`beginScan` state.
+        if case .scanning(let armed) = scan.state {
             XCTAssertEqual(armed.pairingCode, "p1")
         } else {
-            XCTFail("Expected .scanRequested, got \(scan.state)")
+            XCTFail("Expected .scanning, got \(scan.state)")
         }
         XCTAssertEqual(scan.armedAt, clock.now())
     }
@@ -94,10 +99,10 @@ final class ScanCoordinatorTests: XCTestCase {
         scan.cancelActiveScan()
         scan.handleIncomingScanRequest(r2, source: .sse)
 
-        if case .scanRequested(let armed) = scan.state {
+        if case .scanning(let armed) = scan.state {
             XCTAssertEqual(armed.pairingCode, "p2")
         } else {
-            XCTFail("Expected .scanRequested for p2, got \(scan.state)")
+            XCTFail("Expected .scanning for p2, got \(scan.state)")
         }
     }
 
@@ -111,9 +116,11 @@ final class ScanCoordinatorTests: XCTestCase {
         // Advance past the coalesce window.
         clock.advance(by: ScanCoordinator.pairingCoalesceWindow + 1)
 
-        // Same pairing should now re-arm.
+        // Same pairing should now re-arm. Re-arm flows through
+        // `.scanRequested` straight into `.scanning`, so the
+        // observable post-call state is `.scanning`.
         scan.handleIncomingScanRequest(request, source: .sse)
-        if case .scanRequested = scan.state {
+        if case .scanning = scan.state {
             // ok
         } else {
             XCTFail("Expected re-arm after dedup window expired, got \(scan.state)")
@@ -124,7 +131,8 @@ final class ScanCoordinatorTests: XCTestCase {
 
     func testCancelActiveScanGoesToReady() {
         let scan = makeCoordinator()
-        scan.handleIncomingScanRequest(makeRequest(pairing: "p1", expiresInSeconds: 60), source: .push)
+        scan.handleIncomingScanRequest(
+            makeRequest(pairing: "p1", expiresInSeconds: 60), source: .push)
         scan.cancelActiveScan()
         XCTAssertEqual(scan.state, .readyToScan)
         XCTAssertNil(scan.armedAt)
@@ -190,12 +198,14 @@ final class TestClock: @unchecked Sendable {
     init(start: Date) { self.current = start }
 
     func now() -> Date {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return current
     }
 
     func advance(by interval: TimeInterval) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         current = current.addingTimeInterval(interval)
     }
 }

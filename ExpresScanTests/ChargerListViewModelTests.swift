@@ -8,9 +8,10 @@
 //  application, error mapping, and idempotent "already loading" guard.
 //
 
-import XCTest
-@testable import ExpresScan
 import Networking
+import XCTest
+
+@testable import ExpresScan
 
 /// Lock-protected counter for test stub callback bumps. The
 /// `StubURLProtocol.handler` closure is `@Sendable` so a captured
@@ -19,11 +20,13 @@ final class HitCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var _value: Int = 0
     var value: Int {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return _value
     }
     func bump() {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         _value += 1
     }
 }
@@ -50,31 +53,31 @@ final class ChargerListViewModelTests: XCTestCase {
 
         StubURLProtocol.handler = { _ in
             let body = #"""
-            {
-              "chargers": [
                 {
-                  "chargerId": "BAY-1",
-                  "label": "Bay 1",
-                  "siteName": null,
-                  "formFactor": "wallbox",
-                  "connectorType": null,
-                  "maxKw": null,
-                  "state": "idle",
-                  "lastSeenAt": "2026-04-27T12:00:00Z"
-                },
-                {
-                  "chargerId": "BAY-2",
-                  "label": "Bay 2",
-                  "siteName": null,
-                  "formFactor": "pulsar",
-                  "connectorType": null,
-                  "maxKw": null,
-                  "state": "charging",
-                  "lastSeenAt": "2026-04-27T12:01:00Z"
+                  "chargers": [
+                    {
+                      "chargerId": "BAY-1",
+                      "label": "Bay 1",
+                      "siteName": null,
+                      "formFactor": "wallbox",
+                      "connectorType": null,
+                      "maxKw": null,
+                      "state": "idle",
+                      "lastSeenAt": "2026-04-27T12:00:00Z"
+                    },
+                    {
+                      "chargerId": "BAY-2",
+                      "label": "Bay 2",
+                      "siteName": null,
+                      "formFactor": "pulsar",
+                      "connectorType": null,
+                      "maxKw": null,
+                      "state": "charging",
+                      "lastSeenAt": "2026-04-27T12:01:00Z"
+                    }
+                  ]
                 }
-              ]
-            }
-            """#
+                """#
             return (200, ["Content-Type": "application/json"], Data(body.utf8))
         }
 
@@ -123,8 +126,10 @@ final class ChargerListViewModelTests: XCTestCase {
         StubURLProtocol.reset()
         defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { _ in
-            (403, ["Content-Type": "application/json"],
-             Data(#"{"error":"capability_denied","missing":["user"]}"#.utf8))
+            (
+                403, ["Content-Type": "application/json"],
+                Data(#"{"error":"capability_denied","missing":["user"]}"#.utf8)
+            )
         }
         let vm = makeVM()
         await vm.refresh()
@@ -144,8 +149,10 @@ final class ChargerListViewModelTests: XCTestCase {
         StubURLProtocol.reset()
         defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { _ in
-            (410, ["Content-Type": "application/json"],
-             Data(#"{"error":"device_deleted"}"#.utf8))
+            (
+                410, ["Content-Type": "application/json"],
+                Data(#"{"error":"device_deleted"}"#.utf8)
+            )
         }
         let vm = makeVM()
         await vm.refresh()
@@ -171,8 +178,10 @@ final class ChargerListViewModelTests: XCTestCase {
         let counter = HitCounter()
         StubURLProtocol.handler = { _ in
             counter.bump()
-            return (200, ["Content-Type": "application/json"],
-                    Data(#"{"chargers":[]}"#.utf8))
+            return (
+                200, ["Content-Type": "application/json"],
+                Data(#"{"chargers":[]}"#.utf8)
+            )
         }
 
         let vm = makeVM()
@@ -201,14 +210,14 @@ final class ChargerListViewModelTests: XCTestCase {
         StubURLProtocol.reset()
         StubURLProtocol.handler = { _ in
             let body = #"""
-            {
-              "chargers": [
-                {"chargerId":"BAY-1","label":"Bay 1","siteName":null,"formFactor":"wallbox","connectorType":null,"maxKw":null,"state":"idle","lastSeenAt":null},
-                {"chargerId":"BAY-2","label":"Bay 2","siteName":null,"formFactor":"pulsar","connectorType":null,"maxKw":null,"state":"charging","lastSeenAt":null},
-                {"chargerId":"BAY-3","label":"Bay 3","siteName":null,"formFactor":"commander","connectorType":null,"maxKw":null,"state":"offline","lastSeenAt":null}
-              ]
-            }
-            """#
+                {
+                  "chargers": [
+                    {"chargerId":"BAY-1","label":"Bay 1","siteName":null,"formFactor":"wallbox","connectorType":null,"maxKw":null,"state":"idle","lastSeenAt":null},
+                    {"chargerId":"BAY-2","label":"Bay 2","siteName":null,"formFactor":"pulsar","connectorType":null,"maxKw":null,"state":"charging","lastSeenAt":null},
+                    {"chargerId":"BAY-3","label":"Bay 3","siteName":null,"formFactor":"commander","connectorType":null,"maxKw":null,"state":"offline","lastSeenAt":null}
+                  ]
+                }
+                """#
             return (200, ["Content-Type": "application/json"], Data(body.utf8))
         }
         await vm.refresh()

@@ -18,9 +18,8 @@
 //      the card type (right, friendly-formatted).
 //
 
-import SwiftUI
-
 import Models
+import SwiftUI
 
 public struct SuccessView: View {
 
@@ -150,11 +149,13 @@ public struct SuccessView: View {
 
             // Plan + renewal.
             HStack(spacing: Spacing.md) {
-                infoColumn(title: "Plan",
-                          value: result.subscription?.planLabel ?? "—")
+                infoColumn(
+                    title: "Plan",
+                    value: result.subscription?.planLabel ?? "—")
                 Spacer()
-                infoColumn(title: "Renews",
-                          value: formattedRenewal(result.subscription?.currentPeriodEndIso))
+                infoColumn(
+                    title: "Renews",
+                    value: formattedRenewal(result.subscription?.currentPeriodEndIso))
             }
 
             // Comped suffix per success spec.
@@ -226,12 +227,13 @@ public struct SuccessView: View {
     /// never silently drop an unfamiliar value on the floor.
     private func formattedCardType(_ wire: String?) -> String {
         switch wire {
-        case "ev_card":   return "EV card"
+        case "ev_card": return "EV card"
         case "phone_nfc": return "Phone NFC"
-        case "guest_qr":  return "Guest QR"
-        case .none:       return "Unknown"
+        case "guest_qr": return "Guest QR"
+        case .none: return "Unknown"
         case .some(let other):
-            return other
+            return
+                other
                 .replacingOccurrences(of: "_", with: " ")
                 .capitalized
         }

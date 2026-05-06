@@ -52,16 +52,18 @@ struct J1772Icon: View {
             // neutral so this glyph stays status-agnostic.
             let halo = ColorPalette.mutedForeground
             let bodyCenter = CGPoint(x: 50, y: 60)
-            let haloOuter = Path(ellipseIn: CGRect(
-                x: bodyCenter.x - 26, y: bodyCenter.y - 26,
-                width: 52, height: 52
-            ))
+            let haloOuter = Path(
+                ellipseIn: CGRect(
+                    x: bodyCenter.x - 26, y: bodyCenter.y - 26,
+                    width: 52, height: 52
+                ))
             ctx.stroke(haloOuter, with: .color(halo.opacity(0.4)), lineWidth: 2)
 
-            let haloRing = Path(ellipseIn: CGRect(
-                x: bodyCenter.x - 25, y: bodyCenter.y - 25,
-                width: 50, height: 50
-            ))
+            let haloRing = Path(
+                ellipseIn: CGRect(
+                    x: bodyCenter.x - 25, y: bodyCenter.y - 25,
+                    width: 50, height: 50
+                ))
             ctx.stroke(haloRing, with: .color(halo.opacity(0.95)), lineWidth: 4)
         }
         .frame(width: size, height: size)

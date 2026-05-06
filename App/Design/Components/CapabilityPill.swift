@@ -18,12 +18,12 @@ import SwiftUI
 public struct CapabilityPill: View {
 
     public enum Tone: Sendable {
-        case scanner   // teal
-        case charger   // orange
-        case user      // cyan
-        case kiosk     // violet
-        case mobile    // primary cyan — Mobile Start
-        case neutral   // slate
+        case scanner  // teal
+        case charger  // orange
+        case user  // cyan
+        case kiosk  // violet
+        case mobile  // primary cyan — Mobile Start
+        case neutral  // slate
     }
 
     public let label: String
@@ -58,15 +58,15 @@ public struct CapabilityPill: View {
     }
 }
 
-private extension CapabilityPill.Tone {
+extension CapabilityPill.Tone {
     /// Base hue. Used for the bg/border tint.
-    var tint: Color {
+    fileprivate var tint: Color {
         switch self {
         case .scanner: return .teal
         case .charger: return .orange
-        case .user:    return .cyan
-        case .kiosk:   return .purple
-        case .mobile:  return ColorPalette.primaryCyan
+        case .user: return .cyan
+        case .kiosk: return .purple
+        case .mobile: return ColorPalette.primaryCyan
         case .neutral: return .gray
         }
     }
@@ -74,13 +74,13 @@ private extension CapabilityPill.Tone {
     /// Text colour — the same hue as `tint` but bright enough to read
     /// against the page background (matches Tailwind's `text-{color}-300`
     /// pattern in dark mode).
-    var text: Color {
+    fileprivate var text: Color {
         switch self {
         case .scanner: return Color(red: 0.36, green: 0.87, blue: 0.86)  // teal-300
         case .charger: return Color(red: 0.99, green: 0.78, blue: 0.41)  // orange-300
-        case .user:    return Color(red: 0.40, green: 0.90, blue: 0.96)  // cyan-300
-        case .kiosk:   return Color(red: 0.78, green: 0.65, blue: 0.99)  // violet-300
-        case .mobile:  return ColorPalette.primaryCyan
+        case .user: return Color(red: 0.40, green: 0.90, blue: 0.96)  // cyan-300
+        case .kiosk: return Color(red: 0.78, green: 0.65, blue: 0.99)  // violet-300
+        case .mobile: return ColorPalette.primaryCyan
         case .neutral: return Color(red: 0.80, green: 0.83, blue: 0.87)  // slate-300
         }
     }

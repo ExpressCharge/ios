@@ -42,13 +42,14 @@ struct InitialsAvatar: View {
 
     private var initials: String {
         guard let raw = name?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !raw.isEmpty else { return "?" }
+            !raw.isEmpty
+        else { return "?" }
         let parts = raw.split(whereSeparator: { $0.isWhitespace })
         if parts.count == 1 {
             return String(parts[0].prefix(1)).uppercased()
         }
         let first = parts.first?.prefix(1) ?? ""
-        let last  = parts.last?.prefix(1) ?? ""
+        let last = parts.last?.prefix(1) ?? ""
         return (first + last).uppercased()
     }
 }

@@ -29,20 +29,20 @@ public struct StatusHero: View {
 
         var systemImage: String {
             switch self {
-            case .idle:         return "ev.charger"
-            case .plugged:      return "powerplug.fill"
-            case .charging:     return "bolt.fill"
-            case .reserved:     return "clock.fill"
+            case .idle: return "ev.charger"
+            case .plugged: return "powerplug.fill"
+            case .charging: return "bolt.fill"
+            case .reserved: return "clock.fill"
             case .outOfService: return "exclamationmark.triangle.fill"
             }
         }
 
         var tone: StatusPill.Tone {
             switch self {
-            case .idle:         return .neutral
-            case .plugged:      return .info
-            case .charging:     return .positive
-            case .reserved:     return .info
+            case .idle: return .neutral
+            case .plugged: return .info
+            case .charging: return .positive
+            case .reserved: return .info
             case .outOfService: return .warning
             }
         }
@@ -105,7 +105,8 @@ public struct StatusHero: View {
 #Preview {
     VStack(spacing: 16) {
         StatusHero(state: .idle, title: "Idle", secondary: "Ready to charge")
-        StatusHero(state: .reserved, title: "Reserved", secondary: "Reserved by Alice — Until 11:00")
+        StatusHero(
+            state: .reserved, title: "Reserved", secondary: "Reserved by Alice — Until 11:00")
         StatusHero(state: .charging, title: "Charging", secondary: nil)
         StatusHero(state: .outOfService, title: "Out of service")
     }

@@ -124,7 +124,8 @@ public actor SettingsStore {
         try load()
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return dirtyKeys
+        return
+            dirtyKeys
             .sorted()
             .compactMap { key -> SyncRequest.PendingSetting? in
                 guard let v = values[key] else { return nil }

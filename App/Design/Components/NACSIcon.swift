@@ -45,12 +45,13 @@ struct NACSIcon: View {
             // J1772 so the cable connects at the same y.
             let bodyCenter = CGPoint(x: 50, y: 60)
             let bodyRadius: CGFloat = 32
-            let body = Path(ellipseIn: CGRect(
-                x: bodyCenter.x - bodyRadius,
-                y: bodyCenter.y - bodyRadius,
-                width: bodyRadius * 2,
-                height: bodyRadius * 2
-            ))
+            let body = Path(
+                ellipseIn: CGRect(
+                    x: bodyCenter.x - bodyRadius,
+                    y: bodyCenter.y - bodyRadius,
+                    width: bodyRadius * 2,
+                    height: bodyRadius * 2
+                ))
             ctx.stroke(
                 body,
                 with: .color(strokeColor),
@@ -60,16 +61,18 @@ struct NACSIcon: View {
             // Inner halo ring — same opacity / weight pair as the
             // wallbox and J1772 LED ring so the family reads as one.
             let halo = ColorPalette.mutedForeground
-            let haloOuter = Path(ellipseIn: CGRect(
-                x: bodyCenter.x - 26, y: bodyCenter.y - 26,
-                width: 52, height: 52
-            ))
+            let haloOuter = Path(
+                ellipseIn: CGRect(
+                    x: bodyCenter.x - 26, y: bodyCenter.y - 26,
+                    width: 52, height: 52
+                ))
             ctx.stroke(haloOuter, with: .color(halo.opacity(0.4)), lineWidth: 2)
 
-            let haloRing = Path(ellipseIn: CGRect(
-                x: bodyCenter.x - 25, y: bodyCenter.y - 25,
-                width: 50, height: 50
-            ))
+            let haloRing = Path(
+                ellipseIn: CGRect(
+                    x: bodyCenter.x - 25, y: bodyCenter.y - 25,
+                    width: 50, height: 50
+                ))
             ctx.stroke(haloRing, with: .color(halo.opacity(0.95)), lineWidth: 4)
         }
         .frame(width: size, height: size)

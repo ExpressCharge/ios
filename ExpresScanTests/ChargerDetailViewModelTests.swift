@@ -22,9 +22,10 @@
 //   - currentReservation derivation (active window covers Date())
 //
 
-import XCTest
-@testable import ExpresScan
 import Networking
+import XCTest
+
+@testable import ExpresScan
 
 @MainActor
 final class ChargerDetailViewModelTests: XCTestCase {
@@ -77,13 +78,15 @@ final class ChargerDetailViewModelTests: XCTestCase {
             let path = req.url?.path ?? ""
             if path.hasSuffix("/session") {
                 let body = #"""
-                {"session": null, "state": "idle", "chargerId": "BAY-1"}
-                """#
+                    {"session": null, "state": "idle", "chargerId": "BAY-1"}
+                    """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             if path.hasSuffix("/reservations") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"reservations":[]}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"reservations":[]}"#.utf8)
+                )
             }
             return (404, [:], Data())
         }
@@ -102,18 +105,18 @@ final class ChargerDetailViewModelTests: XCTestCase {
             let path = req.url?.path ?? ""
             if path.hasSuffix("/session") {
                 let body = #"""
-                {"session": null, "state": "idle", "chargerId": "BAY-1"}
-                """#
+                    {"session": null, "state": "idle", "chargerId": "BAY-1"}
+                    """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             if path.hasSuffix("/reservations") {
                 let body = """
-                {"reservations": [
-                  {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
-                   "customerLabel":"Alice","lagoCustomerExternalId":\(extIdFragment),
-                   "isBlackout":false,"idTag":"ALICE-CARD-1","isCancelable":true}
-                ]}
-                """
+                    {"reservations": [
+                      {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
+                       "customerLabel":"Alice","lagoCustomerExternalId":\(extIdFragment),
+                       "isBlackout":false,"idTag":"ALICE-CARD-1","isCancelable":true}
+                    ]}
+                    """
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             return (404, [:], Data())
@@ -123,29 +126,30 @@ final class ChargerDetailViewModelTests: XCTestCase {
     // MARK: - bootstrap
 
     func test_bootstrapPopulatesSessionAndReservations() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { req in
             let path = req.url?.path ?? ""
             if path.hasSuffix("/session") {
                 let body = #"""
-                {"session": {
-                   "chargerId":"BAY-1","sessionId":"99","state":"charging",
-                   "startedAt":"2026-04-27T10:00:00Z","idTag":"ALICE",
-                   "customerName":"Alice","kwh":3.5,"kw":11.0,
-                   "elapsedSec":120,"connectorId":1
-                 },"state":"charging","chargerId":"BAY-1"}
-                """#
+                    {"session": {
+                       "chargerId":"BAY-1","sessionId":"99","state":"charging",
+                       "startedAt":"2026-04-27T10:00:00Z","idTag":"ALICE",
+                       "customerName":"Alice","kwh":3.5,"kw":11.0,
+                       "elapsedSec":120,"connectorId":1
+                     },"state":"charging","chargerId":"BAY-1"}
+                    """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             if path.hasSuffix("/reservations") {
                 let body = #"""
-                {"reservations":[
-                  {"reservationId":"7","startsAt":"2026-04-28T09:00:00Z",
-                   "endsAt":"2026-04-28T10:00:00Z","customerLabel":"Bob",
-                   "lagoCustomerExternalId":"lago-bob",
-                   "isBlackout":false,"idTag":"BOB-CARD","isCancelable":true}
-                ]}
-                """#
+                    {"reservations":[
+                      {"reservationId":"7","startsAt":"2026-04-28T09:00:00Z",
+                       "endsAt":"2026-04-28T10:00:00Z","customerLabel":"Bob",
+                       "lagoCustomerExternalId":"lago-bob",
+                       "isBlackout":false,"idTag":"BOB-CARD","isCancelable":true}
+                    ]}
+                    """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             return (404, [:], Data())
@@ -165,7 +169,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
     // MARK: - currentReservation derivation
 
     func test_currentReservationCoversNow() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         let now = Date(timeIntervalSince1970: 1_745_750_000)
         installReservedBootstrap(now: now)
         let vm = makeVM(now: now)
@@ -175,7 +180,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
     }
 
     func test_currentReservationNilWhenNoActiveWindow() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         installIdleBootstrap()
         let vm = makeVM()
         await vm.bootstrap()
@@ -185,7 +191,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
     // MARK: - startCharging — Path A (reserved customer)
 
     func test_startChargingPathAUsesReservationCustomerAndSkipsPicker() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         let now = Date(timeIntervalSince1970: 1_745_750_000)
 
         let observed = ObservedRequest()
@@ -193,8 +200,10 @@ final class ChargerDetailViewModelTests: XCTestCase {
             let path = req.url?.path ?? ""
             if req.httpMethod == "POST", path.hasSuffix("/start") {
                 observed.record(req)
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"operationLogId":1,"taskId":"t","status":"submitted"}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"operationLogId":1,"taskId":"t","status":"submitted"}"#.utf8)
+                )
             }
             // Slice S: Path A no longer hits /tags or /customers — the
             // reservation already carries `lagoCustomerExternalId`. If the
@@ -204,23 +213,23 @@ final class ChargerDetailViewModelTests: XCTestCase {
             let endsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(600))
             if path.hasSuffix("/session") {
                 let body = #"""
-                {"session": {
-                   "chargerId":"BAY-1","sessionId":null,"state":"preparing",
-                   "startedAt":null,"idTag":null,
-                   "customerName":"Alice","kwh":null,"kw":null,
-                   "elapsedSec":null,"connectorId":null
-                 },"state":"preparing","chargerId":"BAY-1"}
-                """#
+                    {"session": {
+                       "chargerId":"BAY-1","sessionId":null,"state":"preparing",
+                       "startedAt":null,"idTag":null,
+                       "customerName":"Alice","kwh":null,"kw":null,
+                       "elapsedSec":null,"connectorId":null
+                     },"state":"preparing","chargerId":"BAY-1"}
+                    """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             if path.hasSuffix("/reservations") {
                 let body = """
-                {"reservations":[
-                  {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
-                   "customerLabel":"Alice","lagoCustomerExternalId":"lago-alice",
-                   "isBlackout":false,"idTag":"ALICE-CARD-1","isCancelable":true}
-                ]}
-                """
+                    {"reservations":[
+                      {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
+                       "customerLabel":"Alice","lagoCustomerExternalId":"lago-alice",
+                       "isBlackout":false,"idTag":"ALICE-CARD-1","isCancelable":true}
+                    ]}
+                    """
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             return (404, [:], Data())
@@ -247,7 +256,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
         // Reservation has no `lagoCustomerExternalId` (older server, or
         // an unmapped tag). The VM should open the customer picker
         // rather than fail-closed.
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         let now = Date(timeIntervalSince1970: 1_745_750_000)
 
         let observed = ObservedRequest()
@@ -260,24 +270,28 @@ final class ChargerDetailViewModelTests: XCTestCase {
             if path.hasSuffix("/customers") {
                 // Customer list comes back empty — Path B picker still
                 // opens; the operator sees an empty-state.
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"customers":[]}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"customers":[]}"#.utf8)
+                )
             }
             let startsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(-600))
             let endsAt = ISO8601DateFormatter().string(from: now.addingTimeInterval(600))
             if path.hasSuffix("/session") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"session":null,"state":"idle","chargerId":"BAY-1"}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"session":null,"state":"idle","chargerId":"BAY-1"}"#.utf8)
+                )
             }
             if path.hasSuffix("/reservations") {
                 // Reservation has no externalId field (older server).
                 let body = """
-                {"reservations":[
-                  {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
-                   "customerLabel":"Alice","isBlackout":false,
-                   "idTag":"ALICE-CARD-1","isCancelable":true}
-                ]}
-                """
+                    {"reservations":[
+                      {"reservationId":"42","startsAt":"\(startsAt)","endsAt":"\(endsAt)",
+                       "customerLabel":"Alice","isBlackout":false,
+                       "idTag":"ALICE-CARD-1","isCancelable":true}
+                    ]}
+                    """
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             return (404, [:], Data())
@@ -294,26 +308,31 @@ final class ChargerDetailViewModelTests: XCTestCase {
     // MARK: - startCharging — Path B (no reservation)
 
     func test_startChargingPathBOpensPicker() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { req in
             let path = req.url?.path ?? ""
             if path.hasSuffix("/customers") {
                 let body = #"""
-                {"customers":[
-                  {"lagoCustomerExternalId":"lago-alice","userId":"u-1",
-                   "displayName":"Alice","name":"Alice","email":"alice@example.com",
-                   "isOwn":false,"lastUsedAt":null}
-                ]}
-                """#
+                    {"customers":[
+                      {"lagoCustomerExternalId":"lago-alice","userId":"u-1",
+                       "displayName":"Alice","name":"Alice","email":"alice@example.com",
+                       "isOwn":false,"lastUsedAt":null}
+                    ]}
+                    """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             if path.hasSuffix("/session") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"session": null, "state": "idle", "chargerId": "BAY-1"}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"session": null, "state": "idle", "chargerId": "BAY-1"}"#.utf8)
+                )
             }
             if path.hasSuffix("/reservations") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"reservations":[]}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"reservations":[]}"#.utf8)
+                )
             }
             return (404, [:], Data())
         }
@@ -330,7 +349,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
     // MARK: - submitStart 200 → optimistic flip
 
     func test_submitStartCustomer200OptimisticallyFlipsToPreparing() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         // Stub returns idle on bootstrap, then preparing on the
         // post-start refresh — the VM's optimistic flip is observed
         // through the surviving session shape.
@@ -341,26 +361,32 @@ final class ChargerDetailViewModelTests: XCTestCase {
             if req.httpMethod == "POST", path.hasSuffix("/start") {
                 observed.record(req)
                 phase.bump()
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"operationLogId":1,"taskId":"t","status":"submitted"}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"operationLogId":1,"taskId":"t","status":"submitted"}"#.utf8)
+                )
             }
             if path.hasSuffix("/session") {
                 if phase.value == 0 {
-                    return (200, ["Content-Type": "application/json"],
-                            Data(#"{"session": null, "state": "idle", "chargerId": "BAY-1"}"#.utf8))
+                    return (
+                        200, ["Content-Type": "application/json"],
+                        Data(#"{"session": null, "state": "idle", "chargerId": "BAY-1"}"#.utf8)
+                    )
                 }
                 let body = #"""
-                {"session": {
-                   "chargerId":"BAY-1","sessionId":null,"state":"preparing",
-                   "startedAt":null,"idTag":null,"customerName":"Alice",
-                   "kwh":null,"kw":null,"elapsedSec":null,"connectorId":null
-                 },"state":"preparing","chargerId":"BAY-1"}
-                """#
+                    {"session": {
+                       "chargerId":"BAY-1","sessionId":null,"state":"preparing",
+                       "startedAt":null,"idTag":null,"customerName":"Alice",
+                       "kwh":null,"kw":null,"elapsedSec":null,"connectorId":null
+                     },"state":"preparing","chargerId":"BAY-1"}
+                    """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             if path.hasSuffix("/reservations") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"reservations":[]}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"reservations":[]}"#.utf8)
+                )
             }
             return (404, [:], Data())
         }
@@ -390,20 +416,27 @@ final class ChargerDetailViewModelTests: XCTestCase {
     // MARK: - submitStart 409 → charger offline
 
     func test_submitStartCustomer409SurfacesChargerOffline() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { req in
             let path = req.url?.path ?? ""
             if req.httpMethod == "POST", path.hasSuffix("/start") {
-                return (409, ["Content-Type": "application/json"],
-                        Data(#"{"error":"charger_offline","lastSeenAt":null}"#.utf8))
+                return (
+                    409, ["Content-Type": "application/json"],
+                    Data(#"{"error":"charger_offline","lastSeenAt":null}"#.utf8)
+                )
             }
             if path.hasSuffix("/session") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"session": null, "state": "idle", "chargerId": "BAY-1"}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"session": null, "state": "idle", "chargerId": "BAY-1"}"#.utf8)
+                )
             }
             if path.hasSuffix("/reservations") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"reservations":[]}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"reservations":[]}"#.utf8)
+                )
             }
             return (404, [:], Data())
         }
@@ -434,27 +467,32 @@ final class ChargerDetailViewModelTests: XCTestCase {
     // MARK: - stopCharging
 
     func test_stopChargingConfirmedFlipsToStopping() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { req in
             let path = req.url?.path ?? ""
             if req.httpMethod == "POST", path.hasSuffix("/stop") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"operationLogId":1,"taskId":"t","status":"submitted"}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"operationLogId":1,"taskId":"t","status":"submitted"}"#.utf8)
+                )
             }
             if path.hasSuffix("/session") {
                 let body = #"""
-                {"session": {
-                   "chargerId":"BAY-1","sessionId":"99","state":"charging",
-                   "startedAt":"2026-04-27T10:00:00Z","idTag":"T1",
-                   "customerName":"Alice","kwh":3.5,"kw":11.0,
-                   "elapsedSec":120,"connectorId":1
-                 },"state":"charging","chargerId":"BAY-1"}
-                """#
+                    {"session": {
+                       "chargerId":"BAY-1","sessionId":"99","state":"charging",
+                       "startedAt":"2026-04-27T10:00:00Z","idTag":"T1",
+                       "customerName":"Alice","kwh":3.5,"kw":11.0,
+                       "elapsedSec":120,"connectorId":1
+                     },"state":"charging","chargerId":"BAY-1"}
+                    """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             if path.hasSuffix("/reservations") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"reservations":[]}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"reservations":[]}"#.utf8)
+                )
             }
             return (404, [:], Data())
         }
@@ -467,7 +505,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
     }
 
     func test_stopChargingNotConfirmedDoesNothing() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         installIdleBootstrap()
         let vm = makeVM()
         await vm.bootstrap()
@@ -478,26 +517,31 @@ final class ChargerDetailViewModelTests: XCTestCase {
     // MARK: - cancelReservation
 
     func test_cancelReservationOptimisticallyRemovesRow() async {
-        StubURLProtocol.reset(); defer { StubURLProtocol.reset() }
+        StubURLProtocol.reset()
+        defer { StubURLProtocol.reset() }
         StubURLProtocol.handler = { req in
             let path = req.url?.path ?? ""
             if req.httpMethod == "DELETE", path.hasSuffix("/cancel-reservation") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"reservationId":7,"status":"cancelled"}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"reservationId":7,"status":"cancelled"}"#.utf8)
+                )
             }
             if path.hasSuffix("/session") {
-                return (200, ["Content-Type": "application/json"],
-                        Data(#"{"session": null, "state": "idle", "chargerId": "BAY-1"}"#.utf8))
+                return (
+                    200, ["Content-Type": "application/json"],
+                    Data(#"{"session": null, "state": "idle", "chargerId": "BAY-1"}"#.utf8)
+                )
             }
             if path.hasSuffix("/reservations") {
                 let body = #"""
-                {"reservations":[
-                  {"reservationId":"7","startsAt":"2026-04-28T09:00:00Z",
-                   "endsAt":"2026-04-28T10:00:00Z","customerLabel":"Bob",
-                   "lagoCustomerExternalId":"lago-bob",
-                   "isBlackout":false,"idTag":"BOB","isCancelable":true}
-                ]}
-                """#
+                    {"reservations":[
+                      {"reservationId":"7","startsAt":"2026-04-28T09:00:00Z",
+                       "endsAt":"2026-04-28T10:00:00Z","customerLabel":"Bob",
+                       "lagoCustomerExternalId":"lago-bob",
+                       "isBlackout":false,"idTag":"BOB","isCancelable":true}
+                    ]}
+                    """#
                 return (200, ["Content-Type": "application/json"], Data(body.utf8))
             }
             return (404, [:], Data())
@@ -519,11 +563,13 @@ private final class AtomicCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var _value: Int = 0
     var value: Int {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return _value
     }
     func bump() {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         _value += 1
     }
 }
@@ -536,12 +582,14 @@ private final class ObservedRequest: @unchecked Sendable {
     private var _lastBody: Data?
 
     var lastBody: Data? {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return _lastBody
     }
 
     func record(_ req: URLRequest) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         if let data = req.httpBody {
             _lastBody = data
             return

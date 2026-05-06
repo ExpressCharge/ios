@@ -5,6 +5,7 @@
 
 import Foundation
 import Testing
+
 @testable import Crypto
 
 @Suite("HexEncoding")

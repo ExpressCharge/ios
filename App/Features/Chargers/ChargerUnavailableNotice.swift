@@ -47,21 +47,21 @@ struct ChargerUnavailableNotice: View {
 
     private var systemImage: String {
         switch reason {
-        case .offline:      return "wifi.slash"
+        case .offline: return "wifi.slash"
         case .outOfService: return "exclamationmark.triangle.fill"
         }
     }
 
     private var title: String {
         switch reason {
-        case .offline:      return "Charger offline"
+        case .offline: return "Charger offline"
         case .outOfService: return "Charger out of service"
         }
     }
 
     private var toneColor: Color {
         switch reason {
-        case .offline:      return ColorPalette.destructiveRose
+        case .offline: return ColorPalette.destructiveRose
         case .outOfService: return ColorPalette.warningAmber
         }
     }
@@ -71,7 +71,8 @@ struct ChargerUnavailableNotice: View {
         case .offline:
             return "Wait for it to come back online and refresh to check its status."
         case .outOfService:
-            return "Reservations and remote starts are paused. Contact your site admin if this persists."
+            return
+                "Reservations and remote starts are paused. Contact your site admin if this persists."
         }
     }
 }

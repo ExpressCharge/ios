@@ -35,13 +35,12 @@
 //    - `50-ios.md` § "Universal Links + PKCE registration".
 //
 
-import Foundation
 import AuthenticationServices
+import Crypto
 import CryptoKit
+import Foundation
 import Observation
 import UIKit
-
-import Crypto
 
 @MainActor
 @Observable
@@ -94,12 +93,15 @@ public final class LoginViewModel: NSObject {
         let verifier = Self.generateCodeVerifier()
         let challenge = Self.computeChallenge(verifier: verifier)
         self.lastVerifier = verifier
-        authLog.debug("LoginViewModel.start: opening auth session, label.len=\(deviceLabel.count, privacy: .public), verifier.len=\(verifier.count, privacy: .public)")
+        authLog.debug(
+            "LoginViewModel.start: opening auth session, label.len=\(deviceLabel.count, privacy: .public), verifier.len=\(verifier.count, privacy: .public)"
+        )
         // The verifier is read by `WelcomeView.onChange(of:deliveredCode)`
         // and handed to the `RootCoordinator.didReceiveOneTimeCode(_,
         // codeVerifier:)` transition — explicit DI, no globals.
 
-        var components = URLComponents(url: BuildConfig.registrationStartURL, resolvingAgainstBaseURL: false)!
+        var components = URLComponents(
+            url: BuildConfig.registrationStartURL, resolvingAgainstBaseURL: false)!
         var items = components.queryItems ?? []
         items.append(URLQueryItem(name: "codeChallenge", value: challenge))
         items.append(URLQueryItem(name: "codeChallengeMethod", value: "S256"))
@@ -186,15 +188,20 @@ public final class LoginViewModel: NSObject {
                 authLog.debug("LoginViewModel: session canceled by user")
                 self.error = .canceled
             case .presentationContextNotProvided,
-                 .presentationContextInvalid:
-                authLog.error("LoginViewModel: presentation-context error \(authErr.code.rawValue, privacy: .public)")
+                .presentationContextInvalid:
+                authLog.error(
+                    "LoginViewModel: presentation-context error \(authErr.code.rawValue, privacy: .public)"
+                )
                 self.error = .presentation
             @unknown default:
-                authLog.error("LoginViewModel: unknown ASWebAuthenticationSessionError code \(authErr.code.rawValue, privacy: .public)")
+                authLog.error(
+                    "LoginViewModel: unknown ASWebAuthenticationSessionError code \(authErr.code.rawValue, privacy: .public)"
+                )
                 self.error = .unknown
             }
         } else {
-            authLog.error("LoginViewModel: session error \(String(describing: error), privacy: .public)")
+            authLog.error(
+                "LoginViewModel: session error \(String(describing: error), privacy: .public)")
             self.error = .unknown
         }
     }
@@ -221,11 +228,14 @@ public final class LoginViewModel: NSObject {
         //    elsewhere: `https://manage.example.com/app/
         //    register/callback?code=…`.
         let isCustomScheme = components.scheme == BuildConfig.callbackURLScheme
-        let isUniversalLink = components.scheme == "https"
+        let isUniversalLink =
+            components.scheme == "https"
             && components.host == BuildConfig.universalLinkHost
             && components.path == BuildConfig.registrationCallbackPath
         guard isCustomScheme || isUniversalLink else {
-            authLog.error("LoginViewModel.extractCode: callback URL did not match expected pattern (scheme=\(components.scheme ?? "nil", privacy: .public))")
+            authLog.error(
+                "LoginViewModel.extractCode: callback URL did not match expected pattern (scheme=\(components.scheme ?? "nil", privacy: .public))"
+            )
             self.error = .unknown
             return
         }
@@ -239,7 +249,9 @@ public final class LoginViewModel: NSObject {
             return
         }
 
-        authLog.debug("LoginViewModel.extractCode: received one-time code, len=\(code.count, privacy: .public)")
+        authLog.debug(
+            "LoginViewModel.extractCode: received one-time code, len=\(code.count, privacy: .public)"
+        )
         self.deliveredCode = code
     }
 
@@ -311,9 +323,11 @@ extension LoginViewModel: ASWebAuthenticationPresentationContextProviding {
             // anchor anyway so the type signature is satisfied.
             let scenes = UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
-            if let foregroundKey = scenes
+            if let foregroundKey =
+                scenes
                 .first(where: { $0.activationState == .foregroundActive })?
-                .keyWindow {
+                .keyWindow
+            {
                 return foregroundKey
             }
             // The first connected scene is the only sensible fallback.
@@ -321,7 +335,9 @@ extension LoginViewModel: ASWebAuthenticationPresentationContextProviding {
             // state and AuthServices can't present anyway — we
             // construct a window for whichever scene exists, falling
             // back to the implicit-foreground scene.
-            let scene = scenes.first ?? UIApplication.shared.connectedScenes
+            let scene =
+                scenes.first
+                ?? UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .first
             if let scene {
@@ -337,9 +353,9 @@ extension LoginViewModel: ASWebAuthenticationPresentationContextProviding {
 
 // MARK: - Base64URL encoding (lightweight; no Crypto dependency)
 
-private extension Data {
+extension Data {
     /// Base64URL encoding (RFC 4648 §5), no padding.
-    var base64URLEncoded: String {
+    fileprivate var base64URLEncoded: String {
         base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")

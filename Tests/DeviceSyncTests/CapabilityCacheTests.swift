@@ -8,6 +8,7 @@
 
 import Foundation
 import Testing
+
 @testable import DeviceSync
 @testable import Models
 
@@ -65,8 +66,9 @@ struct CapabilityCacheTests {
         // Forward-compat: server may add a capability we don't know
         // about yet — we should ignore unknown rawValues, not crash.
         let defaults = makeDefaults()
-        defaults.set(["scanner", "future_unknown_cap", "user"],
-                     forKey: CapabilityCache.storageKey)
+        defaults.set(
+            ["scanner", "future_unknown_cap", "user"],
+            forKey: CapabilityCache.storageKey)
         let cache = CapabilityCache(defaults: defaults)
         #expect(cache.read() == [.scanner, .user])
     }

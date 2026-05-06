@@ -10,10 +10,11 @@
 //  Spec: `50-ios.md` § "Offline scan queue".
 //
 
-import XCTest
-@testable import ExpresScan
 import Models
 import Networking
+import XCTest
+
+@testable import ExpresScan
 
 final class ScanResultQueueTests: XCTestCase {
 
@@ -49,7 +50,7 @@ final class ScanResultQueueTests: XCTestCase {
         for i in 0..<5 {
             await queue.enqueue(body: makeRequest(idTag: String(format: "%08X", i)))
             // Tiny pause so file timestamps are monotonically increasing.
-            try? await Task.sleep(nanoseconds: 2_000_000) // 2 ms
+            try? await Task.sleep(nanoseconds: 2_000_000)  // 2 ms
         }
         let count = await queue.count()
         XCTAssertEqual(count, 5)
@@ -72,7 +73,7 @@ final class ScanResultQueueTests: XCTestCase {
 
     func testDrainKeepsItemsOnNetworkError() async {
         StubURLProtocol.failureMode = .networkError
-        let queue = makeQueue(retrySchedule: [0]) // 1 attempt only — fast test
+        let queue = makeQueue(retrySchedule: [0])  // 1 attempt only — fast test
         await queue.enqueue(body: makeRequest(idTag: "DEADBEEF"))
         await queue.enqueue(body: makeRequest(idTag: "FEEDFACE"))
 
@@ -141,7 +142,8 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         case networkError
     }
 
-    nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> (Int, [String: String], Data))?
+    nonisolated(unsafe) static var handler:
+        (@Sendable (URLRequest) -> (Int, [String: String], Data))?
     nonisolated(unsafe) static var failureMode: FailureMode = .none
 
     static func reset() {

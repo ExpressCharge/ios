@@ -20,9 +20,8 @@
 //    - `20-contracts.md` § "PUT /api/devices/{deviceId}/push-token"
 //
 
-import Foundation
-
 import AuthCore
+import Foundation
 import Models
 import Networking
 
@@ -112,7 +111,8 @@ public final class PushService {
         if let n = userInfo["expiresAtEpochMs"] as? NSNumber {
             expiresAtMs = n.int64Value
         } else if let s = userInfo["expiresAtEpochMs"] as? String,
-                  let ms = Int64(s) {
+            let ms = Int64(s)
+        {
             expiresAtMs = ms
         } else {
             return nil
@@ -126,7 +126,8 @@ public final class PushService {
         } else {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            iso = formatter.string(from: Date(timeIntervalSince1970: TimeInterval(expiresAtMs) / 1000))
+            iso = formatter.string(
+                from: Date(timeIntervalSince1970: TimeInterval(expiresAtMs) / 1000))
         }
 
         let hint = userInfo["hintLabel"] as? String

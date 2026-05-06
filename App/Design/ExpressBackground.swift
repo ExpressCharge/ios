@@ -22,12 +22,12 @@ private struct ExpressBackgroundModifier: ViewModifier {
     }
 }
 
-public extension View {
+extension View {
     /// Paints the receiver with the brand background colour and tells
     /// any contained `Form` / `List` / `ScrollView` to render its
     /// content over that colour instead of the default system grouped
     /// background. Use at every page root.
-    func expressBackground() -> some View {
+    public func expressBackground() -> some View {
         modifier(ExpressBackgroundModifier())
     }
 }

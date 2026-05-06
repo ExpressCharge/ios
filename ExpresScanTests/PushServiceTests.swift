@@ -9,9 +9,10 @@
 //  Spec: `20-contracts.md` § "APNs payload (canonical)"
 //
 
-import XCTest
-@testable import ExpresScan
 import Models
+import XCTest
+
+@testable import ExpresScan
 
 final class PushServiceTests: XCTestCase {
 

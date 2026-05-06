@@ -189,16 +189,18 @@ public final class ReachabilityMonitor {
 
     private func transition(to next: State, reason: String) {
         if state == next { return }
-        reachLog.info("reachability \(self.state.label, privacy: .public) → \(next.label, privacy: .public) [\(reason, privacy: .public)]")
+        reachLog.info(
+            "reachability \(self.state.label, privacy: .public) → \(next.label, privacy: .public) [\(reason, privacy: .public)]"
+        )
         state = next
     }
 }
 
-private extension ReachabilityMonitor.State {
-    var label: String {
+extension ReachabilityMonitor.State {
+    fileprivate var label: String {
         switch self {
-        case .online:            return "online"
-        case .deviceOffline:     return "device-offline"
+        case .online: return "online"
+        case .deviceOffline: return "device-offline"
         case .serverUnreachable: return "server-unreachable"
         }
     }

@@ -59,24 +59,25 @@ public struct ChargerListEntry: Codable, Identifiable, Hashable, Sendable {
         /// `true` when the charger is contactable and running.
         public var isOnline: Bool {
             switch self {
-            case .offline:        return false
+            case .offline: return false
             case .idle,
-                 .preparing,
-                 .charging,
-                 .reserved,
-                 .outOfService:    return true
+                .preparing,
+                .charging,
+                .reserved,
+                .outOfService:
+                return true
             }
         }
 
         /// User-facing label for the row's online pill.
         public var displayLabel: String {
             switch self {
-            case .idle:           return "Idle"
-            case .preparing:      return "Plugged in"
-            case .charging:       return "Charging"
-            case .reserved:       return "Reserved"
-            case .outOfService:   return "Out of service"
-            case .offline:        return "Offline"
+            case .idle: return "Idle"
+            case .preparing: return "Plugged in"
+            case .charging: return "Charging"
+            case .reserved: return "Reserved"
+            case .outOfService: return "Out of service"
+            case .offline: return "Offline"
             }
         }
     }

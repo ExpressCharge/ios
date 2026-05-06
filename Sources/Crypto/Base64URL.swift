@@ -13,7 +13,8 @@ enum Base64URL {
     /// required. Returns `nil` on any non-alphabet character.
     static func decode(_ string: String) -> Data? {
         // Replace base64url alphabet with standard base64.
-        var transformed = string
+        var transformed =
+            string
             .replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")
 

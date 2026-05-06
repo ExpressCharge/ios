@@ -10,10 +10,9 @@
 //  Spec: `50-ios.md` § "Registration capability picker" (Wave 6 / Slice H).
 //
 
-import SwiftUI
-
 import Capabilities
 import Models
+import SwiftUI
 
 /// Section component rendered inside `RegistrationView`'s `Form`. Owns
 /// no state; the parent passes a `Binding<Set<DeviceCapability>>`.

@@ -9,6 +9,7 @@
 
 import Foundation
 import Testing
+
 @testable import Models
 
 @Suite("Contract round-trip")
@@ -31,28 +32,28 @@ struct ContractRoundTripTests {
 
     @Test func enrichedScanResultRoundTrip() throws {
         let json = """
-        {
-          "ok": true,
-          "found": true,
-          "pairingCode": "X7R2KQ",
-          "idTag": "04AB12CDEF1234",
-          "resolvedAtIso": "2026-04-25T12:34:56.000Z",
-          "tag": {
-            "displayName": "Aisha's Card",
-            "tagType": "ev_card"
-          },
-          "customer": {
-            "displayName": "Aisha Patel",
-            "slug": "aisha-patel"
-          },
-          "subscription": {
-            "planLabel": "Standard EV",
-            "status": "active",
-            "currentPeriodEndIso": "2026-05-25T00:00:00.000Z",
-            "billingTier": "standard"
-          }
-        }
-        """
+            {
+              "ok": true,
+              "found": true,
+              "pairingCode": "X7R2KQ",
+              "idTag": "04AB12CDEF1234",
+              "resolvedAtIso": "2026-04-25T12:34:56.000Z",
+              "tag": {
+                "displayName": "Aisha's Card",
+                "tagType": "ev_card"
+              },
+              "customer": {
+                "displayName": "Aisha Patel",
+                "slug": "aisha-patel"
+              },
+              "subscription": {
+                "planLabel": "Standard EV",
+                "status": "active",
+                "currentPeriodEndIso": "2026-05-25T00:00:00.000Z",
+                "billingTier": "standard"
+              }
+            }
+            """
 
         let decoded = try decoder.decode(
             EnrichedScanResult.self,
@@ -75,17 +76,17 @@ struct ContractRoundTripTests {
 
     @Test func enrichedScanResultHandlesNulls() throws {
         let json = """
-        {
-          "ok": true,
-          "found": false,
-          "pairingCode": "X7R2KQ",
-          "idTag": "04AB12CDEF1234",
-          "resolvedAtIso": "2026-04-25T12:34:56.000Z",
-          "tag": null,
-          "customer": null,
-          "subscription": null
-        }
-        """
+            {
+              "ok": true,
+              "found": false,
+              "pairingCode": "X7R2KQ",
+              "idTag": "04AB12CDEF1234",
+              "resolvedAtIso": "2026-04-25T12:34:56.000Z",
+              "tag": null,
+              "customer": null,
+              "subscription": null
+            }
+            """
         let decoded = try decoder.decode(
             EnrichedScanResult.self,
             from: Data(json.utf8)
@@ -100,16 +101,16 @@ struct ContractRoundTripTests {
 
     @Test func scanRequestRoundTrip() throws {
         let json = """
-        {
-          "deviceId": "11111111-2222-3333-4444-555555555555",
-          "pairingCode": "X7R2KQ",
-          "purpose": "admin-link",
-          "expiresAtIso": "2026-04-25T12:35:30.000Z",
-          "expiresAtEpochMs": 1745622090000,
-          "requestedByUserId": "alice",
-          "hintLabel": "Front desk"
-        }
-        """
+            {
+              "deviceId": "11111111-2222-3333-4444-555555555555",
+              "pairingCode": "X7R2KQ",
+              "purpose": "admin-link",
+              "expiresAtIso": "2026-04-25T12:35:30.000Z",
+              "expiresAtEpochMs": 1745622090000,
+              "requestedByUserId": "alice",
+              "hintLabel": "Front desk"
+            }
+            """
         let decoded = try decoder.decode(ScanRequest.self, from: Data(json.utf8))
         #expect(decoded.deviceId == "11111111-2222-3333-4444-555555555555")
         #expect(decoded.purpose == .adminLink)
@@ -123,16 +124,16 @@ struct ContractRoundTripTests {
 
     @Test func scanRequestSystemInitiated() throws {
         let json = """
-        {
-          "deviceId": "uuid",
-          "pairingCode": "X7R2KQ",
-          "purpose": "login",
-          "expiresAtIso": "2026-04-25T12:35:30.000Z",
-          "expiresAtEpochMs": 1745622090000,
-          "requestedByUserId": null,
-          "hintLabel": null
-        }
-        """
+            {
+              "deviceId": "uuid",
+              "pairingCode": "X7R2KQ",
+              "purpose": "login",
+              "expiresAtIso": "2026-04-25T12:35:30.000Z",
+              "expiresAtEpochMs": 1745622090000,
+              "requestedByUserId": null,
+              "hintLabel": null
+            }
+            """
         let decoded = try decoder.decode(ScanRequest.self, from: Data(json.utf8))
         #expect(decoded.purpose == .login)
         #expect(decoded.requestedByUserId == nil)
@@ -143,15 +144,15 @@ struct ContractRoundTripTests {
 
     @Test func deviceRegistrationResponseRoundTrip() throws {
         let json = """
-        {
-          "ok": true,
-          "deviceId": "11111111-2222-3333-4444-555555555555",
-          "deviceToken": "dev_abc123def456",
-          "deviceSecret": "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI",
-          "capabilities": ["scanner"],
-          "expiresAtIso": "2027-04-25T12:34:56.000Z"
-        }
-        """
+            {
+              "ok": true,
+              "deviceId": "11111111-2222-3333-4444-555555555555",
+              "deviceToken": "dev_abc123def456",
+              "deviceSecret": "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI",
+              "capabilities": ["scanner"],
+              "expiresAtIso": "2027-04-25T12:34:56.000Z"
+            }
+            """
         let decoded = try decoder.decode(
             DeviceRegistrationResponse.self,
             from: Data(json.utf8)

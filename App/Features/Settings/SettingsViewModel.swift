@@ -23,12 +23,11 @@
 //    - `20-contracts.md` § "GET /api/devices/me"
 //
 
-import Foundation
-import Observation
-
 import AuthCore
+import Foundation
 import Models
 import Networking
+import Observation
 
 /// Decoded body of `GET /api/devices/me`. Mirrors the TS shape; kept
 /// view-model-local to avoid leaking the type into other modules until
@@ -154,7 +153,8 @@ public final class SettingsViewModel {
                     // Offline. We still wipe local state — see comment
                     // above. The server-side row will be GC'd by the
                     // device-token expiry sweep.
-                    signOutError = "Signed out locally. We'll finish on the server next time you're online."
+                    signOutError =
+                        "Signed out locally. We'll finish on the server next time you're online."
                 } catch {
                     signOutError = "Server reported an error during sign-out."
                 }

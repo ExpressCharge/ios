@@ -24,9 +24,8 @@
 //  Spec: `50-ios.md` § "UX details" → "Scan request".
 //
 
-import SwiftUI
-
 import Models
+import SwiftUI
 
 public struct ScanActiveView: View {
 

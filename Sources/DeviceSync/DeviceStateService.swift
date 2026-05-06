@@ -9,10 +9,10 @@
 //  attaching the token via its `tokenSource`.
 //
 
+import AuthCore
 import Foundation
 import Models
 import Networking
-import AuthCore
 
 public struct DeviceStateService: Sendable {
 

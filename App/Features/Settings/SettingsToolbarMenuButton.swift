@@ -34,10 +34,10 @@ public struct SettingsToolbarMenuButton: ToolbarContent {
     }
 }
 
-public extension View {
+extension View {
     /// Adds the `SettingsToolbarMenuButton` to the receiver's toolbar.
     /// Caller must already be inside a `NavigationStack`.
-    func expressScanToolbarMenu() -> some View {
+    public func expressScanToolbarMenu() -> some View {
         self.toolbar { SettingsToolbarMenuButton() }
     }
 }

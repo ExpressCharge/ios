@@ -23,6 +23,7 @@
 import Foundation
 import Security
 import Testing
+
 @testable import AuthCore
 
 /// Detects whether the test process can talk to the macOS keychain.
@@ -43,7 +44,8 @@ private func keychainAvailable(service: String) -> Bool {
         return true
     } catch let error as KeychainError {
         if case .unhandled(let status) = error,
-           status == errSecMissingEntitlement {
+            status == errSecMissingEntitlement
+        {
             FileHandle.standardError.write(
                 Data("keychain probe: errSecMissingEntitlement, suite skipped\n".utf8)
             )

@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+
 @testable import Networking
 
 /// Feeds an SSE-shaped string through the parser. Note: Swift multiline
@@ -31,11 +32,11 @@ struct SSELineParserTests {
 
     @Test func parsesSingleEvent() {
         let raw = """
-        event: scan.requested
-        id: 1235
-        data: {"deviceId":"abc"}
+            event: scan.requested
+            id: 1235
+            data: {"deviceId":"abc"}
 
-        """
+            """
         let events = feed(raw)
         #expect(events.count == 1)
         #expect(events[0].event == "scan.requested")
@@ -45,9 +46,9 @@ struct SSELineParserTests {
 
     @Test func defaultEventNameIsMessage() {
         let raw = """
-        data: hello
+            data: hello
 
-        """
+            """
         let events = feed(raw)
         #expect(events.count == 1)
         #expect(events[0].event == "message")
@@ -56,11 +57,11 @@ struct SSELineParserTests {
 
     @Test func multipleDataLinesJoinWithNewline() {
         let raw = """
-        event: x
-        data: line one
-        data: line two
+            event: x
+            data: line one
+            data: line two
 
-        """
+            """
         let events = feed(raw)
         #expect(events.count == 1)
         #expect(events[0].data == "line one\nline two")
@@ -68,11 +69,11 @@ struct SSELineParserTests {
 
     @Test func commentLinesAreIgnored() {
         let raw = """
-        : keepalive
-        event: ping
-        data: {}
+            : keepalive
+            event: ping
+            data: {}
 
-        """
+            """
         let events = feed(raw)
         #expect(events.count == 1)
         #expect(events[0].event == "ping")
@@ -96,14 +97,14 @@ struct SSELineParserTests {
 
     @Test func idPersistsWhenFollowingEventOmitsIt() {
         let raw = """
-        event: a
-        id: 1
-        data: x
+            event: a
+            id: 1
+            data: x
 
-        event: b
-        data: y
+            event: b
+            data: y
 
-        """
+            """
         let events = feed(raw)
         #expect(events.count == 2)
         #expect(events[0].id == "1")
@@ -114,16 +115,16 @@ struct SSELineParserTests {
 
     @Test func multipleEventsInOneFeed() {
         let raw = """
-        event: a
-        data: 1
+            event: a
+            data: 1
 
-        event: b
-        data: 2
+            event: b
+            data: 2
 
-        event: c
-        data: 3
+            event: c
+            data: 3
 
-        """
+            """
         let events = feed(raw)
         #expect(events.map(\.event) == ["a", "b", "c"])
         #expect(events.map(\.data) == ["1", "2", "3"])

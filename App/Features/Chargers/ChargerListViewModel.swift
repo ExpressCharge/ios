@@ -11,9 +11,8 @@
 //
 
 import Foundation
-import Observation
-
 import Networking
+import Observation
 
 @MainActor
 @Observable
@@ -41,8 +40,8 @@ public final class ChargerListViewModel {
     /// reads this; it changes whenever either input changes.
     public var displayEntries: [ChargerListEntry] {
         switch filter {
-        case .all:     return entries
-        case .online:  return entries.filter { $0.state.isOnline }
+        case .all: return entries
+        case .online: return entries.filter { $0.state.isOnline }
         }
     }
 

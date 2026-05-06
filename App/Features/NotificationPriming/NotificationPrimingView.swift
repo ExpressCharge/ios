@@ -38,11 +38,13 @@ public struct NotificationPrimingView: View {
                     .font(.title.weight(.bold))
                     .multilineTextAlignment(.center)
 
-                Text("ExpressCharge uses notifications to wake your iPhone the moment a charging station or admin needs to scan a card. Without notifications, scans may be missed when the app is closed.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Spacing.lg)
+                Text(
+                    "ExpressCharge uses notifications to wake your iPhone the moment a charging station or admin needs to scan a card. Without notifications, scans may be missed when the app is closed."
+                )
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.lg)
             }
 
             Spacer()

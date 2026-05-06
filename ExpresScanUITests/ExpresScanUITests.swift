@@ -39,8 +39,8 @@ final class ExpresScanUITests: XCTestCase {
         app.launch()
         // Welcome screen renders within 5 seconds on cold launch.
         XCTAssertTrue(
-            app.staticTexts["ExpresScan"].waitForExistence(timeout: 5),
-            "Expected Welcome screen 'ExpresScan' headline to appear"
+            app.staticTexts["ExpressCharge"].waitForExistence(timeout: 5),
+            "Expected Welcome screen 'ExpressCharge' headline to appear"
         )
     }
 
@@ -48,7 +48,7 @@ final class ExpresScanUITests: XCTestCase {
 
     func testWelcomeShowsBrandHeadline() {
         app.launch()
-        let headline = app.staticTexts["ExpresScan"]
+        let headline = app.staticTexts["ExpressCharge"]
         XCTAssertTrue(headline.waitForExistence(timeout: 5))
     }
 
@@ -57,7 +57,7 @@ final class ExpresScanUITests: XCTestCase {
         // Substring match — full sentence is too long for a stable
         // accessibility identifier.
         let bodyExists = app.staticTexts.containing(
-            NSPredicate(format: "label CONTAINS[c] 'NFC card reader'")
+            NSPredicate(format: "label CONTAINS[c] 'NFC tap reader'")
         ).element.waitForExistence(timeout: 5)
         XCTAssertTrue(bodyExists, "Expected welcome body copy to mention NFC")
     }
@@ -88,8 +88,8 @@ final class ExpresScanUITests: XCTestCase {
         // The shared `PrimaryButton` wraps every CTA with a stable
         // `accessibilityIdentifier("primaryButton_<label>")` so XCUITest
         // queries don't flake on glass-rendering jitter. The Welcome
-        // CTA is "Sign in to ExpresSync".
-        let cta = app.buttons["primaryButton_Sign in to ExpresSync"]
+        // CTA is "Sign in".
+        let cta = app.buttons["primaryButton_Sign in"]
         XCTAssertTrue(cta.waitForExistence(timeout: 5))
     }
 
@@ -98,7 +98,7 @@ final class ExpresScanUITests: XCTestCase {
     func testWelcomeScreenPassesAccessibilityAudit() throws {
         app.launch()
         XCTAssertTrue(
-            app.staticTexts["ExpresScan"].waitForExistence(timeout: 5)
+            app.staticTexts["ExpressCharge"].waitForExistence(timeout: 5)
         )
         // iOS 17+ ships an automated audit. We exclude `.contrast`
         // because the animated AuroraText wordmark briefly dips below

@@ -16,10 +16,10 @@ enum ChargerStatusVisuals {
     /// `ChargerListEntry.ChargerState` and `StatusHero.State` into a
     /// single semantic shape.
     enum Status: Equatable, Sendable {
-        case available     // idle / preparing / plugged
+        case available  // idle / preparing / plugged
         case charging
         case reserved
-        case unavailable   // out-of-service (faulted / unavailable)
+        case unavailable  // out-of-service (faulted / unavailable)
         case offline
     }
 
@@ -29,11 +29,11 @@ enum ChargerStatusVisuals {
     /// both reserved + unavailable, red for offline + faulted.
     static func tone(for status: Status) -> Color {
         switch status {
-        case .available:   return ColorPalette.primaryCyan
-        case .charging:    return ColorPalette.voltGreen
-        case .reserved:    return ColorPalette.warningAmber
+        case .available: return ColorPalette.primaryCyan
+        case .charging: return ColorPalette.voltGreen
+        case .reserved: return ColorPalette.warningAmber
         case .unavailable: return ColorPalette.warningAmber
-        case .offline:     return ColorPalette.destructiveRose
+        case .offline: return ColorPalette.destructiveRose
         }
     }
 
@@ -42,9 +42,9 @@ enum ChargerStatusVisuals {
     /// statuses without a dedicated glow asset.
     static func glow(for status: Status) -> Color {
         switch status {
-        case .charging:  return ColorPalette.glowGreen
+        case .charging: return ColorPalette.glowGreen
         case .available: return ColorPalette.glowCyan
-        default:         return tone(for: status).opacity(0.5)
+        default: return tone(for: status).opacity(0.5)
         }
     }
 
@@ -52,10 +52,10 @@ enum ChargerStatusVisuals {
     static func status(from state: ChargerListEntry.ChargerState) -> Status {
         switch state {
         case .idle, .preparing: return .available
-        case .charging:         return .charging
-        case .reserved:         return .reserved
-        case .outOfService:     return .unavailable
-        case .offline:          return .offline
+        case .charging: return .charging
+        case .reserved: return .reserved
+        case .outOfService: return .unavailable
+        case .offline: return .offline
         }
     }
 
@@ -69,9 +69,9 @@ enum ChargerStatusVisuals {
         if isOffline { return .offline }
         switch hero {
         case .idle, .plugged: return .available
-        case .charging:       return .charging
-        case .reserved:       return .reserved
-        case .outOfService:   return .unavailable
+        case .charging: return .charging
+        case .reserved: return .reserved
+        case .outOfService: return .unavailable
         }
     }
 }

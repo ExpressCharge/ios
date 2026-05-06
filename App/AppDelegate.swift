@@ -25,13 +25,16 @@ public enum AppNotifications {
     /// `userInfo["token"] : String` — base64-encoded raw APNs token.
     public static let apnsTokenReceived = Notification.Name("ExpresScan.APNsTokenReceived")
     /// `userInfo["error"] : Error` — APNs registration failed.
-    public static let apnsRegistrationFailed = Notification.Name("ExpresScan.APNsRegistrationFailed")
+    public static let apnsRegistrationFailed = Notification.Name(
+        "ExpresScan.APNsRegistrationFailed")
     /// `userInfo["payload"] : [AnyHashable: Any]` — raw APNs payload from
     /// `didReceiveRemoteNotification` (foreground or tap).
-    public static let scanRequestPushReceived = Notification.Name("ExpresScan.ScanRequestPushReceived")
+    public static let scanRequestPushReceived = Notification.Name(
+        "ExpresScan.ScanRequestPushReceived")
     /// `userInfo["code"] : String` — one-time code extracted from a
     /// Universal Link.
-    public static let universalLinkRegistrationCallback = Notification.Name("ExpresScan.UniversalLinkRegistrationCallback")
+    public static let universalLinkRegistrationCallback = Notification.Name(
+        "ExpresScan.UniversalLinkRegistrationCallback")
 }
 
 /// Identifier of the single notification category we register.
@@ -147,7 +150,8 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
+        withCompletionHandler completionHandler:
+            @escaping @Sendable (UNNotificationPresentationOptions) -> Void
     ) {
         let payload = PushPayload(userInfo: notification.request.content.userInfo)
         Task { @MainActor in

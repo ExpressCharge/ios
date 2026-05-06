@@ -195,8 +195,8 @@ struct ChargerHero: View {
     private var cableColor: Color {
         switch status {
         case .charging: return tone.opacity(0.85)
-        case .offline:  return ColorPalette.mutedForeground.opacity(0.7)
-        default:        return tone.opacity(0.7)
+        case .offline: return ColorPalette.mutedForeground.opacity(0.7)
+        default: return tone.opacity(0.7)
         }
     }
 
@@ -235,10 +235,10 @@ struct ChargerHero: View {
 
     private var statusTitle: String? {
         switch heroState {
-        case .idle:         return "Idle"
-        case .plugged:      return "Plugged in"
-        case .charging:     return "Charging"
-        case .reserved:     return "Reserved"
+        case .idle: return "Idle"
+        case .plugged: return "Plugged in"
+        case .charging: return "Charging"
+        case .reserved: return "Reserved"
         case .outOfService:
             // Both offline and faulted hide the hero title — the
             // explanatory card below the hero is the source of
@@ -266,14 +266,14 @@ struct ChargerHero: View {
     }
 }
 
-private extension ChargerListEntry.ConnectorType {
-    var displayLabel: String {
+extension ChargerListEntry.ConnectorType {
+    fileprivate var displayLabel: String {
         switch self {
-        case .ccs:     return "CCS"
-        case .j1772:   return "J1772"
-        case .nacs:    return "NACS"
+        case .ccs: return "CCS"
+        case .j1772: return "J1772"
+        case .nacs: return "NACS"
         case .chademo: return "CHAdeMO"
-        case .type2:   return "Type 2"
+        case .type2: return "Type 2"
         }
     }
 }

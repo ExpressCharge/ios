@@ -18,14 +18,13 @@
 //  fills it in later.
 //
 
-import Foundation
-import Observation
-import UIKit
-
 import AuthCore
 import Capabilities
+import Foundation
 import Models
 import Networking
+import Observation
+import UIKit
 
 @MainActor
 @Observable
@@ -90,7 +89,8 @@ public final class RegistrationViewModel {
         deviceIdLast4: String
     ) -> String {
         let trimmed = deviceName.trimmingCharacters(in: .whitespaces)
-        let isGeneric = trimmed.isEmpty
+        let isGeneric =
+            trimmed.isEmpty
             || trimmed.caseInsensitiveCompare("iPhone") == .orderedSame
             || trimmed.caseInsensitiveCompare("iPad") == .orderedSame
         if isGeneric {
@@ -123,9 +123,11 @@ public final class RegistrationViewModel {
         // server enforces the same rule, but we surface the failure
         // inline without a round-trip.
         guard !selectedCapabilities.isEmpty,
-              DeviceCapability.isLegalSet(selectedCapabilities) else {
+            DeviceCapability.isLegalSet(selectedCapabilities)
+        else {
             let capList = self.selectedCapabilities.map(\.rawValue).joined(separator: ",")
-            authLog.error("RegistrationViewModel.submit: illegal capability set \(capList, privacy: .public)")
+            authLog.error(
+                "RegistrationViewModel.submit: illegal capability set \(capList, privacy: .public)")
             self.error = .invalidCapabilities
             return
         }
@@ -136,7 +138,9 @@ public final class RegistrationViewModel {
         // already in `pendingApnsToken`. The bounded wait keeps the
         // submit responsive on declined-permission paths.
         let pushToken = await waitForApnsToken(timeout: 5.0) ?? ""
-        authLog.debug("RegistrationViewModel.submit: posting /api/devices/register, label.len=\(self.label.count, privacy: .public), pushToken.empty=\(pushToken.isEmpty, privacy: .public)")
+        authLog.debug(
+            "RegistrationViewModel.submit: posting /api/devices/register, label.len=\(self.label.count, privacy: .public), pushToken.empty=\(pushToken.isEmpty, privacy: .public)"
+        )
 
         let request = DeviceRegistrationRequest(
             oneTimeCode: oneTimeCode,
@@ -160,7 +164,9 @@ public final class RegistrationViewModel {
 
         do {
             let response: DeviceRegistrationResponse = try await environment.api.request(endpoint)
-            authLog.debug("RegistrationViewModel.submit: registration succeeded, deviceId=\(response.deviceId, privacy: .public)")
+            authLog.debug(
+                "RegistrationViewModel.submit: registration succeeded, deviceId=\(response.deviceId, privacy: .public)"
+            )
 
             // Persist the three secrets. `storeCredentials` applies
             // the per-item Keychain accessibility classes from
@@ -177,13 +183,19 @@ public final class RegistrationViewModel {
 
             didSucceed = true
         } catch let api as APIError {
-            authLog.error("RegistrationViewModel.submit: API error \(String(describing: api), privacy: .public)")
+            authLog.error(
+                "RegistrationViewModel.submit: API error \(String(describing: api), privacy: .public)"
+            )
             error = mapAPIError(api)
         } catch let kc as KeychainError {
-            authLog.error("RegistrationViewModel.submit: keychain error \(String(describing: kc), privacy: .public)")
+            authLog.error(
+                "RegistrationViewModel.submit: keychain error \(String(describing: kc), privacy: .public)"
+            )
             self.error = .keychain
         } catch {
-            authLog.error("RegistrationViewModel.submit: unexpected error \(String(describing: error), privacy: .public)")
+            authLog.error(
+                "RegistrationViewModel.submit: unexpected error \(String(describing: error), privacy: .public)"
+            )
             self.error = .other
         }
     }

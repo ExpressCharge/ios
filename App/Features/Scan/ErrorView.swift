@@ -137,7 +137,8 @@ public struct ErrorView: View {
                 icon: "clock.badge.exclamationmark",
                 tint: ColorPalette.warningAmber,
                 title: "Scan timed out",
-                body: "We didn't see a card. Hold the card to the top of your iPhone and try again.",
+                body:
+                    "We didn't see a card. Hold the card to the top of your iPhone and try again.",
                 retryLabel: "Try again",
                 showsRetry: true
             )

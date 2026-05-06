@@ -13,7 +13,6 @@
 //
 
 import Foundation
-
 import Models
 
 /// Errors the user might see in `.error(_)`. Each is a friendly,

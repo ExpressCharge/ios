@@ -12,9 +12,8 @@
 //  the real `EnrichedScanResult.subscription.status`.
 //
 
-import SwiftUI
-
 import Models
+import SwiftUI
 
 public struct SubscriptionBadge: View {
 

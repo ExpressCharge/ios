@@ -11,12 +11,11 @@
 //  Spec: `50-ios.md` § "Diagnostics sheet (tap connection pill)"
 //
 
+import AuthCore
+import Networking
 import SwiftUI
 import UIKit
 import UserNotifications
-
-import AuthCore
-import Networking
 
 public struct DiagnosticsSheet: View {
 
@@ -141,7 +140,8 @@ public struct DiagnosticsSheet: View {
                 // already collapses these in `ownerDisplayName`; we
                 // re-derive locally only as a defense for older
                 // server builds that don't yet ship the field.
-                let label = me.displayName
+                let label =
+                    me.displayName
                     ?? me.name
                     ?? me.email
                     ?? me.userId
@@ -154,7 +154,10 @@ public struct DiagnosticsSheet: View {
                     LabeledContent("Registered", value: Self.formattedRegistered(registered))
                 }
             } else if accountLoading {
-                HStack { ProgressView().controlSize(.small); Text("Loading…") }
+                HStack {
+                    ProgressView().controlSize(.small)
+                    Text("Loading…")
+                }
             } else if let err = accountError {
                 Text(err).font(.caption).foregroundStyle(.secondary)
                 Button("Retry") { Task { await loadAccount() } }
@@ -177,9 +180,11 @@ public struct DiagnosticsSheet: View {
                 }
             }
             .disabled(testScanInFlight)
-            Text("Forces an immediate device-state sync so QA can confirm bearer auth + connectivity without holding a card.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                "Forces an immediate device-state sync so QA can confirm bearer auth + connectivity without holding a card."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -272,8 +277,8 @@ public struct DiagnosticsSheet: View {
 
 // MARK: - Local helpers
 
-private extension UNAuthorizationStatus {
-    var diagnosticLabel: String {
+extension UNAuthorizationStatus {
+    fileprivate var diagnosticLabel: String {
         switch self {
         case .authorized: return "Authorized"
         case .denied: return "Denied"

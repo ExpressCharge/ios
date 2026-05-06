@@ -95,7 +95,8 @@ struct CustomerPickerSheet: View {
     /// disambiguator for same-named customers.
     private func secondaryLine(for customer: CustomerOption) -> String? {
         if let email = customer.email, !email.isEmpty,
-           email != customer.displayName {
+            email != customer.displayName
+        {
             return email
         }
         return customer.lagoCustomerExternalId

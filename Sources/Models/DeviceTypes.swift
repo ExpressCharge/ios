@@ -38,8 +38,8 @@ public enum DeviceCapability: String, Codable, Sendable, CaseIterable {
 
 /// Capabilities the iOS registration picker may offer. Apps can never be
 /// chargers, so `charger` is excluded from the picker.
-public extension DeviceCapability {
-    static let appRegistrationOptions: [DeviceCapability] = [
+extension DeviceCapability {
+    public static let appRegistrationOptions: [DeviceCapability] = [
         .scanner, .user, .kiosk,
     ]
 }

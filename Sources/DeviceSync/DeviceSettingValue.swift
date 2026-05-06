@@ -67,13 +67,13 @@ public enum AnyCodableJSON: Sendable, Equatable, Codable {
     public func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         switch self {
-        case .null:           try c.encodeNil()
-        case .bool(let b):    try c.encode(b)
-        case .int(let i):     try c.encode(i)
-        case .double(let d):  try c.encode(d)
-        case .string(let s):  try c.encode(s)
-        case .array(let a):   try c.encode(a)
-        case .object(let o):  try c.encode(o)
+        case .null: try c.encodeNil()
+        case .bool(let b): try c.encode(b)
+        case .int(let i): try c.encode(i)
+        case .double(let d): try c.encode(d)
+        case .string(let s): try c.encode(s)
+        case .array(let a): try c.encode(a)
+        case .object(let o): try c.encode(o)
         }
     }
 }

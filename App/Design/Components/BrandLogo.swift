@@ -28,15 +28,15 @@ import SwiftUI
 public struct BrandLogo: View {
 
     public enum Size: Sendable {
-        case small   // 32 pt — sidebar / header
+        case small  // 32 pt — sidebar / header
         case medium  // 40 pt — login banner companion
-        case large   // 96 pt — splash hero
+        case large  // 96 pt — splash hero
 
         var dimension: CGFloat {
             switch self {
-            case .small:  return 32
+            case .small: return 32
             case .medium: return 40
-            case .large:  return 96
+            case .large: return 96
             }
         }
 
@@ -77,7 +77,8 @@ public struct BrandLogo: View {
             squircleShape(gradient: staticGradient)
         } else {
             TimelineView(.animation) { context in
-                let phase = context.date.timeIntervalSinceReferenceDate
+                let phase =
+                    context.date.timeIntervalSinceReferenceDate
                     .truncatingRemainder(dividingBy: 8) / 8
                 squircleShape(
                     gradient: animatedGradient(phase: phase)

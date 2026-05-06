@@ -155,7 +155,7 @@ public struct KeychainStore: Sendable {
             var findQuery = baseQuery
             findQuery[kSecAttrAccount] = account
             let attrs: [CFString: Any] = [
-                kSecValueData: value,
+                kSecValueData: value
             ]
             let updateStatus = SecItemUpdate(
                 findQuery as CFDictionary,

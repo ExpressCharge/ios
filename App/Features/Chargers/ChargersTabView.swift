@@ -55,7 +55,8 @@ public struct ChargersTabView: View {
         @Bindable var bound = vm
 
         switch vm.loadState {
-        case .idle, .loading where vm.entries.isEmpty:
+        case .idle,
+            .loading where vm.entries.isEmpty:
             ProgressView()
                 .controlSize(.large)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -91,14 +92,18 @@ public struct ChargersTabView: View {
             } else {
                 List {
                     ForEach(vm.displayEntries) { entry in
-                        Button { pushedEntry = entry } label: {
+                        Button {
+                            pushedEntry = entry
+                        } label: {
                             ChargerListRow(entry: entry)
                         }
                         .buttonStyle(.plain)
-                        .listRowInsets(EdgeInsets(
-                            top: 4, leading: 16,
-                            bottom: 4, trailing: 16
-                        ))
+                        .listRowInsets(
+                            EdgeInsets(
+                                top: 4, leading: 16,
+                                bottom: 4, trailing: 16
+                            )
+                        )
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     }
@@ -120,8 +125,8 @@ public struct ChargersTabView: View {
     /// the same single-entry response.
     private func maybeAutoPush(_ entries: [ChargerListEntry]) {
         guard !hasAutoPushed,
-              entries.count == 1,
-              let only = entries.first
+            entries.count == 1,
+            let only = entries.first
         else { return }
         pushedEntry = only
         hasAutoPushed = true

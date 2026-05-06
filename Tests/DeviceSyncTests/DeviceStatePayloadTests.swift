@@ -8,6 +8,7 @@
 
 import Foundation
 import Testing
+
 @testable import DeviceSync
 @testable import Models
 
@@ -30,45 +31,45 @@ struct DeviceStatePayloadTests {
 
     @Test func decodesFullEnvelope() throws {
         let json = """
-        {
-          "device": {
-            "id": "dev_123",
-            "label": "Vlad's iPhone",
-            "kind": "phone_nfc",
-            "ownerUserId": "usr_abc",
-            "siteId": null,
-            "registeredAt": "2026-04-01T12:00:00.000Z",
-            "lastSeenAt": "2026-04-27T09:30:00.000Z"
-          },
-          "capabilities": ["scanner", "user"],
-          "kioskAllowed": false,
-          "ownerUser": { "id": "usr_abc", "role": "admin", "displayName": "Vlad" },
-          "settings": {
-            "device.label": {
-              "value": "Vlad's iPhone",
-              "updatedAt": "2026-04-27T09:00:00Z",
-              "updatedBy": "ios-app"
-            },
-            "notifications.scanRequest": {
-              "value": true,
-              "updatedAt": "2026-04-26T20:00:00Z",
-              "updatedBy": "admin"
+            {
+              "device": {
+                "id": "dev_123",
+                "label": "Vlad's iPhone",
+                "kind": "phone_nfc",
+                "ownerUserId": "usr_abc",
+                "siteId": null,
+                "registeredAt": "2026-04-01T12:00:00.000Z",
+                "lastSeenAt": "2026-04-27T09:30:00.000Z"
+              },
+              "capabilities": ["scanner", "user"],
+              "kioskAllowed": false,
+              "ownerUser": { "id": "usr_abc", "role": "admin", "displayName": "Vlad" },
+              "settings": {
+                "device.label": {
+                  "value": "Vlad's iPhone",
+                  "updatedAt": "2026-04-27T09:00:00Z",
+                  "updatedBy": "ios-app"
+                },
+                "notifications.scanRequest": {
+                  "value": true,
+                  "updatedAt": "2026-04-26T20:00:00Z",
+                  "updatedBy": "admin"
+                }
+              },
+              "scanStatus": {
+                "armed": true,
+                "pairingCode": "X7R2KQ",
+                "expiresAt": "2026-04-27T09:35:00Z"
+              },
+              "pushToken": { "last8": "abcd1234", "environment": "production" },
+              "connectivity": {
+                "online": true,
+                "lastSyncAt": "2026-04-27T09:30:00Z",
+                "reconnectCount": 2,
+                "pendingUploads": 0
+              }
             }
-          },
-          "scanStatus": {
-            "armed": true,
-            "pairingCode": "X7R2KQ",
-            "expiresAt": "2026-04-27T09:35:00Z"
-          },
-          "pushToken": { "last8": "abcd1234", "environment": "production" },
-          "connectivity": {
-            "online": true,
-            "lastSyncAt": "2026-04-27T09:30:00Z",
-            "reconnectCount": 2,
-            "pendingUploads": 0
-          }
-        }
-        """
+            """
 
         let data = Data(json.utf8)
         let dec = JSONDecoder()
@@ -98,30 +99,30 @@ struct DeviceStatePayloadTests {
 
     @Test func decodesNullScanStatusAndPushToken() throws {
         let json = """
-        {
-          "device": {
-            "id": "dev_42",
-            "label": "Kiosk-only iPad",
-            "kind": "laptop_nfc",
-            "ownerUserId": "usr_x",
-            "siteId": "site_1",
-            "registeredAt": "2026-04-01T12:00:00.000Z",
-            "lastSeenAt": "2026-04-27T09:30:00.000Z"
-          },
-          "capabilities": ["user", "kiosk"],
-          "kioskAllowed": true,
-          "ownerUser": { "id": "usr_x", "role": "customer", "displayName": "Cust" },
-          "settings": {},
-          "scanStatus": null,
-          "pushToken": null,
-          "connectivity": {
-            "online": false,
-            "lastSyncAt": null,
-            "reconnectCount": 0,
-            "pendingUploads": 3
-          }
-        }
-        """
+            {
+              "device": {
+                "id": "dev_42",
+                "label": "Kiosk-only iPad",
+                "kind": "laptop_nfc",
+                "ownerUserId": "usr_x",
+                "siteId": "site_1",
+                "registeredAt": "2026-04-01T12:00:00.000Z",
+                "lastSeenAt": "2026-04-27T09:30:00.000Z"
+              },
+              "capabilities": ["user", "kiosk"],
+              "kioskAllowed": true,
+              "ownerUser": { "id": "usr_x", "role": "customer", "displayName": "Cust" },
+              "settings": {},
+              "scanStatus": null,
+              "pushToken": null,
+              "connectivity": {
+                "online": false,
+                "lastSyncAt": null,
+                "reconnectCount": 0,
+                "pendingUploads": 3
+              }
+            }
+            """
         let dec = JSONDecoder()
         dec.dateDecodingStrategy = .iso8601
         let state = try dec.decode(DeviceState.self, from: Data(json.utf8))
@@ -151,7 +152,7 @@ struct DeviceStatePayloadTests {
                     value: .bool(true),
                     updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
                     updatedBy: "ios-app"
-                ),
+                )
             ],
             scanStatus: .init(armed: false, pairingCode: nil, expiresAt: nil),
             pushToken: nil,

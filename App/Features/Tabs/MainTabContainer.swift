@@ -15,10 +15,9 @@
 //  default so the existing scan flow keeps working.
 //
 
-import SwiftUI
-
 import Capabilities
 import Models
+import SwiftUI
 
 /// Top-level shell for the `.ready` route. Owns the capability-derived
 /// VM and renders one of: lone screen, two-tab `TabView`, or kiosk wrap.

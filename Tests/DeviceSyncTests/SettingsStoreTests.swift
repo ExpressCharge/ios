@@ -5,6 +5,7 @@
 
 import Foundation
 import Testing
+
 @testable import DeviceSync
 
 @Suite("SettingsStore — actor + on-disk persistence")
@@ -12,7 +13,8 @@ struct SettingsStoreTests {
 
     private func makeTempDir() throws -> URL {
         let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ExpresScan-SettingsStoreTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent(
+                "ExpresScan-SettingsStoreTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
@@ -54,7 +56,7 @@ struct SettingsStoreTests {
                 value: .string("server-merged"),
                 updatedAt: Date(),
                 updatedBy: "admin"
-            ),
+            )
         ]
         try await store.applyMerged(merged)
         #expect(try await store.dirty().isEmpty)
@@ -96,7 +98,7 @@ struct SettingsStoreTests {
                 value: .string("clean"),
                 updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
                 updatedBy: "admin"
-            ),
+            )
         ])
         // Make a local edit on a different key.
         try await store.setLocal(

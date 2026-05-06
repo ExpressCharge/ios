@@ -115,7 +115,7 @@ public struct ScanIconView: View {
         let t = Date().timeIntervalSinceReferenceDate
         let phase = (t.truncatingRemainder(dividingBy: 1.5)) / 1.5
         let s = sin(phase * 2 * .pi)
-        return 1.0 + 0.04 * (1.0 + s) // 1.0 … 1.08
+        return 1.0 + 0.04 * (1.0 + s)  // 1.0 … 1.08
     }
 
     private func symbolName(for mode: ScanIconMode) -> String {
@@ -149,23 +149,23 @@ public struct ScanIconView: View {
     /// Stable per-mode token so `.bounce` re-fires on each transition.
     private func bounceTrigger(for mode: ScanIconMode) -> Int {
         switch mode {
-        case .idle:               return 0
-        case .armed:              return 1
-        case .result(.unknown):   return 2
-        case .result(.active):    return 3
-        case .result(.inactive):  return 4
-        case .result(.failure):   return 5
+        case .idle: return 0
+        case .armed: return 1
+        case .result(.unknown): return 2
+        case .result(.active): return 3
+        case .result(.inactive): return 4
+        case .result(.failure): return 5
         }
     }
 
     private func accessibilityLabel(for mode: ScanIconMode) -> String {
         switch mode {
-        case .idle:               return "NFC reader ready"
-        case .armed:              return "Scan a card now"
-        case .result(.unknown):   return "Card scanned, account not found"
-        case .result(.active):    return "Active subscription"
-        case .result(.inactive):  return "Subscription inactive"
-        case .result(.failure):   return "Scan failed"
+        case .idle: return "NFC reader ready"
+        case .armed: return "Scan a card now"
+        case .result(.unknown): return "Card scanned, account not found"
+        case .result(.active): return "Active subscription"
+        case .result(.inactive): return "Subscription inactive"
+        case .result(.failure): return "Scan failed"
         }
     }
 }

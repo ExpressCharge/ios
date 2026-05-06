@@ -57,9 +57,9 @@ extension Data {
 
     private static func nibble(_ ascii: UInt8) -> UInt8? {
         switch ascii {
-        case 0x30...0x39: return ascii - 0x30                  // '0'-'9'
-        case 0x41...0x46: return ascii - 0x41 + 10             // 'A'-'F'
-        case 0x61...0x66: return ascii - 0x61 + 10             // 'a'-'f'
+        case 0x30...0x39: return ascii - 0x30  // '0'-'9'
+        case 0x41...0x46: return ascii - 0x41 + 10  // 'A'-'F'
+        case 0x61...0x66: return ascii - 0x61 + 10  // 'a'-'f'
         default: return nil
         }
     }

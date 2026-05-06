@@ -7,10 +7,11 @@
 //  iOS shell Combinations table).
 //
 
-import XCTest
-@testable import ExpresScan
 import Capabilities
 import Models
+import XCTest
+
+@testable import ExpresScan
 
 @MainActor
 final class MainTabContainerViewModelTests: XCTestCase {
@@ -56,13 +57,13 @@ final class MainTabContainerViewModelTests: XCTestCase {
 
     func testTabBarVisible_iff_scannerAndUser() {
         let cases: [(Set<DeviceCapability>, Bool)] = [
-            ([],                            false),
-            ([.scanner],                    false),
-            ([.user],                       false),
-            ([.scanner, .user],             true),
-            ([.scanner, .kiosk],            false),
-            ([.user, .kiosk],               false),
-            ([.scanner, .user, .kiosk],     true), // illegal but logic-only
+            ([], false),
+            ([.scanner], false),
+            ([.user], false),
+            ([.scanner, .user], true),
+            ([.scanner, .kiosk], false),
+            ([.user, .kiosk], false),
+            ([.scanner, .user, .kiosk], true),  // illegal but logic-only
         ]
         for (caps, expected) in cases {
             let vm = MainTabContainerViewModel(capabilities: caps)

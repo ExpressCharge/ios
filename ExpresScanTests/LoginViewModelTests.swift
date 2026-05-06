@@ -14,8 +14,9 @@
 //  + PKCE registration" (custom-scheme callback shape).
 //
 
-import XCTest
 import CryptoKit
+import XCTest
+
 @testable import ExpresScan
 
 @MainActor

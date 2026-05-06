@@ -31,10 +31,10 @@ public struct StatusPill: View {
         var fillColor: Color {
             switch self {
             case .positive: return ColorPalette.success
-            case .warning:  return ColorPalette.warningAmber
+            case .warning: return ColorPalette.warningAmber
             case .negative: return ColorPalette.destructiveRose
-            case .neutral:  return ColorPalette.mutedForeground
-            case .info:     return ColorPalette.info
+            case .neutral: return ColorPalette.mutedForeground
+            case .info: return ColorPalette.info
             }
         }
 
@@ -45,10 +45,10 @@ public struct StatusPill: View {
         var textColor: Color {
             switch self {
             case .positive: return ColorPalette.success
-            case .warning:  return ColorPalette.warningAmber
+            case .warning: return ColorPalette.warningAmber
             case .negative: return ColorPalette.destructiveRose
-            case .neutral:  return ColorPalette.mutedForeground
-            case .info:     return ColorPalette.info
+            case .neutral: return ColorPalette.mutedForeground
+            case .info: return ColorPalette.info
             }
         }
     }

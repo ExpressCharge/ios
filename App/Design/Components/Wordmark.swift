@@ -18,15 +18,15 @@ import SwiftUI
 public struct Wordmark: View {
 
     public enum Size: Sendable {
-        case small   // .callout
+        case small  // .callout
         case medium  // .title3
-        case large   // .largeTitle bold
+        case large  // .largeTitle bold
 
         var font: Font {
             switch self {
-            case .small:  return .callout.weight(.bold)
+            case .small: return .callout.weight(.bold)
             case .medium: return .title3.weight(.bold)
-            case .large:  return .largeTitle.weight(.bold)
+            case .large: return .largeTitle.weight(.bold)
             }
         }
     }
@@ -83,7 +83,8 @@ public struct AnimatedWordmark: View {
             Wordmark(text: text, size: size)
         } else {
             TimelineView(.animation) { timeline in
-                let phase = timeline.date.timeIntervalSinceReferenceDate
+                let phase =
+                    timeline.date.timeIntervalSinceReferenceDate
                     .truncatingRemainder(dividingBy: 8) / 8
                 Text(text)
                     .font(size.font)

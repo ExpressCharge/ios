@@ -13,11 +13,10 @@
 //  `MainTabContainer` view switches on.
 //
 
-import Foundation
-import Observation
-
 import Capabilities
+import Foundation
 import Models
+import Observation
 
 /// Top-level shell decision for the `.ready` route. Derived purely from
 /// the current capability set — no networking, no side effects.
@@ -55,12 +54,12 @@ public final class MainTabContainerViewModel {
         if kiosk {
             // Kiosk legality: exactly one of {scanner, user}.
             if scanner { return .kioskScan }
-            if user    { return .kioskChargers }
+            if user { return .kioskChargers }
             // Illegal — fall through to a sane default rather than crash.
             return .loneScan
         }
         if scanner && user { return .tabs }
-        if user            { return .loneChargers }
+        if user { return .loneChargers }
         // Default: scanner-only (or unknown) → lone scan view.
         return .loneScan
     }

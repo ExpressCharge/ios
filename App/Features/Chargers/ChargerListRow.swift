@@ -100,7 +100,7 @@ struct ChargerListRow: View {
 
     private var stateBackground: Color {
         switch status {
-        case .charging:    return ColorPalette.voltGreen.opacity(0.12)
+        case .charging: return ColorPalette.voltGreen.opacity(0.12)
         case .unavailable: return Color(red: 0.16, green: 0.18, blue: 0.22)
         case .available, .reserved, .offline:
             return ColorPalette.card
@@ -109,9 +109,9 @@ struct ChargerListRow: View {
 
     private var stateBorderColor: Color {
         switch status {
-        case .charging:    return ColorPalette.voltGreen.opacity(0.40)
+        case .charging: return ColorPalette.voltGreen.opacity(0.40)
         case .unavailable: return ColorPalette.destructiveRose.opacity(0.55)
-        case .offline:     return Color.white.opacity(0.18)
+        case .offline: return Color.white.opacity(0.18)
         case .available, .reserved:
             return ColorPalette.borderSubtle
         }
@@ -120,7 +120,7 @@ struct ChargerListRow: View {
     private var stateBorderWidth: CGFloat {
         switch status {
         case .unavailable, .offline, .charging: return 1.5
-        case .available, .reserved:             return 1
+        case .available, .reserved: return 1
         }
     }
 
@@ -170,38 +170,38 @@ struct ChargerListRow: View {
     }
 }
 
-private extension ChargerListEntry.ConnectorType {
-    var displayLabel: String {
+extension ChargerListEntry.ConnectorType {
+    fileprivate var displayLabel: String {
         switch self {
-        case .ccs:     return "CCS"
-        case .j1772:   return "J1772"
-        case .nacs:    return "NACS"
+        case .ccs: return "CCS"
+        case .j1772: return "J1772"
+        case .nacs: return "NACS"
         case .chademo: return "CHAdeMO"
-        case .type2:   return "Type 2"
+        case .type2: return "Type 2"
         }
     }
 }
 
-private extension ChargerListEntry.ChargerState {
-    var systemImage: String {
+extension ChargerListEntry.ChargerState {
+    fileprivate var systemImage: String {
         switch self {
-        case .idle:           return "checkmark.circle.fill"
-        case .preparing:      return "powerplug.fill"
-        case .charging:       return "bolt.fill"
-        case .reserved:       return "clock.fill"
-        case .outOfService:   return "exclamationmark.triangle.fill"
-        case .offline:        return "wifi.slash"
+        case .idle: return "checkmark.circle.fill"
+        case .preparing: return "powerplug.fill"
+        case .charging: return "bolt.fill"
+        case .reserved: return "clock.fill"
+        case .outOfService: return "exclamationmark.triangle.fill"
+        case .offline: return "wifi.slash"
         }
     }
 
-    var pillTone: StatusPill.Tone {
+    fileprivate var pillTone: StatusPill.Tone {
         switch self {
-        case .idle:           return .neutral
-        case .preparing:      return .info
-        case .charging:       return .positive
-        case .reserved:       return .info
-        case .outOfService:   return .warning
-        case .offline:        return .negative
+        case .idle: return .neutral
+        case .preparing: return .info
+        case .charging: return .positive
+        case .reserved: return .info
+        case .outOfService: return .warning
+        case .offline: return .negative
         }
     }
 }

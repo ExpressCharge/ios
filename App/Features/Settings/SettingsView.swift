@@ -16,11 +16,10 @@
 //  Spec: `50-ios.md` § "Settings screen" + § "Sign-out = deregister".
 //
 
+import AuthCore
 import SwiftUI
 import UIKit
 import UserNotifications
-
-import AuthCore
 
 public struct SettingsView: View {
 
@@ -100,7 +99,9 @@ public struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This iPhone will stop receiving scan requests. You'll need to sign in again to use ExpressCharge.")
+            Text(
+                "This iPhone will stop receiving scan requests. You'll need to sign in again to use ExpressCharge."
+            )
         }
     }
 
@@ -112,7 +113,8 @@ public struct SettingsView: View {
     /// (slice G).
     private var connectivitySection: some View {
         Section("Connectivity") {
-            let status = coordinator.deviceState?.connectionStatus
+            let status =
+                coordinator.deviceState?.connectionStatus
                 ?? coordinator.scan?.connectionStatus
                 ?? .offline
             LabeledContent("Status") {
@@ -124,7 +126,8 @@ public struct SettingsView: View {
             }
             // Mirrors the Diagnostics-sheet "Last sync" row so the
             // operator can see freshness without drilling in.
-            let lastSync = coordinator.deviceState?.lastHeartbeatAt
+            let lastSync =
+                coordinator.deviceState?.lastHeartbeatAt
                 ?? coordinator.scan?.lastHeartbeatAt
             LabeledContent(
                 "Last sync",
@@ -214,8 +217,8 @@ public struct SettingsView: View {
 
 // MARK: - ConnectionStatus pill mapping (Settings)
 
-private extension ConnectionStatus {
-    var settingsLabel: String {
+extension ConnectionStatus {
+    fileprivate var settingsLabel: String {
         switch self {
         case .offline: return "Offline"
         case .connecting: return "Connecting"
@@ -223,7 +226,7 @@ private extension ConnectionStatus {
         case .reconnecting: return "Reconnecting"
         }
     }
-    var settingsIcon: String {
+    fileprivate var settingsIcon: String {
         switch self {
         case .offline: return "wifi.slash"
         case .connecting: return "arrow.triangle.2.circlepath"
@@ -231,7 +234,7 @@ private extension ConnectionStatus {
         case .reconnecting: return "arrow.triangle.2.circlepath.circle"
         }
     }
-    var settingsTone: StatusPill.Tone {
+    fileprivate var settingsTone: StatusPill.Tone {
         switch self {
         case .offline: return .negative
         case .connecting: return .info
@@ -243,8 +246,8 @@ private extension ConnectionStatus {
 
 // MARK: - UN auth-status helpers
 
-private extension UNAuthorizationStatus {
-    var label: String {
+extension UNAuthorizationStatus {
+    fileprivate var label: String {
         switch self {
         case .notDetermined: return "Ask"
         case .denied: return "Denied"
@@ -254,7 +257,7 @@ private extension UNAuthorizationStatus {
         @unknown default: return "Unknown"
         }
     }
-    var icon: String {
+    fileprivate var icon: String {
         switch self {
         case .authorized, .provisional: return "checkmark.circle.fill"
         case .denied: return "xmark.octagon.fill"
@@ -263,7 +266,7 @@ private extension UNAuthorizationStatus {
         @unknown default: return "questionmark.circle"
         }
     }
-    var tone: StatusPill.Tone {
+    fileprivate var tone: StatusPill.Tone {
         switch self {
         case .authorized, .provisional: return .positive
         case .denied: return .negative

@@ -74,7 +74,8 @@ struct OfflineOverlay: View {
     private var countdown: some View {
         if let nextProbeAt, let total = currentBackoffSeconds, total > 0 {
             TimelineView(.animation(minimumInterval: 1.0)) { context in
-                let remaining = max(0, Int(nextProbeAt.timeIntervalSince(context.date).rounded(.up)))
+                let remaining = max(
+                    0, Int(nextProbeAt.timeIntervalSince(context.date).rounded(.up)))
                 let progress = Double(remaining) / Double(max(total, 1))
                 CompactCountdown(
                     progress: progress,
@@ -90,25 +91,25 @@ struct OfflineOverlay: View {
 
     private var systemImage: String {
         switch state {
-        case .deviceOffline:     return "wifi.exclamationmark"
+        case .deviceOffline: return "wifi.exclamationmark"
         case .serverUnreachable: return "bolt.horizontal.icloud"
-        case .online:            return "checkmark.circle"
+        case .online: return "checkmark.circle"
         }
     }
 
     private var title: String {
         switch state {
-        case .deviceOffline:     return "You're offline"
+        case .deviceOffline: return "You're offline"
         case .serverUnreachable: return "Can't reach ExpressCharge"
-        case .online:            return ""
+        case .online: return ""
         }
     }
 
     private var toneColor: Color {
         switch state {
-        case .deviceOffline:     return ColorPalette.warningAmber
+        case .deviceOffline: return ColorPalette.warningAmber
         case .serverUnreachable: return ColorPalette.destructiveRose
-        case .online:            return ColorPalette.success
+        case .online: return ColorPalette.success
         }
     }
 

@@ -23,6 +23,7 @@
 
 import Foundation
 import Testing
+
 @testable import Crypto
 
 private struct Vector: Decodable {
@@ -35,10 +36,12 @@ private struct Vector: Decodable {
 }
 
 private func loadVectors() throws -> [Vector] {
-    guard let url = Bundle.module.url(
-        forResource: "hmac-vectors",
-        withExtension: "json"
-    ) else {
+    guard
+        let url = Bundle.module.url(
+            forResource: "hmac-vectors",
+            withExtension: "json"
+        )
+    else {
         Issue.record("hmac-vectors.json not found in test bundle")
         return []
     }
@@ -91,8 +94,10 @@ struct ScanResultSignerTests {
         let v = try #require(vectors.first)
         let signer = try ScanResultSigner(deviceSecretBase64URL: v.deviceSecretBase64URL)
 
-        let a = signer.sign(idTag: v.idTag, pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts)
-        let b = signer.sign(idTag: v.idTag, pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts)
+        let a = signer.sign(
+            idTag: v.idTag, pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts)
+        let b = signer.sign(
+            idTag: v.idTag, pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts)
         #expect(a == b, "HMAC must be deterministic")
         #expect(a.count == 64, "SHA-256 hex must be 64 chars")
         #expect(a == a.lowercased(), "must be lowercase hex")
@@ -104,11 +109,16 @@ struct ScanResultSignerTests {
         let v = try #require(vectors.first)
         let signer = try ScanResultSigner(deviceSecretBase64URL: v.deviceSecretBase64URL)
 
-        let base = signer.sign(idTag: v.idTag, pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts)
-        let differentTs = signer.sign(idTag: v.idTag, pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts + 1)
-        let differentDevice = signer.sign(idTag: v.idTag, pairingCode: v.pairingCode, deviceId: "other", ts: v.ts)
-        let differentPairing = signer.sign(idTag: v.idTag, pairingCode: "other", deviceId: v.deviceId, ts: v.ts)
-        let differentTag = signer.sign(idTag: "DEADBEEF", pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts)
+        let base = signer.sign(
+            idTag: v.idTag, pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts)
+        let differentTs = signer.sign(
+            idTag: v.idTag, pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts + 1)
+        let differentDevice = signer.sign(
+            idTag: v.idTag, pairingCode: v.pairingCode, deviceId: "other", ts: v.ts)
+        let differentPairing = signer.sign(
+            idTag: v.idTag, pairingCode: "other", deviceId: v.deviceId, ts: v.ts)
+        let differentTag = signer.sign(
+            idTag: "DEADBEEF", pairingCode: v.pairingCode, deviceId: v.deviceId, ts: v.ts)
 
         #expect(base != differentTs)
         #expect(base != differentDevice)

@@ -9,12 +9,13 @@
 //  Spec: `50-ios.md` § "Registration capability picker" + the H plan.
 //
 
-import XCTest
-@testable import ExpresScan
 import AuthCore
 import Capabilities
 import Models
 import Networking
+import XCTest
+
+@testable import ExpresScan
 
 @MainActor
 final class RegistrationViewModelTests: XCTestCase {
@@ -44,20 +45,21 @@ final class RegistrationViewModelTests: XCTestCase {
         StubURLProtocol.handler = { request in
             captured.body = request.httpBodyOrStreamData()
             let response = #"""
-            {"ok":true,"deviceId":"dev_1","deviceToken":"t","deviceSecret":"s","capabilities":["scanner","user"],"expiresAtIso":"2099-01-01T00:00:00Z"}
-            """#
+                {"ok":true,"deviceId":"dev_1","deviceToken":"t","deviceSecret":"s","capabilities":["scanner","user"],"expiresAtIso":"2099-01-01T00:00:00Z"}
+                """#
             return (200, ["Content-Type": "application/json"], Data(response.utf8))
         }
 
         let vm = makeViewModel()
-        vm.selectedCapabilities = [.kiosk, .scanner] // legal: kiosk + 1 base
+        vm.selectedCapabilities = [.kiosk, .scanner]  // legal: kiosk + 1 base
         await vm.submit()
 
         let body = try XCTUnwrap(captured.body)
         let decoded = try JSONDecoder().decode(DeviceRegistrationRequest.self, from: body)
         // The submit() method sorts capabilities by raw value for
         // deterministic test fixtures.
-        XCTAssertEqual(decoded.requestedCapabilities, [.kiosk, .scanner].sorted { $0.rawValue < $1.rawValue })
+        XCTAssertEqual(
+            decoded.requestedCapabilities, [.kiosk, .scanner].sorted { $0.rawValue < $1.rawValue })
     }
 
     func test_submitRejectsIllegalCapabilitySet() async {
@@ -72,7 +74,7 @@ final class RegistrationViewModelTests: XCTestCase {
         }
 
         let vm = makeViewModel()
-        vm.selectedCapabilities = [.scanner, .user, .kiosk] // illegal
+        vm.selectedCapabilities = [.scanner, .user, .kiosk]  // illegal
         await vm.submit()
 
         XCTAssertEqual(vm.error, .invalidCapabilities)
@@ -176,11 +178,11 @@ private final class NetworkHitFlag: @unchecked Sendable {
     var didHit: Bool = false
 }
 
-private extension URLRequest {
+extension URLRequest {
     /// `URLRequest.httpBody` is nil when the body was set via
     /// `httpBodyStream` — `URLSession`'s `URLProtocol` path uses the
     /// stream form. Drain whichever is populated.
-    func httpBodyOrStreamData() -> Data? {
+    fileprivate func httpBodyOrStreamData() -> Data? {
         if let body = httpBody { return body }
         guard let stream = httpBodyStream else { return nil }
         stream.open()

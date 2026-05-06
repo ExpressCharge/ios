@@ -26,17 +26,16 @@
 //  `APIClient` actor).
 //
 
+import AuthCore
+import Capabilities
+import CoreNFC
+import DeviceSync
 import Foundation
+import Models
+import Networking
 import Observation
 import UIKit
 import UserNotifications
-import CoreNFC
-
-import AuthCore
-import Capabilities
-import DeviceSync
-import Models
-import Networking
 
 @MainActor
 @Observable
@@ -138,9 +137,10 @@ public final class DeviceStateCoordinator {
         self.cache = cache
         self.service = service ?? DeviceStateService(api: api)
         self.now = now
-        self.diagnosticsProvider = diagnosticsProvider ?? { @MainActor in
-            await Self.defaultDiagnostics()
-        }
+        self.diagnosticsProvider =
+            diagnosticsProvider ?? { @MainActor in
+                await Self.defaultDiagnostics()
+            }
 
         // Best-effort cache read so the first capability surface is the
         // last-known set, not the hard default.
