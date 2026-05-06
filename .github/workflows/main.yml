@@ -51,7 +51,7 @@ env:
 jobs:
   lint:
     name: Lint
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
 
   format:
     name: Format check
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -99,7 +99,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
           xcodebuild build-for-testing \
             -project ExpresScan.xcodeproj \
             -scheme ExpresScan-Debug \
-            -destination "$TEST_DESTINATION" \
+            -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
             -derivedDataPath DerivedData \
             CODE_SIGNING_ALLOWED=NO \
@@ -133,7 +133,7 @@ jobs:
   test-unit:
     name: Test (unit)
     needs: build
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 20
     steps:
       - name: Select latest Xcode
@@ -171,7 +171,7 @@ jobs:
   test-ui:
     name: Test (UI)
     needs: build
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 25
     steps:
       - name: Select latest Xcode
@@ -210,7 +210,7 @@ jobs:
     name: Release to TestFlight
     needs: [lint, format, build, test-unit, test-ui]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     permissions:
       contents: write
