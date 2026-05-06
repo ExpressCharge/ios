@@ -24,7 +24,7 @@ const APP_ID = Deno.env.get("ASC_APP_ID")!;
 const SUPPORT_URL = "https://example.com";
 const MARKETING_URL = "https://example.com";
 const PRIVACY_URL = "https://example.com/privacy";
-const FEEDBACK_EMAIL = "accounts@vlad.gg";
+const FEEDBACK_EMAIL = "support@example.com";
 const CONTACT_FIRST = "Vlad";
 const CONTACT_LAST = "Zaharia";
 // Apple validates the phone format strictly. Setting null skips the
