@@ -12,6 +12,7 @@
 //  list (so users can still see "other" chargers as the fleet grows).
 //
 
+import Networking
 import SwiftUI
 
 public struct ChargersTabView: View {
@@ -20,6 +21,11 @@ public struct ChargersTabView: View {
     @State private var viewModel: ChargerListViewModel?
     @State private var pushedEntry: ChargerListEntry?
     @State private var hasAutoPushed: Bool = false
+    /// Deep-link target id stashed when the notification arrives before
+    /// the list has loaded — replayed once `displayEntries` populates
+    /// (covers cold-launch from a sticker scan).
+    @State private var pendingDeepLinkId: String?
+    @State private var deepLinkLoading: Bool = false
 
     public init() {}
 
@@ -47,6 +53,67 @@ public struct ChargersTabView: View {
         }
         .onChange(of: viewModel?.displayEntries ?? []) { _, newValue in
             maybeAutoPush(newValue)
+            replayPendingDeepLink(newValue)
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: AppNotifications.chargerDeepLinkRequested)
+        ) { note in
+            guard let id = note.userInfo?["chargerId"] as? String else { return }
+            handleDeepLink(chargerId: id)
+        }
+    }
+
+    /// Look up the id in the loaded list and push it. If the list isn't
+    /// loaded yet (cold-launch from a sticker), stash the id and let
+    /// `replayPendingDeepLink` finish the job once entries arrive. If
+    /// the id isn't in the list at all (e.g. permissions or a freshly-
+    /// added charger), fall back to a single-charger fetch.
+    private func handleDeepLink(chargerId: String) {
+        if let match = viewModel?.entries.first(where: { $0.chargerId == chargerId }) {
+            pushedEntry = match
+            return
+        }
+        if viewModel?.displayEntries.isEmpty ?? true {
+            pendingDeepLinkId = chargerId
+            return
+        }
+        Task { await fetchAndPush(chargerId: chargerId) }
+    }
+
+    private func replayPendingDeepLink(_ entries: [ChargerListEntry]) {
+        guard let id = pendingDeepLinkId else { return }
+        if let match = entries.first(where: { $0.chargerId == id }) {
+            pendingDeepLinkId = nil
+            pushedEntry = match
+            return
+        }
+        // List loaded but the id isn't there — fetch directly.
+        pendingDeepLinkId = nil
+        Task { await fetchAndPush(chargerId: id) }
+    }
+
+    /// Fallback for a deep-link id that isn't in the cached list (e.g. a
+    /// fresh unmanaged charger created server-side after the last list
+    /// refresh). Hits `GET /api/devices/{id}` and pushes the result.
+    private func fetchAndPush(chargerId: String) async {
+        guard !deepLinkLoading else { return }
+        deepLinkLoading = true
+        defer { deepLinkLoading = false }
+
+        let endpoint = Endpoint(
+            path: "/api/devices/\(chargerId)",
+            method: .get
+        )
+        struct SingleChargerResponse: Decodable, Sendable {
+            let charger: ChargerListEntry
+        }
+        do {
+            let response: SingleChargerResponse = try await app.api.request(endpoint)
+            pushedEntry = response.charger
+        } catch {
+            // Soft failure — sticker may be wrong / charger removed. Stay
+            // on the list; the user can retry by tapping again.
         }
     }
 

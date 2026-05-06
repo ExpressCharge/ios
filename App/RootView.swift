@@ -304,7 +304,25 @@ public struct RootView: View {
     }
 
     private func handleUniversalLink(_ url: URL) {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else {
+            return
+        }
+
+        // 1. Charger sticker deep link — Migration 0043.
+        // Universal: `https://example.com/c/<id>` (customer surface)
+        // Custom:    `expchg://c/<id>`
+        if let chargerId = parseChargerDeepLink(components) {
+            NotificationCenter.default.post(
+                name: AppNotifications.chargerDeepLinkRequested,
+                object: nil,
+                userInfo: ["chargerId": chargerId]
+            )
+            return
+        }
+
+        // 2. Registration PKCE callback (the original flow).
+        guard
             components.host == BuildConfig.universalLinkHost,
             components.path == BuildConfig.registrationCallbackPath
         else {
@@ -320,6 +338,42 @@ public struct RootView: View {
             object: nil,
             userInfo: ["code": code]
         )
+    }
+
+    /// Returns the trailing chargeBoxId from a charger sticker URL, in
+    /// either form. Defensive: rejects empty / multi-segment ids so a
+    /// crafted `/c/foo/bar` doesn't sneak through as `chargerId="foo/bar"`.
+    private func parseChargerDeepLink(_ components: URLComponents) -> String? {
+        let scheme = (components.scheme ?? "").lowercased()
+
+        // Universal link form: https://example.com/c/<id>
+        // Customer host — distinct from `universalLinkHost`, which only
+        // carries the admin OAuth callback (`/app/register/callback`).
+        if scheme == "https",
+            components.host == BuildConfig.chargerLinkHost,
+            components.path.hasPrefix(BuildConfig.chargerDeepLinkPath)
+        {
+            let id = String(
+                components.path.dropFirst(BuildConfig.chargerDeepLinkPath.count))
+            return validatedChargerId(id)
+        }
+
+        // Custom-scheme form: expchg://c/<id>
+        if scheme == BuildConfig.callbackURLScheme,
+            components.host == BuildConfig.chargerDeepLinkSchemeHost
+        {
+            let trimmed = components.path.trimmingCharacters(in: ["/"])
+            return validatedChargerId(trimmed)
+        }
+
+        return nil
+    }
+
+    private func validatedChargerId(_ raw: String) -> String? {
+        guard !raw.isEmpty else { return nil }
+        // No path traversal — the chargeBoxId itself is single-segment.
+        guard !raw.contains("/") else { return nil }
+        return raw
     }
 }
 

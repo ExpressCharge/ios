@@ -108,14 +108,21 @@ public final class ChargerDetailViewModel {
     /// High-level availability of the charger for user actions. Drives
     /// whether the detail screen renders the reservations card +
     /// start/stop CTA (`.ready`) or replaces them with an explanatory
-    /// notice (`.offline` / `.outOfService`).
+    /// notice (`.offline` / `.outOfService`) or the "just plug in"
+    /// instructions (`.dumbCharger` — Migration 0043).
     public enum Availability: Equatable, Sendable {
         case ready
         case offline
         case outOfService
+        case dumbCharger
     }
 
     public var availability: Availability {
+        // `.dumbCharger` wins over every transient network state.
+        // `managementMode` is a static property of the charger row — an
+        // unmanaged charger should NEVER surface OCPP CTAs even if it
+        // momentarily reports an OCPP-flavoured state.
+        if entry.managementMode == .unmanaged { return .dumbCharger }
         if isOffline { return .offline }
         if heroState == .outOfService { return .outOfService }
         return .ready
@@ -139,8 +146,14 @@ public final class ChargerDetailViewModel {
 
     /// Initial bootstrap — parallel-load `session` + `reservations`.
     /// Idempotent: re-entrant calls while loading short-circuit.
+    /// Unmanaged chargers (Migration 0043) skip every load: they don't
+    /// have sessions or reservations and the endpoints would 404 anyway.
     public func bootstrap() async {
         if case .loading = loadState { return }
+        if entry.managementMode == .unmanaged {
+            loadState = .ok
+            return
+        }
         loadState = .loading
         await loadSessionAndReservations()
     }
@@ -148,6 +161,10 @@ public final class ChargerDetailViewModel {
     /// Pull-to-refresh entry point; same shape as bootstrap but
     /// re-runs even if a previous load errored.
     public func refresh() async {
+        if entry.managementMode == .unmanaged {
+            loadState = .ok
+            return
+        }
         loadState = .loading
         await loadSessionAndReservations()
     }

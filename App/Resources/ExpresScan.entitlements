@@ -5,6 +5,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:manage.example.com</string>
+		<string>applinks:example.com</string>
 	</array>
 	<key>com.apple.developer.nfc.readersession.formats</key>
 	<array>

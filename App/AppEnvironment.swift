@@ -65,12 +65,34 @@ public enum BuildConfig {
     /// Path prefix on the universal-link host that we react to.
     public static let registrationCallbackPath = "/app/register/callback"
 
+    /// Customer-facing host that carries charger sticker links —
+    /// `https://example.com/c/<id>`. Distinct from
+    /// `universalLinkHost` (admin, used for OAuth registration only)
+    /// because the customer flow lives on the customer surface; admins
+    /// don't scan stickers. Migration 0043 (ExpresSync).
+    public static let chargerLinkHost = "example.com"
+
+    /// Path prefix for charger sticker links — `/c/<chargeBoxId>`.
+    /// Migration 0043 (ExpresSync). Tapping a sticker (NFC NDEF URL or
+    /// QR) on an unmanaged charger lands here; the universal link
+    /// handler extracts the trailing id and routes to ChargersTabView.
+    public static let chargerDeepLinkPath = "/c/"
+
     /// Custom URL scheme that `ASWebAuthenticationSession` is registered
     /// to intercept. The web admin's POST handler 302s the in-session
     /// browser to `expchg://register/callback?code=…`; iOS sees the
     /// scheme match the session's `callbackURLScheme`, dismisses the
-    /// auth view, and delivers the URL to the completion handler.
+    /// auth view, and delivers the URL to the completion handler. The
+    /// same scheme also carries `expchg://c/<id>` charger deep links
+    /// (Migration 0043) — the `c` host mirrors the `/c/` path on the
+    /// universal-link form so both shapes read the same on stickers
+    /// and docs.
     public static let callbackURLScheme = "expchg"
+
+    /// Host segment for charger deep links delivered via the custom
+    /// scheme: `expchg://c/<chargeBoxId>`. Mirrors `chargerDeepLinkPath`
+    /// on the universal-link side.
+    public static let chargerDeepLinkSchemeHost = "c"
 
     /// Web-side login starting point for the PKCE-protected
     /// registration flow. Always lives on the production host because

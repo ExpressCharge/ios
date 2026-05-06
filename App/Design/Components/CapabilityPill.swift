@@ -24,6 +24,7 @@ public struct CapabilityPill: View {
         case kiosk  // violet
         case mobile  // primary cyan — Mobile Start
         case neutral  // slate
+        case free  // volt-green — "Free charging" (Migration 0043)
     }
 
     public let label: String
@@ -68,6 +69,7 @@ extension CapabilityPill.Tone {
         case .kiosk: return .purple
         case .mobile: return ColorPalette.primaryCyan
         case .neutral: return .gray
+        case .free: return ColorPalette.voltGreen
         }
     }
 
@@ -82,6 +84,7 @@ extension CapabilityPill.Tone {
         case .kiosk: return Color(red: 0.78, green: 0.65, blue: 0.99)  // violet-300
         case .mobile: return ColorPalette.primaryCyan
         case .neutral: return Color(red: 0.80, green: 0.83, blue: 0.87)  // slate-300
+        case .free: return ColorPalette.voltGreen
         }
     }
 }

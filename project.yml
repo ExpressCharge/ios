@@ -125,6 +125,9 @@ targets:
           - TAG
         com.apple.developer.associated-domains:
           - applinks:manage.example.com
+          # Customer surface — carries charger sticker links
+          # (`/c/<id>`). Migration 0043 (ExpresSync).
+          - applinks:example.com
         # TODO(provisioning): `com.apple.developer.device-information.user-assigned-device-name`
         # requires Apple's manual approval (request via
         # https://developer.apple.com/contact/request/personalized-name/).

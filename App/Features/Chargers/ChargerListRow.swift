@@ -55,11 +55,22 @@ struct ChargerListRow: View {
                 // border), so a separate state line would be
                 // redundant noise.
                 HStack(spacing: 6) {
-                    CapabilityPill(
-                        label: "Mobile Start",
-                        systemImage: "iphone",
-                        tone: .mobile
-                    )
+                    if isUnmanaged {
+                        // Migration 0043 — unmanaged chargers don't
+                        // have remote-start; the pill telegraphs that
+                        // the unit is free to use without the app.
+                        CapabilityPill(
+                            label: "Free",
+                            systemImage: "bolt.fill",
+                            tone: .free
+                        )
+                    } else {
+                        CapabilityPill(
+                            label: "Mobile Start",
+                            systemImage: "iphone",
+                            tone: .mobile
+                        )
+                    }
                     if hasScannerCapability {
                         CapabilityPill(
                             label: "NFC",
@@ -133,6 +144,13 @@ struct ChargerListRow: View {
     /// missing on older server builds (treated as no NFC).
     private var hasScannerCapability: Bool {
         entry.capabilities?.contains("scanner") ?? false
+    }
+
+    /// `true` when the charger is administered outside StEvE (Tesla
+    /// Wall Connectors etc.). Migration 0043. Older server builds omit
+    /// the field; treat absence as `.ocpp`.
+    private var isUnmanaged: Bool {
+        entry.managementMode == .unmanaged
     }
 
     private var captionText: String? {

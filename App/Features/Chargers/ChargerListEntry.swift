@@ -26,10 +26,20 @@ public struct ChargerListEntry: Codable, Identifiable, Hashable, Sendable {
     /// carry `"scanner"` when the charger has a built-in NFC reader.
     /// Optional on the wire so older server builds keep round-tripping.
     public let capabilities: [String]?
+    /// Distinguishes OCPP-managed chargers from "unmanaged" ones (Tesla
+    /// Wall Connectors etc.) that don't speak OCPP. Optional on the
+    /// wire — older server builds omit the field, in which case the app
+    /// treats the charger as `.ocpp`. Migration 0043.
+    public let managementMode: ManagementMode?
 
     /// Identifiable conformance — the `chargeBoxId` is unique per
     /// charger and stable across rebuilds.
     public var id: String { chargerId }
+
+    public enum ManagementMode: String, Codable, Sendable {
+        case ocpp
+        case unmanaged
+    }
 
     public enum FormFactor: String, Codable, Sendable, CaseIterable {
         case wallbox

@@ -35,6 +35,13 @@ public enum AppNotifications {
     /// Universal Link.
     public static let universalLinkRegistrationCallback = Notification.Name(
         "ExpresScan.UniversalLinkRegistrationCallback")
+    /// `userInfo["chargerId"] : String` — chargeBoxId extracted from a
+    /// charger sticker link (`https://example.com/c/<id>` on the
+    /// customer surface or `expchg://c/<id>`). Observed by
+    /// `ChargersTabView` to look up or fetch the charger and push its
+    /// detail screen. Migration 0043 (ExpresSync).
+    public static let chargerDeepLinkRequested = Notification.Name(
+        "ExpresScan.ChargerDeepLinkRequested")
 }
 
 /// Identifier of the single notification category we register.

@@ -79,6 +79,12 @@ struct ChargerDetailView: View {
                     ChargerUnavailableNotice(reason: .offline)
                 case .outOfService:
                     ChargerUnavailableNotice(reason: .outOfService)
+                case .dumbCharger:
+                    // Migration 0043 — unmanaged chargers (Tesla Wall
+                    // Connectors etc.). No CTA reachable from this branch
+                    // because `readyBody` (which renders the Start/Stop
+                    // button via `primaryCTA`) is never called.
+                    DumbChargerInstructionsView()
                 }
 
                 if case .error(let message) = vm.loadState {
