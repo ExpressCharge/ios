@@ -24,7 +24,7 @@ const APP_ID = Deno.env.get("ASC_APP_ID")!;
 const SUPPORT_URL = "https://polaris.express";
 const MARKETING_URL = "https://polaris.express";
 const PRIVACY_URL = "https://polaris.express/privacy";
-const FEEDBACK_EMAIL = "accounts@vlad.gg";
+const FEEDBACK_EMAIL = "support@polaris.express";
 const CONTACT_FIRST = "Vlad";
 const CONTACT_LAST = "Zaharia";
 // Apple validates the phone format strictly. Setting null skips the
