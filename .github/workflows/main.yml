@@ -64,13 +64,33 @@ jobs:
             ExpresScanUITests
             .swift-format
           sparse-checkout-cone-mode: false
-      - name: Select latest stable Xcode
+      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
         run: |
-          XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
-          echo "Selected: $XCODE"
-          sudo xcode-select -s "$XCODE/Contents/Developer"
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
+          # but only some runtimes are preinstalled on the runner image.
+          # Picking "latest Xcode" naively can yield an SDK whose runtime
+          # is missing, breaking xcodebuild even with a generic destination.
+          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
+          echo "Installed iOS runtimes: $INSTALLED"
+          PICK=""
+          for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
+            PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
+            SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
+                   | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            echo "  $X — iOS SDK $SDK"
+            for R in $INSTALLED; do
+              if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
+            done
+          done
+          if [ -z "$PICK" ]; then
+            PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+            echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
+          fi
+          echo "Selected: $PICK"
+          sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
-          xcrun simctl list runtimes | grep -i ios || true
       - name: swift-format lint
         run: |
           xcrun swift-format lint --recursive --strict \
@@ -91,13 +111,33 @@ jobs:
             ExpresScanUITests
             .swift-format
           sparse-checkout-cone-mode: false
-      - name: Select latest stable Xcode
+      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
         run: |
-          XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
-          echo "Selected: $XCODE"
-          sudo xcode-select -s "$XCODE/Contents/Developer"
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
+          # but only some runtimes are preinstalled on the runner image.
+          # Picking "latest Xcode" naively can yield an SDK whose runtime
+          # is missing, breaking xcodebuild even with a generic destination.
+          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
+          echo "Installed iOS runtimes: $INSTALLED"
+          PICK=""
+          for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
+            PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
+            SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
+                   | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            echo "  $X — iOS SDK $SDK"
+            for R in $INSTALLED; do
+              if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
+            done
+          done
+          if [ -z "$PICK" ]; then
+            PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+            echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
+          fi
+          echo "Selected: $PICK"
+          sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
-          xcrun simctl list runtimes | grep -i ios || true
       - name: swift-format idempotency
         run: |
           xcrun swift-format format --recursive --in-place \
@@ -113,13 +153,33 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Select latest stable Xcode
+      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
         run: |
-          XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
-          echo "Selected: $XCODE"
-          sudo xcode-select -s "$XCODE/Contents/Developer"
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
+          # but only some runtimes are preinstalled on the runner image.
+          # Picking "latest Xcode" naively can yield an SDK whose runtime
+          # is missing, breaking xcodebuild even with a generic destination.
+          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
+          echo "Installed iOS runtimes: $INSTALLED"
+          PICK=""
+          for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
+            PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
+            SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
+                   | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            echo "  $X — iOS SDK $SDK"
+            for R in $INSTALLED; do
+              if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
+            done
+          done
+          if [ -z "$PICK" ]; then
+            PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+            echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
+          fi
+          echo "Selected: $PICK"
+          sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
-          xcrun simctl list runtimes | grep -i ios || true
       - name: Install xcodegen + xcbeautify
         run: brew install xcodegen xcbeautify
       - name: Generate Xcode project
@@ -151,13 +211,33 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 20
     steps:
-      - name: Select latest stable Xcode
+      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
         run: |
-          XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
-          echo "Selected: $XCODE"
-          sudo xcode-select -s "$XCODE/Contents/Developer"
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
+          # but only some runtimes are preinstalled on the runner image.
+          # Picking "latest Xcode" naively can yield an SDK whose runtime
+          # is missing, breaking xcodebuild even with a generic destination.
+          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
+          echo "Installed iOS runtimes: $INSTALLED"
+          PICK=""
+          for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
+            PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
+            SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
+                   | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            echo "  $X — iOS SDK $SDK"
+            for R in $INSTALLED; do
+              if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
+            done
+          done
+          if [ -z "$PICK" ]; then
+            PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+            echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
+          fi
+          echo "Selected: $PICK"
+          sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
-          xcrun simctl list runtimes | grep -i ios || true
       - name: Install xcbeautify
         run: brew install xcbeautify
       - name: Download build products
@@ -194,13 +274,33 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 25
     steps:
-      - name: Select latest stable Xcode
+      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
         run: |
-          XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
-          echo "Selected: $XCODE"
-          sudo xcode-select -s "$XCODE/Contents/Developer"
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
+          # but only some runtimes are preinstalled on the runner image.
+          # Picking "latest Xcode" naively can yield an SDK whose runtime
+          # is missing, breaking xcodebuild even with a generic destination.
+          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
+          echo "Installed iOS runtimes: $INSTALLED"
+          PICK=""
+          for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
+            PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
+            SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
+                   | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            echo "  $X — iOS SDK $SDK"
+            for R in $INSTALLED; do
+              if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
+            done
+          done
+          if [ -z "$PICK" ]; then
+            PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+            echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
+          fi
+          echo "Selected: $PICK"
+          sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
-          xcrun simctl list runtimes | grep -i ios || true
       - name: Install xcbeautify
         run: brew install xcbeautify
       - name: Download build products
@@ -245,13 +345,33 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Select latest stable Xcode
+      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
         run: |
-          XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
-          echo "Selected: $XCODE"
-          sudo xcode-select -s "$XCODE/Contents/Developer"
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
+          # but only some runtimes are preinstalled on the runner image.
+          # Picking "latest Xcode" naively can yield an SDK whose runtime
+          # is missing, breaking xcodebuild even with a generic destination.
+          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
+          echo "Installed iOS runtimes: $INSTALLED"
+          PICK=""
+          for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
+            PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
+            SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
+                   | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            echo "  $X — iOS SDK $SDK"
+            for R in $INSTALLED; do
+              if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
+            done
+          done
+          if [ -z "$PICK" ]; then
+            PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+            echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
+          fi
+          echo "Selected: $PICK"
+          sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
-          xcrun simctl list runtimes | grep -i ios || true
 
       - name: Install tooling
         run: |
