@@ -45,7 +45,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
 
     private func makeEntry(
         chargerId: String = "BAY-1",
-        state: ChargerListEntry.ChargerState = .idle
+        state: ChargerListEntry.ChargerState = .idle,
+        managementMode: ChargerListEntry.ManagementMode? = nil
     ) -> ChargerListEntry {
         ChargerListEntry(
             chargerId: chargerId,
@@ -56,7 +57,8 @@ final class ChargerDetailViewModelTests: XCTestCase {
             maxKw: 22,
             state: state,
             lastSeenAt: nil,
-            capabilities: ["charger"]
+            capabilities: ["charger"],
+            managementMode: managementMode
         )
     }
 
