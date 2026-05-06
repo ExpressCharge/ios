@@ -45,9 +45,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  TEST_DESTINATION: 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest'
-
 jobs:
   lint:
     name: Lint
@@ -64,16 +61,24 @@ jobs:
             ExpresScanUITests
             .swift-format
           sparse-checkout-cone-mode: false
-      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
+      - name: Select Xcode + iOS runtime, export TEST_DESTINATION
         run: |
-          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
-          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
-          # but only some runtimes are preinstalled on the runner image.
-          # Picking "latest Xcode" naively can yield an SDK whose runtime
-          # is missing, breaking xcodebuild even with a generic destination.
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5) but only some
+          # iOS simulator runtimes are preinstalled. Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific runtime version, so
+          # picking "latest Xcode" naively can land on an SDK whose runtime
+          # is missing. Walk Xcodes newest-first, pick the first whose SDK
+          # matches an installed runtime, then derive TEST_DESTINATION
+          # from the highest installed iOS runtime so test jobs always
+          # target the freshest device available on the image.
           INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
+          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          if [ -z "$LATEST_RUNTIME" ]; then
+            echo "::error::No iOS simulator runtimes installed on this runner."
+            exit 1
+          fi
           PICK=""
           for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
             PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
@@ -88,9 +93,11 @@ jobs:
             PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
             echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
           fi
-          echo "Selected: $PICK"
+          echo "Selected Xcode: $PICK"
+          echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: swift-format lint
         run: |
           xcrun swift-format lint --recursive --strict \
@@ -111,16 +118,24 @@ jobs:
             ExpresScanUITests
             .swift-format
           sparse-checkout-cone-mode: false
-      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
+      - name: Select Xcode + iOS runtime, export TEST_DESTINATION
         run: |
-          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
-          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
-          # but only some runtimes are preinstalled on the runner image.
-          # Picking "latest Xcode" naively can yield an SDK whose runtime
-          # is missing, breaking xcodebuild even with a generic destination.
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5) but only some
+          # iOS simulator runtimes are preinstalled. Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific runtime version, so
+          # picking "latest Xcode" naively can land on an SDK whose runtime
+          # is missing. Walk Xcodes newest-first, pick the first whose SDK
+          # matches an installed runtime, then derive TEST_DESTINATION
+          # from the highest installed iOS runtime so test jobs always
+          # target the freshest device available on the image.
           INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
+          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          if [ -z "$LATEST_RUNTIME" ]; then
+            echo "::error::No iOS simulator runtimes installed on this runner."
+            exit 1
+          fi
           PICK=""
           for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
             PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
@@ -135,9 +150,11 @@ jobs:
             PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
             echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
           fi
-          echo "Selected: $PICK"
+          echo "Selected Xcode: $PICK"
+          echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: swift-format idempotency
         run: |
           xcrun swift-format format --recursive --in-place \
@@ -153,16 +170,24 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
+      - name: Select Xcode + iOS runtime, export TEST_DESTINATION
         run: |
-          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
-          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
-          # but only some runtimes are preinstalled on the runner image.
-          # Picking "latest Xcode" naively can yield an SDK whose runtime
-          # is missing, breaking xcodebuild even with a generic destination.
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5) but only some
+          # iOS simulator runtimes are preinstalled. Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific runtime version, so
+          # picking "latest Xcode" naively can land on an SDK whose runtime
+          # is missing. Walk Xcodes newest-first, pick the first whose SDK
+          # matches an installed runtime, then derive TEST_DESTINATION
+          # from the highest installed iOS runtime so test jobs always
+          # target the freshest device available on the image.
           INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
+          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          if [ -z "$LATEST_RUNTIME" ]; then
+            echo "::error::No iOS simulator runtimes installed on this runner."
+            exit 1
+          fi
           PICK=""
           for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
             PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
@@ -177,9 +202,11 @@ jobs:
             PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
             echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
           fi
-          echo "Selected: $PICK"
+          echo "Selected Xcode: $PICK"
+          echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: Install xcodegen + xcbeautify
         run: brew install xcodegen xcbeautify
       - name: Generate Xcode project
@@ -211,16 +238,24 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 20
     steps:
-      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
+      - name: Select Xcode + iOS runtime, export TEST_DESTINATION
         run: |
-          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
-          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
-          # but only some runtimes are preinstalled on the runner image.
-          # Picking "latest Xcode" naively can yield an SDK whose runtime
-          # is missing, breaking xcodebuild even with a generic destination.
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5) but only some
+          # iOS simulator runtimes are preinstalled. Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific runtime version, so
+          # picking "latest Xcode" naively can land on an SDK whose runtime
+          # is missing. Walk Xcodes newest-first, pick the first whose SDK
+          # matches an installed runtime, then derive TEST_DESTINATION
+          # from the highest installed iOS runtime so test jobs always
+          # target the freshest device available on the image.
           INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
+          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          if [ -z "$LATEST_RUNTIME" ]; then
+            echo "::error::No iOS simulator runtimes installed on this runner."
+            exit 1
+          fi
           PICK=""
           for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
             PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
@@ -235,9 +270,11 @@ jobs:
             PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
             echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
           fi
-          echo "Selected: $PICK"
+          echo "Selected Xcode: $PICK"
+          echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: Install xcbeautify
         run: brew install xcbeautify
       - name: Download build products
@@ -274,16 +311,24 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 25
     steps:
-      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
+      - name: Select Xcode + iOS runtime, export TEST_DESTINATION
         run: |
-          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
-          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
-          # but only some runtimes are preinstalled on the runner image.
-          # Picking "latest Xcode" naively can yield an SDK whose runtime
-          # is missing, breaking xcodebuild even with a generic destination.
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5) but only some
+          # iOS simulator runtimes are preinstalled. Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific runtime version, so
+          # picking "latest Xcode" naively can land on an SDK whose runtime
+          # is missing. Walk Xcodes newest-first, pick the first whose SDK
+          # matches an installed runtime, then derive TEST_DESTINATION
+          # from the highest installed iOS runtime so test jobs always
+          # target the freshest device available on the image.
           INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
+          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          if [ -z "$LATEST_RUNTIME" ]; then
+            echo "::error::No iOS simulator runtimes installed on this runner."
+            exit 1
+          fi
           PICK=""
           for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
             PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
@@ -298,9 +343,11 @@ jobs:
             PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
             echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
           fi
-          echo "Selected: $PICK"
+          echo "Selected Xcode: $PICK"
+          echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
       - name: Install xcbeautify
         run: brew install xcbeautify
       - name: Download build products
@@ -345,16 +392,24 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Select Xcode whose iOS SDK matches an installed simulator runtime
+      - name: Select Xcode + iOS runtime, export TEST_DESTINATION
         run: |
-          # macos-26 ships several Xcodes (e.g. 26.4, 26.5). Each Xcode's
-          # iPhoneSimulator SDK pairs with a specific iOS runtime version,
-          # but only some runtimes are preinstalled on the runner image.
-          # Picking "latest Xcode" naively can yield an SDK whose runtime
-          # is missing, breaking xcodebuild even with a generic destination.
+          # macos-26 ships several Xcodes (e.g. 26.4, 26.5) but only some
+          # iOS simulator runtimes are preinstalled. Each Xcode's
+          # iPhoneSimulator SDK pairs with a specific runtime version, so
+          # picking "latest Xcode" naively can land on an SDK whose runtime
+          # is missing. Walk Xcodes newest-first, pick the first whose SDK
+          # matches an installed runtime, then derive TEST_DESTINATION
+          # from the highest installed iOS runtime so test jobs always
+          # target the freshest device available on the image.
           INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
+          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          if [ -z "$LATEST_RUNTIME" ]; then
+            echo "::error::No iOS simulator runtimes installed on this runner."
+            exit 1
+          fi
           PICK=""
           for X in $(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -rV); do
             PLIST="$X/Contents/Developer/Platforms/iPhoneSimulator.platform/Info.plist"
@@ -369,9 +424,11 @@ jobs:
             PICK=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
             echo "No Xcode SDK matched an installed runtime; falling back to $PICK"
           fi
-          echo "Selected: $PICK"
+          echo "Selected Xcode: $PICK"
+          echo "Latest iOS runtime: $LATEST_RUNTIME"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          echo "TEST_DESTINATION=platform=iOS Simulator,name=iPhone 17 Pro,OS=${LATEST_RUNTIME}" >> "$GITHUB_ENV"
 
       - name: Install tooling
         run: |
