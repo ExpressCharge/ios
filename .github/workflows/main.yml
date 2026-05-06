@@ -1,18 +1,27 @@
 # Build · Test · Lint · Format · Release-to-TestFlight
 #
 # Each concern runs as its own job so its pass/fail signal is
-# independent and surfaces in the GitHub UI on its own line:
+# independent in the GitHub UI:
 #
-#   lint    — swift-format --lint (style + naming rules)
-#   format  — swift-format --in-place idempotency check
-#   build   — `xcodebuild build` of the shippable app target
-#   test    — `xcodebuild test` (unit + UI bundles)
-#   release — only on push to main; archives, uploads to TestFlight,
-#             polls App Store Connect to VALID, sets What's New.
-#             Depends on all four checks passing.
+#   lint       — swift-format --lint (style + naming)
+#   format     — swift-format --in-place idempotency check
+#   build      — `xcodebuild build-for-testing` of the app + test
+#                bundles. Uploads the compiled .app, .xctest bundles,
+#                and the .xctestrun manifest as a "build-products"
+#                artifact for the test jobs to consume.
+#   test-unit  — downloads build-products and runs
+#                `xcodebuild test-without-building` against the
+#                ExpresScanTests bundle.
+#   test-ui    — same artifact, runs the ExpresScanUITests bundle.
+#   release    — only on push to main; archives, uploads to
+#                TestFlight, polls App Store Connect to VALID, sets
+#                What's New. Depends on every check above passing.
 #
-# PRs trigger lint/format/build/test. Pushes to main additionally
-# trigger release. See CLAUDE.md for the policy.
+# Splitting build from test means each test job can re-run
+# independently after a transient simulator hiccup without
+# recompiling the world (~5 min compile vs ~1 min download). Splitting
+# unit from UI tests means a flaky UI test doesn't block the unit
+# signal.
 #
 # Required GitHub repository secrets (Settings → Secrets and variables
 # → Actions → New repository secret):
@@ -36,6 +45,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  TEST_DESTINATION: 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest'
+
 jobs:
   lint:
     name: Lint
@@ -48,12 +60,16 @@ jobs:
             App
             Sources
             Tests
+            ExpresScanTests
+            ExpresScanUITests
             .swift-format
           sparse-checkout-cone-mode: false
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
       - name: swift-format lint
-        run: xcrun swift-format lint --recursive --strict App Sources Tests
+        run: |
+          xcrun swift-format lint --recursive --strict \
+            App Sources Tests ExpresScanTests ExpresScanUITests
 
   format:
     name: Format check
@@ -66,15 +82,18 @@ jobs:
             App
             Sources
             Tests
+            ExpresScanTests
+            ExpresScanUITests
             .swift-format
           sparse-checkout-cone-mode: false
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
       - name: swift-format idempotency
         run: |
-          xcrun swift-format format --recursive --in-place App Sources Tests
+          xcrun swift-format format --recursive --in-place \
+            App Sources Tests ExpresScanTests ExpresScanUITests
           if ! git diff --exit-code; then
-            echo "::error::swift-format produced a diff. Run 'xcrun swift-format format -i -r App Sources Tests' locally and commit the result."
+            echo "::error::swift-format produced a diff. Run 'xcrun swift-format format -i -r App Sources Tests ExpresScanTests ExpresScanUITests' locally and commit the result."
             exit 1
           fi
 
@@ -90,51 +109,106 @@ jobs:
         run: brew install xcodegen xcbeautify
       - name: Generate Xcode project
         run: xcodegen generate
-      - name: xcodebuild build
+      - name: xcodebuild build-for-testing
         run: |
           set -o pipefail
-          xcodebuild build \
+          xcodebuild build-for-testing \
             -project ExpresScan.xcodeproj \
             -scheme ExpresScan-Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "$TEST_DESTINATION" \
             -configuration Debug \
+            -derivedDataPath DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             | xcbeautify --renderer github-actions
+      - name: Upload build products
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-products
+          path: DerivedData/Build/Products
+          retention-days: 1
+          # Compiled .app + .xctest bundles are mostly already
+          # compressed; minimal compression keeps upload fast.
+          compression-level: 1
 
-  test:
-    name: Test
+  test-unit:
+    name: Test (unit)
+    needs: build
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
-      - name: Install xcodegen + xcbeautify
-        run: brew install xcodegen xcbeautify
-      - name: Generate Xcode project
-        run: xcodegen generate
-      - name: xcodebuild test
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+      - name: Download build products
+        uses: actions/download-artifact@v4
+        with:
+          name: build-products
+          path: DerivedData/Build/Products
+      - name: Locate xctestrun
+        id: xctestrun
+        run: |
+          XCTESTRUN=$(ls DerivedData/Build/Products/*.xctestrun | head -1)
+          echo "Found: $XCTESTRUN"
+          echo "path=$XCTESTRUN" >> "$GITHUB_OUTPUT"
+      - name: xcodebuild test-without-building (unit)
         run: |
           set -o pipefail
-          xcodebuild test \
-            -project ExpresScan.xcodeproj \
-            -scheme ExpresScan-Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' \
-            -configuration Debug \
-            -resultBundlePath TestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO \
+          xcodebuild test-without-building \
+            -xctestrun "${{ steps.xctestrun.outputs.path }}" \
+            -destination "$TEST_DESTINATION" \
+            -resultBundlePath UnitTestResults.xcresult \
+            -only-testing:ExpresScanTests \
             | xcbeautify --renderer github-actions
-      - name: Upload test result bundle
+      - name: Upload unit test result bundle
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: TestResults.xcresult
+          name: unit-test-results
+          path: UnitTestResults.xcresult
+          retention-days: 7
+
+  test-ui:
+    name: Test (UI)
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+      - name: Download build products
+        uses: actions/download-artifact@v4
+        with:
+          name: build-products
+          path: DerivedData/Build/Products
+      - name: Locate xctestrun
+        id: xctestrun
+        run: |
+          XCTESTRUN=$(ls DerivedData/Build/Products/*.xctestrun | head -1)
+          echo "Found: $XCTESTRUN"
+          echo "path=$XCTESTRUN" >> "$GITHUB_OUTPUT"
+      - name: xcodebuild test-without-building (UI)
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -xctestrun "${{ steps.xctestrun.outputs.path }}" \
+            -destination "$TEST_DESTINATION" \
+            -resultBundlePath UITestResults.xcresult \
+            -only-testing:ExpresScanUITests \
+            | xcbeautify --renderer github-actions
+      - name: Upload UI test result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-results
+          path: UITestResults.xcresult
           retention-days: 7
 
   release:
     name: Release to TestFlight
-    needs: [lint, format, build, test]
+    needs: [lint, format, build, test-unit, test-ui]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: macos-15
     timeout-minutes: 45
