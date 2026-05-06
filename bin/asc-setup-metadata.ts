@@ -27,10 +27,10 @@ const PRIVACY_URL = "https://example.com/privacy";
 const FEEDBACK_EMAIL = "accounts@vlad.gg";
 const CONTACT_FIRST = "Vlad";
 const CONTACT_LAST = "Zaharia";
-// Phone is validated by Apple's regex (must be a real format) so we
-// skip it on auto-setup. Set it manually in App Store Connect or by
-// editing this constant + re-running before external Beta App Review.
-const CONTACT_PHONE: string | null = null;
+// Apple validates the phone format strictly. Setting null skips the
+// Beta App Review Detail update; set a real number to enable external
+// Beta App Review submissions.
+const CONTACT_PHONE: string | null = "+12063563646";
 const PRIMARY_CATEGORY = "TRAVEL";
 const SECONDARY_CATEGORY = "UTILITIES";
 
@@ -52,6 +52,11 @@ const KEYWORDS = "ev,charging,nfc,polaris,charge,electric vehicle,charger,tap";
 
 const BETA_DESCRIPTION =
   "Internal beta of the ExpressCharge iOS companion app — pair a Polaris charge card via NFC to start a charging session at any registered station.";
+
+// App Store version metadata (per-version, not per-app).
+const APP_COPYRIGHT = `${new Date().getFullYear()} Polaris Express`;
+const APP_VERSION_RELEASE_NOTES =
+  "Initial release of ExpressCharge for iOS — tap a Polaris charge card to your phone to start a charging session at any registered Polaris station.";
 
 // ---------------------------------------------------------------------------
 // JWT + API helpers
@@ -216,10 +221,27 @@ ok("age rating declaration = all clear (4+)");
 // Step 2 — App Store Version 1.0 localization (en-US)
 // ---------------------------------------------------------------------------
 
-step("filling App Store version 1.0 (en-US) localization");
+step("filling App Store version 1.0 metadata");
 const versions = await api(`/v1/apps/${APP_ID}/appStoreVersions?limit=5`);
 const version = versions.data[0]; // most recent — currently 1.0 PREPARE_FOR_SUBMISSION
 const VERSION_ID = version.id;
+
+// Per-version attributes: copyright, usesIdfa, releaseType.
+await api(`/v1/appStoreVersions/${VERSION_ID}`, {
+  method: "PATCH",
+  body: JSON.stringify({
+    data: {
+      type: "appStoreVersions",
+      id: VERSION_ID,
+      attributes: {
+        copyright: APP_COPYRIGHT,
+        usesIdfa: false, // App does not use the advertising identifier
+        releaseType: "AFTER_APPROVAL",
+      },
+    },
+  }),
+});
+ok(`version attrs: copyright="${APP_COPYRIGHT}", usesIdfa=false, releaseType=AFTER_APPROVAL`);
 
 const locs = await api(
   `/v1/appStoreVersions/${VERSION_ID}/appStoreVersionLocalizations`,
@@ -227,20 +249,22 @@ const locs = await api(
 const enUS = locs.data.find((l: { attributes: { locale: string } }) =>
   l.attributes.locale === "en-US"
 );
+// Version-localization fields that are always writable on a draft.
+const versionLocAttrs: Record<string, unknown> = {
+  description: APP_DESCRIPTION,
+  keywords: KEYWORDS,
+  marketingUrl: MARKETING_URL,
+  promotionalText: PROMOTIONAL_TEXT,
+  supportUrl: SUPPORT_URL,
+};
+
 if (!enUS) {
   await api(`/v1/appStoreVersionLocalizations`, {
     method: "POST",
     body: JSON.stringify({
       data: {
         type: "appStoreVersionLocalizations",
-        attributes: {
-          locale: "en-US",
-          description: APP_DESCRIPTION,
-          keywords: KEYWORDS,
-          marketingUrl: MARKETING_URL,
-          promotionalText: PROMOTIONAL_TEXT,
-          supportUrl: SUPPORT_URL,
-        },
+        attributes: { ...versionLocAttrs, locale: "en-US" },
         relationships: {
           appStoreVersion: {
             data: { type: "appStoreVersions", id: VERSION_ID },
@@ -257,17 +281,68 @@ if (!enUS) {
       data: {
         type: "appStoreVersionLocalizations",
         id: enUS.id,
-        attributes: {
-          description: APP_DESCRIPTION,
-          keywords: KEYWORDS,
-          marketingUrl: MARKETING_URL,
-          promotionalText: PROMOTIONAL_TEXT,
-          supportUrl: SUPPORT_URL,
-        },
+        attributes: versionLocAttrs,
       },
     }),
   });
   ok(`updated en-US version localization`);
+}
+
+// Try to set whatsNew (release notes) separately. Apple locks this field
+// on the very first version of an app — there's nothing to be "new" since
+// — so a 409 with "cannot be edited at this time" is expected on v1.0
+// and shouldn't fail the bootstrap. On later versions the same code path
+// will succeed.
+const targetLocId = enUS?.id ??
+  // Re-fetch if we just created it.
+  ((await api(
+    `/v1/appStoreVersions/${VERSION_ID}/appStoreVersionLocalizations`,
+  )) as { data: Array<{ id: string; attributes: { locale: string } }> })
+    .data
+    .find((l) => l.attributes.locale === "en-US")?.id;
+if (targetLocId) {
+  try {
+    await api(`/v1/appStoreVersionLocalizations/${targetLocId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        data: {
+          type: "appStoreVersionLocalizations",
+          id: targetLocId,
+          attributes: { whatsNew: APP_VERSION_RELEASE_NOTES },
+        },
+      }),
+    });
+    ok("whatsNew (App Store release notes) set");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("cannot be edited at this time")) {
+      note(
+        "whatsNew skipped — locked on first version (will succeed on next release)",
+      );
+    } else {
+      throw err;
+    }
+  }
+}
+
+// Link the most-recently-uploaded VALID build to this version. Without
+// this, App Store review submission has no binary to review. The
+// relationship is one-to-one; PATCHing replaces any prior assignment.
+step("linking the latest VALID build to version 1.0");
+const builds = await api(
+  `/v1/builds?filter%5Bapp%5D=${APP_ID}&filter%5BprocessingState%5D=VALID&sort=-uploadedDate&limit=1`,
+);
+const latestBuild = builds.data[0];
+if (latestBuild) {
+  await api(`/v1/appStoreVersions/${VERSION_ID}/relationships/build`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      data: { type: "builds", id: latestBuild.id },
+    }),
+  });
+  ok(`linked build ${latestBuild.attributes.version} (id ${latestBuild.id})`);
+} else {
+  note("no VALID builds yet — skipped (re-run after a successful TestFlight upload)");
 }
 
 // ---------------------------------------------------------------------------
@@ -364,8 +439,11 @@ if (CONTACT_PHONE) {
 console.log("");
 console.log("✓ ASC metadata bootstrap complete");
 console.log("");
-console.log("Still needs you:");
-note(`Replace the placeholder phone (${CONTACT_PHONE}) before external Beta App Review submission.`);
-note(`Privacy policy URL is ${PRIVACY_URL} — make sure that page actually serves a privacy policy before any submission.`);
-note("Screenshots — required for App Store submission. Capture from a real device once UI is final.");
-note("Review the description / promotional text in App Store Connect; tweak as you like.");
+console.log("Web-UI-only (App Store Connect API doesn't expose these):");
+note("App Privacy / Privacy Nutrition Labels — declare data types collected at https://appstoreconnect.apple.com/apps/" + APP_ID + "/distribution/privacy");
+note("Pricing & availability — defaults to free in all territories; adjust at https://appstoreconnect.apple.com/apps/" + APP_ID + "/pricing");
+console.log("");
+console.log("Content the bootstrap can't autogenerate:");
+note(`Privacy policy at ${PRIVACY_URL} is published; review the actual policy text whenever the data flows change.`);
+note("Screenshots (required for App Store submission, not TestFlight) — capture from a real device once the UI is final.");
+note("Review the description / keywords / promotional text in App Store Connect and tweak the marketing copy.");
