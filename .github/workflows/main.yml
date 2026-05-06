@@ -71,10 +71,17 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
-                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
-          echo "Installed iOS runtimes: $INSTALLED"
-          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          # simctl reports e.g. "iOS 26.4 (26.4.1 - 23E254a)" — the
+          # parenthetical is the actual version we need for -destination.
+          INSTALLED_FULL=$(xcrun simctl list runtimes 2>/dev/null \
+                            | sed -nE 's/.*iOS [0-9.]+ \(([0-9.]+) -.*/\1/p' \
+                            | sort -uV)
+          # Major.minor view (e.g. "26.4") to match against an Xcode SDK,
+          # which only carries the major.minor string.
+          INSTALLED_MM=$(echo "$INSTALLED_FULL" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/' | sort -uV)
+          echo "Installed iOS runtimes (full):       $INSTALLED_FULL"
+          echo "Installed iOS runtimes (major.minor): $INSTALLED_MM"
+          LATEST_RUNTIME=$(echo "$INSTALLED_FULL" | tail -1)
           if [ -z "$LATEST_RUNTIME" ]; then
             echo "::error::No iOS simulator runtimes installed on this runner."
             exit 1
@@ -85,7 +92,7 @@ jobs:
             SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
                    | grep -oE '[0-9]+\.[0-9]+' | head -1)
             echo "  $X — iOS SDK $SDK"
-            for R in $INSTALLED; do
+            for R in $INSTALLED_MM; do
               if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
             done
           done
@@ -128,10 +135,17 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
-                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
-          echo "Installed iOS runtimes: $INSTALLED"
-          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          # simctl reports e.g. "iOS 26.4 (26.4.1 - 23E254a)" — the
+          # parenthetical is the actual version we need for -destination.
+          INSTALLED_FULL=$(xcrun simctl list runtimes 2>/dev/null \
+                            | sed -nE 's/.*iOS [0-9.]+ \(([0-9.]+) -.*/\1/p' \
+                            | sort -uV)
+          # Major.minor view (e.g. "26.4") to match against an Xcode SDK,
+          # which only carries the major.minor string.
+          INSTALLED_MM=$(echo "$INSTALLED_FULL" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/' | sort -uV)
+          echo "Installed iOS runtimes (full):       $INSTALLED_FULL"
+          echo "Installed iOS runtimes (major.minor): $INSTALLED_MM"
+          LATEST_RUNTIME=$(echo "$INSTALLED_FULL" | tail -1)
           if [ -z "$LATEST_RUNTIME" ]; then
             echo "::error::No iOS simulator runtimes installed on this runner."
             exit 1
@@ -142,7 +156,7 @@ jobs:
             SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
                    | grep -oE '[0-9]+\.[0-9]+' | head -1)
             echo "  $X — iOS SDK $SDK"
-            for R in $INSTALLED; do
+            for R in $INSTALLED_MM; do
               if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
             done
           done
@@ -180,10 +194,17 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
-                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
-          echo "Installed iOS runtimes: $INSTALLED"
-          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          # simctl reports e.g. "iOS 26.4 (26.4.1 - 23E254a)" — the
+          # parenthetical is the actual version we need for -destination.
+          INSTALLED_FULL=$(xcrun simctl list runtimes 2>/dev/null \
+                            | sed -nE 's/.*iOS [0-9.]+ \(([0-9.]+) -.*/\1/p' \
+                            | sort -uV)
+          # Major.minor view (e.g. "26.4") to match against an Xcode SDK,
+          # which only carries the major.minor string.
+          INSTALLED_MM=$(echo "$INSTALLED_FULL" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/' | sort -uV)
+          echo "Installed iOS runtimes (full):       $INSTALLED_FULL"
+          echo "Installed iOS runtimes (major.minor): $INSTALLED_MM"
+          LATEST_RUNTIME=$(echo "$INSTALLED_FULL" | tail -1)
           if [ -z "$LATEST_RUNTIME" ]; then
             echo "::error::No iOS simulator runtimes installed on this runner."
             exit 1
@@ -194,7 +215,7 @@ jobs:
             SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
                    | grep -oE '[0-9]+\.[0-9]+' | head -1)
             echo "  $X — iOS SDK $SDK"
-            for R in $INSTALLED; do
+            for R in $INSTALLED_MM; do
               if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
             done
           done
@@ -248,10 +269,17 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
-                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
-          echo "Installed iOS runtimes: $INSTALLED"
-          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          # simctl reports e.g. "iOS 26.4 (26.4.1 - 23E254a)" — the
+          # parenthetical is the actual version we need for -destination.
+          INSTALLED_FULL=$(xcrun simctl list runtimes 2>/dev/null \
+                            | sed -nE 's/.*iOS [0-9.]+ \(([0-9.]+) -.*/\1/p' \
+                            | sort -uV)
+          # Major.minor view (e.g. "26.4") to match against an Xcode SDK,
+          # which only carries the major.minor string.
+          INSTALLED_MM=$(echo "$INSTALLED_FULL" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/' | sort -uV)
+          echo "Installed iOS runtimes (full):       $INSTALLED_FULL"
+          echo "Installed iOS runtimes (major.minor): $INSTALLED_MM"
+          LATEST_RUNTIME=$(echo "$INSTALLED_FULL" | tail -1)
           if [ -z "$LATEST_RUNTIME" ]; then
             echo "::error::No iOS simulator runtimes installed on this runner."
             exit 1
@@ -262,7 +290,7 @@ jobs:
             SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
                    | grep -oE '[0-9]+\.[0-9]+' | head -1)
             echo "  $X — iOS SDK $SDK"
-            for R in $INSTALLED; do
+            for R in $INSTALLED_MM; do
               if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
             done
           done
@@ -321,10 +349,17 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
-                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
-          echo "Installed iOS runtimes: $INSTALLED"
-          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          # simctl reports e.g. "iOS 26.4 (26.4.1 - 23E254a)" — the
+          # parenthetical is the actual version we need for -destination.
+          INSTALLED_FULL=$(xcrun simctl list runtimes 2>/dev/null \
+                            | sed -nE 's/.*iOS [0-9.]+ \(([0-9.]+) -.*/\1/p' \
+                            | sort -uV)
+          # Major.minor view (e.g. "26.4") to match against an Xcode SDK,
+          # which only carries the major.minor string.
+          INSTALLED_MM=$(echo "$INSTALLED_FULL" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/' | sort -uV)
+          echo "Installed iOS runtimes (full):       $INSTALLED_FULL"
+          echo "Installed iOS runtimes (major.minor): $INSTALLED_MM"
+          LATEST_RUNTIME=$(echo "$INSTALLED_FULL" | tail -1)
           if [ -z "$LATEST_RUNTIME" ]; then
             echo "::error::No iOS simulator runtimes installed on this runner."
             exit 1
@@ -335,7 +370,7 @@ jobs:
             SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
                    | grep -oE '[0-9]+\.[0-9]+' | head -1)
             echo "  $X — iOS SDK $SDK"
-            for R in $INSTALLED; do
+            for R in $INSTALLED_MM; do
               if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
             done
           done
@@ -402,10 +437,17 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
-                       | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
-          echo "Installed iOS runtimes: $INSTALLED"
-          LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
+          # simctl reports e.g. "iOS 26.4 (26.4.1 - 23E254a)" — the
+          # parenthetical is the actual version we need for -destination.
+          INSTALLED_FULL=$(xcrun simctl list runtimes 2>/dev/null \
+                            | sed -nE 's/.*iOS [0-9.]+ \(([0-9.]+) -.*/\1/p' \
+                            | sort -uV)
+          # Major.minor view (e.g. "26.4") to match against an Xcode SDK,
+          # which only carries the major.minor string.
+          INSTALLED_MM=$(echo "$INSTALLED_FULL" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/' | sort -uV)
+          echo "Installed iOS runtimes (full):       $INSTALLED_FULL"
+          echo "Installed iOS runtimes (major.minor): $INSTALLED_MM"
+          LATEST_RUNTIME=$(echo "$INSTALLED_FULL" | tail -1)
           if [ -z "$LATEST_RUNTIME" ]; then
             echo "::error::No iOS simulator runtimes installed on this runner."
             exit 1
@@ -416,7 +458,7 @@ jobs:
             SDK=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" 2>/dev/null \
                    | grep -oE '[0-9]+\.[0-9]+' | head -1)
             echo "  $X — iOS SDK $SDK"
-            for R in $INSTALLED; do
+            for R in $INSTALLED_MM; do
               if [ "$R" = "$SDK" ]; then PICK="$X"; break 2; fi
             done
           done
