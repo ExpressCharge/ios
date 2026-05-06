@@ -34,24 +34,27 @@ const CONTACT_PHONE: string | null = "+12063563646";
 const PRIMARY_CATEGORY = "TRAVEL";
 const SECONDARY_CATEGORY = "UTILITIES";
 
-const APP_DESCRIPTION = `ExpressCharge turns your iPhone into a tap-to-start key for Polaris EV charging stations. Tap a Polaris charge card to your phone, the station verifies your account, and your session begins — no app to launch, no QR code to scan, no waiting.
+const APP_DESCRIPTION =
+  `ExpressCharge puts your Polaris EV charging in your pocket. Start a session from the app, watch it in real time, and see exactly how much energy you've used and what you owe — without walking back to the station.
 
-Built for the rare moment when your card isn't where you'd expect: tap your card to your phone, and we'll relay the verification to the station for you.
+You can also walk up to any Polaris station and tap your registered charging card on the built-in reader to begin instantly; no app required.
 
 Features
-• Tap-to-start: hold a Polaris charge card to your phone to begin a session.
-• Live status: see whether the station is reachable and your account is in good standing before you tap.
-• Secure by design: your account credentials never leave the keychain; sessions are signed end to end.
+• Remote start: kick off a charging session from anywhere your phone has signal.
+• Live sessions: watch energy delivered, time elapsed, and current cost as your car charges.
+• Account management: review past sessions, manage your charging cards, and check your balance.
+• Reservations: hold a specific charger and connector for a time window so it's ready when you arrive.
 
-ExpressCharge requires a Polaris account and a registered NFC charge card. Visit example.com to sign up.`;
+ExpressCharge requires a Polaris account. Visit example.com to sign up.`;
 
 const PROMOTIONAL_TEXT =
-  "Tap a Polaris charge card to your phone to start charging — no app to launch, no QR scan.";
+  "Start, monitor, and manage your Polaris EV charging from your phone — or tap your card at the station.";
 
-const KEYWORDS = "ev,charging,nfc,polaris,charge,electric vehicle,charger,tap";
+const KEYWORDS =
+  "ev,charging,polaris,charge,electric vehicle,charger,charge card,session";
 
 const BETA_DESCRIPTION =
-  "Internal beta of the ExpressCharge iOS companion app — pair a Polaris charge card via NFC to start a charging session at any registered station.";
+  "Internal beta of the ExpressCharge iOS companion app — start, monitor, and manage charging sessions at any registered Polaris station, plus the tap-to-start flow at the station itself.";
 
 // App Store version metadata (per-version, not per-app).
 const APP_COPYRIGHT = `${new Date().getFullYear()} Polaris Express`;
