@@ -71,7 +71,7 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
           LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
@@ -128,7 +128,7 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
           LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
@@ -180,7 +180,7 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
           LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
@@ -248,7 +248,7 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
           LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
@@ -321,7 +321,7 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
           LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
@@ -402,7 +402,7 @@ jobs:
           # matches an installed runtime, then derive TEST_DESTINATION
           # from the highest installed iOS runtime so test jobs always
           # target the freshest device available on the image.
-          INSTALLED=$(ls /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null \
+          INSTALLED=$(xcrun simctl list runtimes 2>/dev/null \
                        | grep -oE 'iOS [0-9]+\.[0-9]+' | awk '{print $2}' | sort -uV)
           echo "Installed iOS runtimes: $INSTALLED"
           LATEST_RUNTIME=$(echo "$INSTALLED" | tail -1)
