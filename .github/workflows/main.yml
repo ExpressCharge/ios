@@ -1,11 +1,18 @@
 # Build · Test · Lint · Format · Release-to-TestFlight
 #
-# Workflow philosophy:
-#   - PRs run `check` (build + test + lint + format) so review can see
-#     correctness signals before merge.
-#   - Pushes to `main` run `check` and then `release` — every push to
-#     main is treated as a major piece of work and ships a new
-#     TestFlight build automatically. See CLAUDE.md for the policy.
+# Each concern runs as its own job so its pass/fail signal is
+# independent and surfaces in the GitHub UI on its own line:
+#
+#   lint    — swift-format --lint (style + naming rules)
+#   format  — swift-format --in-place idempotency check
+#   build   — `xcodebuild build` of the shippable app target
+#   test    — `xcodebuild test` (unit + UI bundles)
+#   release — only on push to main; archives, uploads to TestFlight,
+#             polls App Store Connect to VALID, sets What's New.
+#             Depends on all four checks passing.
+#
+# PRs trigger lint/format/build/test. Pushes to main additionally
+# trigger release. See CLAUDE.md for the policy.
 #
 # Required GitHub repository secrets (Settings → Secrets and variables
 # → Actions → New repository secret):
@@ -15,14 +22,6 @@
 #   APPLE_DISTRIBUTION_CERT_PASSWORD — password for the .p12
 #   APPLE_PROVISIONING_PROFILE      — base64 of the App Store .mobileprovision
 #   KEYCHAIN_PASSWORD               — any string; used for the temp keychain
-#
-# Generate the base64 blobs with `base64 -i path/to/file -o /tmp/out`
-# on macOS, or `base64 -w0 path/to/file` on Linux.
-#
-# Security note: this workflow does not interpolate any untrusted
-# webhook payload fields (issue titles, PR bodies, commit messages,
-# branch names) into shell commands. All such values, where used,
-# would need to be passed via env: with quoted expansion.
 
 name: Build · Test · Release
 
@@ -38,41 +37,83 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
-    name: Build · Test · Lint · Format
+  lint:
+    name: Lint
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          sparse-checkout: |
+            App
+            Sources
+            Tests
+            .swift-format
+          sparse-checkout-cone-mode: false
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
+      - name: swift-format lint
+        run: xcrun swift-format lint --recursive --strict App Sources Tests
 
-      - name: Print toolchain
-        run: |
-          xcodebuild -version
-          xcrun swift --version
-
-      - name: Install xcodegen + xcbeautify
-        run: brew install xcodegen xcbeautify
-
-      - name: Generate Xcode project
-        run: xcodegen generate
-
-      - name: Lint (informational)
-        continue-on-error: true
-        run: xcrun swift-format lint --recursive App Sources Tests
-
-      - name: Format check (informational)
-        continue-on-error: true
+  format:
+    name: Format check
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            App
+            Sources
+            Tests
+            .swift-format
+          sparse-checkout-cone-mode: false
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
+      - name: swift-format idempotency
         run: |
           xcrun swift-format format --recursive --in-place App Sources Tests
           if ! git diff --exit-code; then
-            echo "::warning::swift-format would reformat files; run 'xcrun swift-format format -i -r App Sources Tests' locally to inspect proposed changes."
-            git checkout -- App Sources Tests
+            echo "::error::swift-format produced a diff. Run 'xcrun swift-format format -i -r App Sources Tests' locally and commit the result."
+            exit 1
           fi
 
-      - name: Build & Test
+  build:
+    name: Build
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
+      - name: Install xcodegen + xcbeautify
+        run: brew install xcodegen xcbeautify
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: xcodebuild build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project ExpresScan.xcodeproj \
+            -scheme ExpresScan-Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+
+  test:
+    name: Test
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
+      - name: Install xcodegen + xcbeautify
+        run: brew install xcodegen xcbeautify
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: xcodebuild test
         run: |
           set -o pipefail
           xcodebuild test \
@@ -83,7 +124,6 @@ jobs:
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             | xcbeautify --renderer github-actions
-
       - name: Upload test result bundle
         if: always()
         uses: actions/upload-artifact@v4
@@ -94,7 +134,7 @@ jobs:
 
   release:
     name: Release to TestFlight
-    needs: check
+    needs: [lint, format, build, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: macos-15
     timeout-minutes: 45
