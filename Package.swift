@@ -1,4 +1,4 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.2
 //
 // ExpresScan — pure-Swift libraries (Wave 1 / Track E-pkg).
 //
