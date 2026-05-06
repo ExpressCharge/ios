@@ -2,20 +2,20 @@
 //  J1772Icon.swift
 //  ExpresScan
 //
-//  Outline of an SAE J1772 connector face. Renders just the
-//  silhouette — no surrounding plate or LED bezel — so it sits
-//  cleanly on a transparent hero next to the wallbox glyph.
+//  SAE J1772 connector face, drawn to feel like a peer of the
+//  wallbox glyph (`ChargerFormFactorIcon`). Same recessed-halo
+//  language: silhouette outline + concentric inner LED ring.
 //
-//  Outline:
-//   * Round body (the contact disk) with a small rectangular
-//     release-latch tab on top.
-//   * Five contact holes inside in the canonical J1772 layout:
-//       ─ top pair: L1 (left), L2 (right)
-//       ─ middle pair: CP (left), Proximity Detect (right)
-//       ─ bottom centre: PE / ground
+//  Layers (outer → inner):
+//   * Body silhouette stroke — round contact disk plus the
+//     rectangular release-latch tab on top.
+//   * Inner halo ring inside the round body: a soft outer diffuse
+//     bleed and a crisp ring on top. Drawn in the muted neutral so
+//     the wallbox glyph remains the single status-bearing element
+//     of the hero.
 //
-//  Drawn in a neutral foreground colour (no accent tint) so the
-//  charger glyph is the single status-bearing element.
+//  No pin holes, no inner filled face — the halo alone reads as the
+//  socket well, keeping the J1772 visually lighter than the wallbox.
 //
 
 import SwiftUI
@@ -43,29 +43,26 @@ struct J1772Icon: View {
             ctx.stroke(
                 body,
                 with: .color(strokeColor),
-                style: StrokeStyle(lineWidth: 4, lineJoin: .round)
+                style: StrokeStyle(lineWidth: 3, lineJoin: .round)
             )
 
-            // Five contact holes — stroked rather than filled so the
-            // whole glyph reads as a wireframe, matching the body
-            // outline weight.
-            let pinLarge: CGFloat = 6.5
-            let pinSmall: CGFloat = 5
-            let stroke = StrokeStyle(lineWidth: 3)
-            let circle: (CGFloat, CGFloat, CGFloat) -> Path = { x, y, r in
-                Path(ellipseIn: CGRect(
-                    x: x - r, y: y - r,
-                    width: r * 2, height: r * 2
-                ))
-            }
-            // Top pair (L1, L2)
-            ctx.stroke(circle(40, 50, pinLarge), with: .color(strokeColor), style: stroke)
-            ctx.stroke(circle(60, 50, pinLarge), with: .color(strokeColor), style: stroke)
-            // Middle pair (CP, PD)
-            ctx.stroke(circle(40, 65, pinSmall), with: .color(strokeColor), style: stroke)
-            ctx.stroke(circle(60, 65, pinSmall), with: .color(strokeColor), style: stroke)
-            // Bottom (PE)
-            ctx.stroke(circle(50, 78, pinLarge), with: .color(strokeColor), style: stroke)
+            // Inner halo ring — concentric circle inside the round
+            // body. Mirrors the wallbox's two-layer LED treatment
+            // (diffuse bleed under a crisp ring) but in the muted
+            // neutral so this glyph stays status-agnostic.
+            let halo = ColorPalette.mutedForeground
+            let bodyCenter = CGPoint(x: 50, y: 60)
+            let haloOuter = Path(ellipseIn: CGRect(
+                x: bodyCenter.x - 26, y: bodyCenter.y - 26,
+                width: 52, height: 52
+            ))
+            ctx.stroke(haloOuter, with: .color(halo.opacity(0.4)), lineWidth: 2)
+
+            let haloRing = Path(ellipseIn: CGRect(
+                x: bodyCenter.x - 25, y: bodyCenter.y - 25,
+                width: 50, height: 50
+            ))
+            ctx.stroke(haloRing, with: .color(halo.opacity(0.95)), lineWidth: 4)
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
@@ -119,5 +116,6 @@ struct J1772Icon: View {
         J1772Icon(size: 56)
     }
     .padding()
+    .background(Color.black)
 }
 #endif

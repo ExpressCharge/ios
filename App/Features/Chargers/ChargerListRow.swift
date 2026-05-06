@@ -30,7 +30,11 @@ struct ChargerListRow: View {
 
     private var rowContent: some View {
         HStack(alignment: .center, spacing: Spacing.lg) {
-            ChargerFormFactorIcon(size: 56, haloColor: haloColor)
+            ChargerFormFactorIcon(
+                size: 56,
+                formFactor: entry.formFactor,
+                haloColor: haloColor
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.label)

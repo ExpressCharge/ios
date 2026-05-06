@@ -36,6 +36,7 @@ public struct ChargerListEntry: Codable, Identifiable, Hashable, Sendable {
         case pulsar
         case commander
         case wallMount = "wall_mount"
+        case tesla
         case generic
     }
 

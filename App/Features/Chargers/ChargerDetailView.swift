@@ -68,7 +68,8 @@ struct ChargerDetailView: View {
                 ChargerHero(
                     heroState: vm.heroState,
                     isOffline: vm.isOffline,
-                    connectors: vm.connectors
+                    connectors: vm.connectors,
+                    formFactor: vm.entry.formFactor
                 )
 
                 switch vm.availability {
