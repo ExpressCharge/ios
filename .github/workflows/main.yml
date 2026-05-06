@@ -1,0 +1,175 @@
+# Build · Test · Lint · Format · Release-to-TestFlight
+#
+# Workflow philosophy:
+#   - PRs run `check` (build + test + lint + format) so review can see
+#     correctness signals before merge.
+#   - Pushes to `main` run `check` and then `release` — every push to
+#     main is treated as a major piece of work and ships a new
+#     TestFlight build automatically. See CLAUDE.md for the policy.
+#
+# Required GitHub repository secrets (Settings → Secrets and variables
+# → Actions → New repository secret):
+#
+#   ASC_API_KEY_P8                  — contents of AuthKey_*.p8 (raw text, NOT base64)
+#   APPLE_DISTRIBUTION_CERT_P12     — base64 of the Apple Distribution .p12
+#   APPLE_DISTRIBUTION_CERT_PASSWORD — password for the .p12
+#   APPLE_PROVISIONING_PROFILE      — base64 of the App Store .mobileprovision
+#   KEYCHAIN_PASSWORD               — any string; used for the temp keychain
+#
+# Generate the base64 blobs with `base64 -i path/to/file -o /tmp/out`
+# on macOS, or `base64 -w0 path/to/file` on Linux.
+#
+# Security note: this workflow does not interpolate any untrusted
+# webhook payload fields (issue titles, PR bodies, commit messages,
+# branch names) into shell commands. All such values, where used,
+# would need to be passed via env: with quoted expansion.
+
+name: Build · Test · Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Build · Test · Lint · Format
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
+
+      - name: Print toolchain
+        run: |
+          xcodebuild -version
+          xcrun swift --version
+
+      - name: Install xcodegen + xcbeautify
+        run: brew install xcodegen xcbeautify
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Lint (informational)
+        continue-on-error: true
+        run: xcrun swift-format lint --recursive App Sources Tests
+
+      - name: Format check (informational)
+        continue-on-error: true
+        run: |
+          xcrun swift-format format --recursive --in-place App Sources Tests
+          if ! git diff --exit-code; then
+            echo "::warning::swift-format would reformat files; run 'xcrun swift-format format -i -r App Sources Tests' locally to inspect proposed changes."
+            git checkout -- App Sources Tests
+          fi
+
+      - name: Build & Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project ExpresScan.xcodeproj \
+            -scheme ExpresScan-Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' \
+            -configuration Debug \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+
+      - name: Upload test result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults.xcresult
+          retention-days: 7
+
+  release:
+    name: Release to TestFlight
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
+
+      - name: Install tooling
+        run: |
+          brew install xcodegen
+          curl -fsSL https://deno.land/install.sh | sh -s -- -y
+          echo "$HOME/.deno/bin" >> "$GITHUB_PATH"
+
+      - name: Import Apple Distribution cert into a temporary keychain
+        env:
+          CERT_P12_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERT_P12 }}
+          CERT_P12_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+
+          echo "$CERT_P12_BASE64" | base64 --decode --output "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" \
+            -P "$CERT_P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN_PATH" \
+            $(security list-keychains -d user | tr -d '" ')
+          rm -f "$CERT_PATH"
+
+      - name: Install provisioning profile
+        env:
+          PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+        run: |
+          PROFILE_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          echo "$PROFILE_BASE64" | base64 --decode \
+            --output "$PROFILE_DIR/express-polaris-ios-app-store.mobileprovision"
+
+      - name: Install ASC API key
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          mkdir -p "$HOME/.secrets/expressync"
+          printf '%s' "$ASC_API_KEY_P8" > "$HOME/.secrets/expressync/AuthKey_3QASFD6K93.p8"
+          chmod 600 "$HOME/.secrets/expressync/AuthKey_3QASFD6K93.p8"
+
+      - name: Configure git for build-bump commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Release to TestFlight
+        env:
+          DEVELOPER_DIR_OVERRIDE: ${{ env.DEVELOPER_DIR }}
+        run: bin/release-testflight.sh --skip-device
+
+      - name: Commit & push build-number bump
+        run: |
+          if git diff --quiet -- project.yml; then
+            echo "No build-number bump to commit."
+            exit 0
+          fi
+          NEXT=$(grep -oE 'CURRENT_PROJECT_VERSION: "[0-9]+"' project.yml | head -1 | grep -oE '[0-9]+')
+          git add project.yml
+          git commit -m "chore(release): bump build to ${NEXT} [skip ci]"
+          git push origin HEAD:main
