@@ -261,6 +261,23 @@ public struct RootView: View {
                 handleUniversalLink(url)
             }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: AppNotifications.userQrSignInRequested)
+        ) { note in
+            guard let publicId = note.userInfo?["publicId"] as? String else {
+                return
+            }
+            // Only run the QR sign-in when we're in the unauthenticated
+            // shell — once we're past .ready the user is already signed
+            // in and the URL is a no-op.
+            switch coordinator.route {
+            case .welcome, .loggingIn, .launching:
+                Task { await runQrSignIn(publicId: publicId) }
+            default:
+                return
+            }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .background:
@@ -321,7 +338,22 @@ public struct RootView: View {
             return
         }
 
-        // 2. Registration PKCE callback (the original flow).
+        // 2. User QR sign-in deep link — Track I7.
+        // Universal: `https://example.com/u/<publicId>` printed on
+        // the customer's charge card. Camera scan → AASA matches /u/* →
+        // iOS hands the URL to ExpresScan, which posts to
+        // `/api/auth/qr-sign-in` to mint a session + register the
+        // device + auto-bind a per-device OCPP tag.
+        if let publicId = parseUserSignInDeepLink(components) {
+            NotificationCenter.default.post(
+                name: AppNotifications.userQrSignInRequested,
+                object: nil,
+                userInfo: ["publicId": publicId]
+            )
+            return
+        }
+
+        // 3. Registration PKCE callback (the original flow).
         guard
             components.host == BuildConfig.universalLinkHost,
             components.path == BuildConfig.registrationCallbackPath
@@ -338,6 +370,51 @@ public struct RootView: View {
             object: nil,
             userInfo: ["code": code]
         )
+    }
+
+    /// Run the iOS-only QR sign-in pipeline: POST the publicId, persist
+    /// the returned credentials, then ask the coordinator to re-bootstrap
+    /// so the AuthStore lookup picks up the new tokens and advances the
+    /// route to `.ready`.
+    private func runQrSignIn(publicId: String) async {
+        let vm = QrSignInViewModel(api: app.api, authStore: app.authStore)
+        let ok = await vm.signIn(publicId: publicId)
+        if ok {
+            await coordinator.bootstrap(environment: app)
+        }
+        // On failure the user lands back at the Welcome screen with
+        // QrSignInViewModel.loadState carrying the error. Surfacing
+        // that string in the UI is a follow-up — for now the user can
+        // retry by re-scanning the card.
+    }
+
+    /// Returns the trailing publicId from a user-card sticker URL.
+    /// Format must be exactly `https://example.com/u/XXXXXXXX` —
+    /// 8 chars from the public-ID alphabet (defended at the server
+    /// too, but rejecting bad inputs locally avoids a wasted POST).
+    private func parseUserSignInDeepLink(
+        _ components: URLComponents
+    ) -> String? {
+        guard
+            (components.scheme ?? "").lowercased() == "https",
+            components.host == BuildConfig.chargerLinkHost
+        else { return nil }
+        let prefix = "/u/"
+        guard components.path.hasPrefix(prefix) else { return nil }
+        let id = String(components.path.dropFirst(prefix.count))
+        return validatedPublicId(id)
+    }
+
+    /// Validate that `raw` matches the public-ID alphabet
+    /// (`23456789ABCDEFGHJKMNPQRSTVWXYZ`) and is exactly 8 chars long.
+    /// The alphabet is hard-coded rather than imported from a shared
+    /// module so the parser stays self-contained at the deep-link
+    /// boundary.
+    private func validatedPublicId(_ raw: String) -> String? {
+        guard raw.count == 8 else { return nil }
+        let alphabet: Set<Character> = Set(
+            "23456789ABCDEFGHJKMNPQRSTVWXYZ")
+        return raw.allSatisfy { alphabet.contains($0) } ? raw : nil
     }
 
     /// Returns the trailing chargeBoxId from a charger sticker URL, in

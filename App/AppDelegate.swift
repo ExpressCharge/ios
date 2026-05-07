@@ -42,6 +42,12 @@ public enum AppNotifications {
     /// detail screen. Migration 0043 (ExpresSync).
     public static let chargerDeepLinkRequested = Notification.Name(
         "ExpresScan.ChargerDeepLinkRequested")
+    /// `userInfo["publicId"] : String` — 8-char user public ID extracted
+    /// from a user-card sticker link (`https://example.com/u/<id>`).
+    /// Observed by the unauthenticated login flow to drive iOS-only QR
+    /// sign-in. Track W13 (server) + I7 (iOS).
+    public static let userQrSignInRequested = Notification.Name(
+        "ExpresScan.UserQrSignInRequested")
 }
 
 /// Identifier of the single notification category we register.
