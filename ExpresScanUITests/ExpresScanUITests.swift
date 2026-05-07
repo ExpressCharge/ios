@@ -64,9 +64,12 @@ final class ExpresScanUITests: XCTestCase {
 
     func testWelcomeShowsSignInButton() {
         app.launch()
-        let signIn = app.buttons.containing(
-            NSPredicate(format: "label CONTAINS[c] 'Sign in'")
-        ).element
+        // Use the stable accessibilityIdentifier set by `PrimaryButton`.
+        // The label-CONTAINS predicate matches the button's child Text
+        // element on iOS 26's accessibility tree, which then fails the
+        // hittability check in CI's iPhone 17 Pro simulator. The id is
+        // unambiguous and survives label copy changes.
+        let signIn = app.buttons["primaryButton_Sign in"]
         XCTAssertTrue(signIn.waitForExistence(timeout: 5))
         XCTAssertTrue(signIn.isHittable)
     }
@@ -117,8 +120,17 @@ final class ExpresScanUITests: XCTestCase {
     func testLaunchPerformance() {
         // Cold launch baseline. Will fail loudly if a future change
         // adds a >1s synchronous block to init.
+        //
+        // Terminate the `setUp()`-allocated `app` first so the metric's
+        // own launch/terminate cycle owns the only running instance.
+        // Without this, CI's iPhone 17 Pro simulator occasionally
+        // refuses to terminate the leftover process between iterations
+        // ("Failed to terminate com.example.expresscharge.ios:NNNN").
+        app.terminate()
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+            let perfApp = XCUIApplication()
+            perfApp.launch()
+            perfApp.terminate()
         }
     }
 }
