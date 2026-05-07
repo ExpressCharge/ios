@@ -381,11 +381,23 @@ public struct RootView: View {
         let ok = await vm.signIn(publicId: publicId)
         if ok {
             await coordinator.bootstrap(environment: app)
+            return
         }
-        // On failure the user lands back at the Welcome screen with
-        // QrSignInViewModel.loadState carrying the error. Surfacing
-        // that string in the UI is a follow-up — for now the user can
-        // retry by re-scanning the card.
+        // Failure path — surface the user-facing message back to
+        // WelcomeView via notification. The view auto-hides the
+        // banner after a few seconds; the user can retry by
+        // re-scanning the card.
+        let message: String
+        if case let .error(text) = vm.loadState {
+            message = text
+        } else {
+            message = "Couldn't sign in. Try scanning again."
+        }
+        NotificationCenter.default.post(
+            name: AppNotifications.qrSignInError,
+            object: nil,
+            userInfo: ["message": message]
+        )
     }
 
     /// Returns the trailing publicId from a user-card sticker URL.

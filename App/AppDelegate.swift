@@ -48,6 +48,12 @@ public enum AppNotifications {
     /// sign-in. Track W13 (server) + I7 (iOS).
     public static let userQrSignInRequested = Notification.Name(
         "ExpresScan.UserQrSignInRequested")
+    /// `userInfo["message"] : String` — user-facing copy describing
+    /// why the QR sign-in attempt failed. Observed by `WelcomeView`
+    /// to surface a transient error banner. Posted by
+    /// `RootView.runQrSignIn` on `QrSignInViewModel.signIn` failure.
+    public static let qrSignInError = Notification.Name(
+        "ExpresScan.QrSignInError")
 }
 
 /// Identifier of the single notification category we register.

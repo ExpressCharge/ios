@@ -26,6 +26,13 @@ public struct WelcomeView: View {
 
     @State private var loginViewModel = LoginViewModel()
 
+    /// Surfaced from `RootView.runQrSignIn` via the
+    /// `qrSignInError` notification when an iOS-only QR sign-in
+    /// attempt fails. Displayed as a top banner; auto-dismisses
+    /// after ~5 s.
+    @State private var qrSignInError: String?
+    @State private var qrSignInAutoHide: Task<Void, Never>?
+
     public init(showingLoginActivity: Bool = false) {
         self.showingLoginActivity = showingLoginActivity
     }
@@ -63,6 +70,53 @@ public struct WelcomeView: View {
                 .padding(.bottom, Spacing.xl)
                 .accessibilityHint("Opens Safari to sign in to your ExpressCharge account.")
             }
+
+            // QR sign-in error banner. Renders only when set; the
+            // notification observer below sets it from
+            // `AppNotifications.qrSignInError`.
+            if let message = qrSignInError {
+                VStack {
+                    HStack(alignment: .top, spacing: Spacing.sm) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.white)
+                        Text(message)
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button {
+                            dismissQrSignInError()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .foregroundStyle(.white.opacity(0.85))
+                        }
+                        .accessibilityLabel("Dismiss error")
+                    }
+                    .padding(Spacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(ColorPalette.destructiveRose)
+                    )
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.top, Spacing.md)
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: qrSignInError)
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: AppNotifications.qrSignInError)
+        ) { note in
+            let message = (note.userInfo?["message"] as? String)
+                ?? "Couldn't sign in. Try scanning again."
+            qrSignInError = message
+            qrSignInAutoHide?.cancel()
+            qrSignInAutoHide = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if !Task.isCancelled { qrSignInError = nil }
+            }
         }
         .onChange(of: loginViewModel.deliveredCode) { _, newCode in
             // The login VM hands a one-time code back via this property.
@@ -88,5 +142,10 @@ public struct WelcomeView: View {
 
     private func handleSignInTapped() {
         loginViewModel.start()
+    }
+
+    private func dismissQrSignInError() {
+        qrSignInAutoHide?.cancel()
+        qrSignInError = nil
     }
 }
