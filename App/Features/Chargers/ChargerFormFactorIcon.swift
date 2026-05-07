@@ -8,9 +8,9 @@
 //  row reads as one family; the status-bearing element differs per
 //  form factor:
 //
-//   * .wallbox / .pulsar / .commander / .wallMount — rounded-square
-//     body with an inset rounded-rect LED halo and recessed
-//     rectangular face. The default for branded wall-mounted units.
+//   * .wallbox — rounded-square body with an inset rounded-rect LED
+//     halo and recessed rectangular face. The default for any branded
+//     wall-mounted unit.
 //   * .generic — same body silhouette as wallbox, but with a circular
 //     LED halo around a circular recessed port. Reads as "some kind
 //     of charger" without picking a brand-specific shape.
@@ -65,7 +65,7 @@ struct ChargerFormFactorIcon: View {
                 drawTesla(into: &ctx)
             case .generic:
                 drawGeneric(into: &ctx)
-            case .wallbox, .pulsar, .commander, .wallMount:
+            case .wallbox:
                 drawWallbox(into: &ctx)
             }
         }

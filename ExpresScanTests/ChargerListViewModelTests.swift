@@ -69,7 +69,7 @@ final class ChargerListViewModelTests: XCTestCase {
                       "chargerId": "BAY-2",
                       "label": "Bay 2",
                       "siteName": null,
-                      "formFactor": "pulsar",
+                      "formFactor": "tesla",
                       "connectorType": null,
                       "maxKw": null,
                       "state": "charging",
@@ -213,8 +213,8 @@ final class ChargerListViewModelTests: XCTestCase {
                 {
                   "chargers": [
                     {"chargerId":"BAY-1","label":"Bay 1","siteName":null,"formFactor":"wallbox","connectorType":null,"maxKw":null,"state":"idle","lastSeenAt":null},
-                    {"chargerId":"BAY-2","label":"Bay 2","siteName":null,"formFactor":"pulsar","connectorType":null,"maxKw":null,"state":"charging","lastSeenAt":null},
-                    {"chargerId":"BAY-3","label":"Bay 3","siteName":null,"formFactor":"commander","connectorType":null,"maxKw":null,"state":"offline","lastSeenAt":null}
+                    {"chargerId":"BAY-2","label":"Bay 2","siteName":null,"formFactor":"tesla","connectorType":null,"maxKw":null,"state":"charging","lastSeenAt":null},
+                    {"chargerId":"BAY-3","label":"Bay 3","siteName":null,"formFactor":"generic","connectorType":null,"maxKw":null,"state":"offline","lastSeenAt":null}
                   ]
                 }
                 """#
