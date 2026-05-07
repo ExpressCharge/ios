@@ -92,7 +92,9 @@ public struct CapabilityMetadata: Sendable, Equatable {
             key: .scanner,
             displayName: "NFC scanner",
             description: "Use this device to read NFC chargecards",
-            sfSymbol: "nfc"
+            // Matches the NFC pill on ChargerListRow so the same
+            // capability reads identically wherever it appears.
+            sfSymbol: "wave.3.right.circle.fill"
         ),
         CapabilityMetadata(
             key: .charger,
