@@ -50,6 +50,7 @@ final class ChargerDetailViewModelTests: XCTestCase {
     ) -> ChargerListEntry {
         ChargerListEntry(
             chargerId: chargerId,
+            publicId: nil,
             label: "Bay 1",
             siteName: nil,
             formFactor: .wallbox,
@@ -57,6 +58,9 @@ final class ChargerDetailViewModelTests: XCTestCase {
             maxKw: 22,
             state: state,
             lastSeenAt: nil,
+            address: nil,
+            latitude: nil,
+            longitude: nil,
             capabilities: ["charger"],
             managementMode: managementMode
         )

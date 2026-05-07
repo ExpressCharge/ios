@@ -95,6 +95,7 @@ targets:
         UIBackgroundModes:
           - remote-notification
         NFCReaderUsageDescription: "ExpressCharge reads the unique ID from your NFC charge card so the charging station can verify your account and start your session."
+        NSLocationWhenInUseUsageDescription: "ExpressCharge uses your approximate location to show the closest charger first. Your location stays on your device — we never receive or store it."
         ITSAppUsesNonExemptEncryption: false
         # Register the `expchg://` scheme used by ASWebAuthenticationSession's
         # callback. iOS 26 silently fails to intercept the auth-session 302 to

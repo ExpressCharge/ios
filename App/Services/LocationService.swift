@@ -81,13 +81,12 @@ public final class LocationService: NSObject, CLLocationManagerDelegate {
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.authorization = status
-            if (status == .authorizedWhenInUse || status == .authorizedAlways) &&
-                self.isUpdating == false {
-                // User just granted — start streaming. The coordinator
-                // re-checks on tab-focus too, but this gets the first
-                // fix into the UI as fast as possible.
-                self.isUpdating = true
-                manager.startUpdatingLocation()
+            if status == .authorizedWhenInUse || status == .authorizedAlways {
+                // User just granted — start streaming via the
+                // MainActor-isolated `startUpdating()`, which uses the
+                // stored `manager` property and avoids sending the
+                // delegate's `manager` parameter across actors.
+                self.startUpdating()
             }
         }
     }

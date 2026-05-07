@@ -111,7 +111,7 @@ struct CapabilitiesTests {
         let scanner = CapabilityMetadata.metadata(for: .scanner)
         #expect(scanner.displayName == "NFC scanner")
         #expect(scanner.description == "Use this device to read NFC chargecards")
-        #expect(scanner.sfSymbol == "nfc")
+        #expect(scanner.sfSymbol == "wave.3.right.circle.fill")
 
         let charger = CapabilityMetadata.metadata(for: .charger)
         #expect(charger.displayName == "EV charger")

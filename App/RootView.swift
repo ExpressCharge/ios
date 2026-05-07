@@ -88,6 +88,14 @@ public final class RootCoordinator {
             self.route = .ready
             scan?.startConnecting()
             deviceState?.bootstrap()
+            // Cold-launch APNs refresh: re-deliver the token via the
+            // AppDelegate callback (so we PUT /push-token even when
+            // iOS dedupes a same-token re-registration on a later
+            // launch) and drain any token stashed pre-deviceId. This
+            // is the safety net for devices that registered with an
+            // empty `pushToken` because the 5 s wait at submit time
+            // expired before iOS delivered.
+            push?.refreshIfAuthenticated()
         } else {
             self.route = .welcome
         }

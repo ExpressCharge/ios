@@ -24,6 +24,7 @@ import AuthCore
 import Foundation
 import Models
 import Networking
+import UIKit
 
 /// Errors emitted by the push service. All non-fatal — the token-upload
 /// path retries opportunistically, payload decode failures are
@@ -41,6 +42,17 @@ public final class PushService {
     /// Bound by `RootView` after construction.
     public weak var coordinator: ScanCoordinator?
 
+    /// Last APNs token observed by this process — set on every
+    /// `uploadToken(_:)` call regardless of whether the PUT lands.
+    /// Used by `refreshIfAuthenticated()` to drain a stashed token
+    /// once `deviceId` becomes available (covers the race where iOS
+    /// delivered the token before registration completed).
+    private var pendingToken: String?
+    /// Last token successfully PUT to the server. Used to skip
+    /// redundant uploads when iOS redelivers the same token on
+    /// cold-launch.
+    private var lastUploadedToken: String?
+
     public init(environment: AppEnvironment) {
         self.environment = environment
     }
@@ -50,12 +62,29 @@ public final class PushService {
     /// Persists the raw APNs token (base64) against the registered
     /// device. Idempotent; safe to call multiple times.
     public func uploadToken(_ base64Token: String) async {
+        guard !base64Token.isEmpty else {
+            authLog.error("PushService.uploadToken: empty token, refusing to upload")
+            return
+        }
+        pendingToken = base64Token
+        if base64Token == lastUploadedToken {
+            authLog.debug("PushService.uploadToken: token unchanged, skip PUT")
+            return
+        }
         do {
             guard let deviceId = try await environment.authStore.loadDeviceID() else {
-                // Pre-registration token receipt: stash for the
-                // RegistrationViewModel to pick up.
+                // Pre-registration token receipt: stashed in
+                // `pendingToken`; `refreshIfAuthenticated()` drains it
+                // after credentials land.
+                authLog.debug(
+                    "PushService.uploadToken: deferred — no deviceId yet (token.len=\(base64Token.count))"
+                )
                 return
             }
+            let env = BuildConfig.apnsEnvironment == "production" ? "production" : "sandbox"
+            authLog.debug(
+                "PushService.uploadToken: PUT /api/devices/\(deviceId, privacy: .public)/push-token env=\(env, privacy: .public) token.len=\(base64Token.count)"
+            )
             let body = PushTokenUpdateRequest(
                 pushToken: base64Token,
                 apnsEnvironment: BuildConfig.apnsEnvironment == "production"
@@ -68,9 +97,33 @@ public final class PushService {
                 body: body
             )
             try await environment.api.send(endpoint)
+            lastUploadedToken = base64Token
+            authLog.debug(
+                "PushService.uploadToken: PUT succeeded (deviceId=\(deviceId, privacy: .public))"
+            )
         } catch {
-            // Soft-fail: we'll retry on the next `didRegisterForRemoteNotificationsWithDeviceToken`
-            // call, and the heartbeat path doesn't depend on this.
+            // Soft-fail: we'll retry on the next
+            // `didRegisterForRemoteNotificationsWithDeviceToken` call
+            // or the next `refreshIfAuthenticated()` from bootstrap.
+            authLog.error(
+                "PushService.uploadToken: PUT failed: \(String(describing: error), privacy: .public)"
+            )
+        }
+    }
+
+    /// Called from `RootCoordinator.bootstrap()` whenever we transition
+    /// into `.ready` with valid credentials. Pokes iOS to redeliver
+    /// the APNs token via `AppDelegate.didRegisterForRemoteNotifications`
+    /// AND drains any token already stashed in `pendingToken` (covers
+    /// the race where iOS delivered before sign-in completed). Either
+    /// path lands the same effect: PUT with the current token.
+    public func refreshIfAuthenticated() {
+        UIApplication.shared.registerForRemoteNotifications()
+        if let token = pendingToken {
+            authLog.debug(
+                "PushService.refreshIfAuthenticated: draining stashed token (len=\(token.count))"
+            )
+            Task { await self.uploadToken(token) }
         }
     }
 

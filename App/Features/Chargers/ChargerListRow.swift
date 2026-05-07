@@ -212,11 +212,15 @@ struct ChargerListRow: View {
     }
 
     private var stateLine: String {
+        // Unmanaged chargers (Migration 0043) ship without a state on
+        // the wire; fall back to `.idle` so the line still reads as a
+        // usable charger.
+        let label = (entry.state ?? .idle).displayLabel
         if let lastSeen = entry.lastSeenAt {
             let rel = Self.relative.localizedString(for: lastSeen, relativeTo: Date())
-            return "\(entry.state.displayLabel) · \(rel)"
+            return "\(label) · \(rel)"
         }
-        return entry.state.displayLabel
+        return label
     }
 
     private static let relative: RelativeDateTimeFormatter = {
@@ -226,7 +230,8 @@ struct ChargerListRow: View {
     }()
 
     private var accessibilitySummary: String {
-        var bits: [String] = [entry.label, entry.state.displayLabel]
+        var bits: [String] = [entry.label]
+        if let state = entry.state { bits.append(state.displayLabel) }
         if let site = entry.siteName { bits.append(site) }
         if let connector = entry.connectorType?.displayLabel { bits.append(connector) }
         if let kw = entry.maxKw { bits.append("\(Int(kw)) kilowatts") }

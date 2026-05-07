@@ -103,6 +103,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // base64 because it's shorter and the contract documents it as
         // "<base64>".)
         let token = deviceToken.base64EncodedString()
+        authLog.debug(
+            "AppDelegate.didRegisterForRemoteNotifications: token.len=\(token.count) bytes=\(deviceToken.count)"
+        )
         // RegistrationViewModel still observes this notification so it
         // can stash the token for the in-flight register call.
         NotificationCenter.default.post(
@@ -113,7 +116,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // Once the device is registered, also push the new token to
         // the backend so existing registrations stay reachable.
         Task { @MainActor in
-            await AppEnvironment.shared.pushService?.uploadToken(token)
+            if let push = AppEnvironment.shared.pushService {
+                await push.uploadToken(token)
+            } else {
+                authLog.error(
+                    "AppDelegate.didRegisterForRemoteNotifications: pushService nil, token NOT uploaded — RootCoordinator.bootstrap will retry via refreshIfAuthenticated()"
+                )
+            }
         }
     }
 
@@ -121,6 +130,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
+        authLog.error(
+            "AppDelegate.didFailToRegisterForRemoteNotifications: \(error.localizedDescription, privacy: .public)"
+        )
         NotificationCenter.default.post(
             name: AppNotifications.apnsRegistrationFailed,
             object: nil,

@@ -85,7 +85,7 @@ public final class QrSignInViewModel {
         )
         do {
             let response: QrSignInResponse = try await api.request(endpoint)
-            try authStore.storeCredentials(
+            try await authStore.storeCredentials(
                 deviceId: response.device.id,
                 deviceToken: response.token.deviceToken,
                 deviceSecret: response.token.deviceSecret
