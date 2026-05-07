@@ -101,16 +101,25 @@ struct ChargerHero: View {
                     )
                 )
 
+                // Strain-relief boots ("lug nuts" in the design
+                // brief). Track I2 fix: previously the boots floated
+                // a few points below the charger / connector with a
+                // visible gap and inherited the cable's translucent
+                // colour, making them read as detached. We now
+                // position them so they overlap the charger body's
+                // bottom edge, and `strainReliefBoot` fills with the
+                // status tone at full opacity so the boot reads as
+                // a solid grommet attached to the device.
                 strainReliefBoot(size: Self.chargerBootSize)
                     .position(
                         x: chargerBottom.x,
-                        y: chargerBottom.y + Self.chargerBootSize.height / 2 - 2
+                        y: chargerBottom.y - 2
                     )
 
                 strainReliefBoot(size: Self.connectorBootSize)
                     .position(
                         x: connectorBottom.x,
-                        y: connectorBottom.y + Self.connectorBootSize.height / 2 - 2
+                        y: connectorBottom.y - 2
                     )
 
                 ChargerFormFactorIcon(
@@ -147,8 +156,10 @@ struct ChargerHero: View {
 
     private var heroArtworkHeight: CGFloat {
         // Tall enough to hold the charger + connector at one
-        // vertical centre plus the cable U beneath them.
-        Self.chargerSize + Self.connectorSize / 2 + Spacing.xl + Spacing.lg
+        // vertical centre plus the cable U beneath them, plus the
+        // headroom needed by the kW/connector meta block which
+        // (Track I2) now sits above the connector glyph.
+        Self.chargerSize + Self.connectorSize / 2 + Spacing.xl + Spacing.xl
     }
 
     /// Squared cable with filleted bend corners: out the bottom of
@@ -184,12 +195,25 @@ struct ChargerHero: View {
     }
 
     /// Strain-relief boot rendered at each cable terminus — a small
-    /// filled rounded rect in the cable color, sized to read as a
-    /// grommet where the cable enters each device.
+    /// filled rounded rect that reads as a solid grommet where the
+    /// cable enters each device. Filled with `bootColor` (no opacity
+    /// — distinct from `cableColor` which carries 0.7-0.85) so the
+    /// boot remains readable when overlapped with the charger body.
     private func strainReliefBoot(size: CGSize) -> some View {
         RoundedRectangle(cornerRadius: Self.bootCornerRadius, style: .continuous)
-            .fill(cableColor)
+            .fill(bootColor)
             .frame(width: size.width, height: size.height)
+    }
+
+    /// Fully-opaque variant of the cable colour. Mirrors the
+    /// charging / offline / idle distinctions but at 1.0 alpha so
+    /// the boot reads as a solid grommet rather than a translucent
+    /// dot floating off the device.
+    private var bootColor: Color {
+        switch status {
+        case .offline: return ColorPalette.mutedForeground
+        default: return tone
+        }
     }
 
     private var cableColor: Color {
@@ -200,13 +224,15 @@ struct ChargerHero: View {
         }
     }
 
-    /// Right-aligned `kW` + connector type label hugging the
-    /// connector glyph from the left so it reads as the
-    /// connector's spec sheet.
+    /// kW + connector type label, centred above the connector
+    /// glyph so it reads as the spec sheet hovering directly over
+    /// the part it describes. Track I2 moved this from the left of
+    /// the glyph (where it visually competed with the cable) to
+    /// straight above.
     @ViewBuilder
     private func connectorMeta(at center: CGPoint) -> some View {
         if let descriptor = connectors.first {
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .center, spacing: 2) {
                 Text(kWLabel(for: descriptor))
                     .font(.headline)
                 Text(typeLabel(for: descriptor))
@@ -214,8 +240,8 @@ struct ChargerHero: View {
                     .foregroundStyle(.secondary)
             }
             .position(
-                x: center.x - Self.connectorSize / 2 - 56,
-                y: center.y
+                x: center.x,
+                y: center.y - Self.connectorSize / 2 - 18
             )
         }
     }

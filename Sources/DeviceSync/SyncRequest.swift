@@ -190,5 +190,20 @@ public struct SyncRequest: Sendable, Equatable, Codable {
             self.networkIsExpensive = networkIsExpensive
             self.diskFreeBytes = diskFreeBytes
         }
+
+        /// Returns a copy with the customer-restricted device-health
+        /// fields cleared. Track I6 — customer accounts shouldn't ship
+        /// us battery / thermal state / disk free / low power mode;
+        /// only Polaris-team (admin-owned) devices keep the full
+        /// readout for fleet diagnosis.
+        public func scrubbedForCustomerAccount() -> Diagnostics {
+            var copy = self
+            copy.batteryLevel = nil
+            copy.batteryState = nil
+            copy.lowPowerMode = nil
+            copy.thermalState = nil
+            copy.diskFreeBytes = nil
+            return copy
+        }
     }
 }

@@ -105,8 +105,11 @@ struct ChargerListRow: View {
 
     /// Coarse status used to look up tone/glow via the central
     /// `ChargerStatusVisuals` helper — keeps list and detail aligned.
+    /// Unmanaged chargers don't carry a state on the wire (Track W7);
+    /// fall back to `.available` so the row reads as a usable charger
+    /// rather than offline.
     private var status: ChargerStatusVisuals.Status {
-        ChargerStatusVisuals.status(from: entry.state)
+        ChargerStatusVisuals.status(from: entry.state ?? .idle)
     }
 
     private var stateBackground: Color {

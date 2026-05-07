@@ -85,8 +85,10 @@ public final class ChargerDetailViewModel {
                 return currentReservation != nil ? .reserved : .idle
             }
         }
-        // Fall back to the row state until `session` loads.
-        switch entry.state {
+        // Fall back to the row state until `session` loads. Unmanaged
+        // chargers (Track W7) ship no state — treat as idle so the
+        // hero doesn't render an "offline" badge.
+        switch entry.state ?? .idle {
         case .charging: return .charging
         case .preparing: return .plugged
         case .reserved: return .reserved
@@ -102,6 +104,8 @@ public final class ChargerDetailViewModel {
     }
 
     public var isOffline: Bool {
+        // Unmanaged chargers don't ship a state — they're physically
+        // present and usable, so treat absence-of-state as not-offline.
         entry.state == .offline
     }
 

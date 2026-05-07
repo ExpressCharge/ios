@@ -78,9 +78,11 @@ struct J1772Icon: View {
         let bodyCenter = CGPoint(x: 50, y: 60)
         let bodyRadius: CGFloat = 32
         // Latch geometry — sits above the body, joining where the
-        // tangent lines meet the circle.
-        let latchHalfWidth: CGFloat = 9
-        let latchTop: CGFloat = 14
+        // tangent lines meet the circle. Half-width widened from 9 to
+        // 11 (Track I2) so the lock reads at smaller charger-list
+        // sizes without losing its silhouette.
+        let latchHalfWidth: CGFloat = 11
+        let latchTop: CGFloat = 13
         // Compute the y-coordinate on the circle where the latch's
         // sides meet (so the joints are tangent).
         let dx = latchHalfWidth

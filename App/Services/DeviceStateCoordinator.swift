@@ -284,7 +284,17 @@ public final class DeviceStateCoordinator {
             // retries.
             return false
         }
-        let diagnostics = await diagnosticsProvider()
+        var diagnostics = await diagnosticsProvider()
+        // Track I6 — customer accounts don't report device-health
+        // telemetry. Polaris-team (admin-owned) devices keep the
+        // full set so the fleet stays observable; customer phones
+        // omit battery / thermal state / disk free / low power mode.
+        // The owner role is read from the last applied envelope; on
+        // first sync (before applyEnvelope ever runs) the role is
+        // unknown and we err on the side of NOT sending telemetry.
+        if state?.ownerUser.role != .admin {
+            diagnostics = diagnostics.scrubbedForCustomerAccount()
+        }
         let body = SyncRequest(pendingSettings: pending, diagnostics: diagnostics)
 
         do {
