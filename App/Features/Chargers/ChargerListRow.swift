@@ -84,6 +84,16 @@ struct ChargerListRow: View {
             .layoutPriority(1)
 
             Spacer(minLength: 0)
+
+            // Track I3 — replaces the row's trailing chevron with the
+            // charger's 8-char public ID rendered in the same 4×4
+            // green-letters / blue-digits format printed on the
+            // sticker. Acts as a quiet identity watermark so the
+            // operator can match a row to a card at a glance.
+            if let pid = entry.publicId {
+                PublicIdView(publicId: pid, size: .small)
+                    .padding(.leading, Spacing.sm)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilitySummary)

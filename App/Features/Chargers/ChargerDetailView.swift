@@ -35,6 +35,19 @@ struct ChargerDetailView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Navigate — opens Apple Maps preferring the structured
+            // address (so the user sees "123 Main St" rather than a
+            // pin-drop), falling back to lat/lon when only coords are
+            // available. Hidden entirely when the charger has neither,
+            // matching the plan's "no empty navigate button" rule.
+            if let mapsURL = mapsNavigationURL(for: entry) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Link(destination: mapsURL) {
+                        Image(systemName: "arrow.triangle.turn.up.right.diamond")
+                            .accessibilityLabel("Navigate to charger")
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     if let vm = viewModel {
@@ -244,5 +257,32 @@ struct ChargerDetailView: View {
         } else {
             Text("Stop the in-progress session?")
         }
+    }
+
+    /// Build an Apple Maps URL for the charger's location. Prefers the
+    /// formatted `address` (e.g. "123 Main St, San Francisco, CA, US")
+    /// because Maps renders the route to a labelled landmark; falls
+    /// back to the lat/lon pin when only coordinates are populated.
+    /// Returns `nil` when neither is available — the toolbar item then
+    /// hides itself rather than showing a disabled button.
+    private func mapsNavigationURL(for entry: ChargerListEntry) -> URL? {
+        if let address = entry.address?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !address.isEmpty {
+            var components = URLComponents(string: "https://maps.apple.com/")
+            components?.queryItems = [
+                URLQueryItem(name: "address", value: address),
+                URLQueryItem(name: "dirflg", value: "d"),
+            ]
+            if let url = components?.url { return url }
+        }
+        if let lat = entry.latitude, let lon = entry.longitude {
+            var components = URLComponents(string: "https://maps.apple.com/")
+            components?.queryItems = [
+                URLQueryItem(name: "ll", value: "\(lat),\(lon)"),
+                URLQueryItem(name: "dirflg", value: "d"),
+            ]
+            return components?.url
+        }
+        return nil
     }
 }
