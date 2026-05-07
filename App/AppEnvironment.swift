@@ -125,6 +125,14 @@ public final class AppEnvironment: @unchecked Sendable {
     /// the SwiftUI hierarchy is up.
     public let reachability: ReachabilityMonitor
 
+    /// Track I5 — coarse location for the Chargers tab. Started/
+    /// stopped by `ChargersTabView` on focus change. Lives at the
+    /// process level so the same fix backs distance + primary-card
+    /// rendering across navigations.
+    @MainActor public lazy var locationService: LocationService = {
+        LocationService()
+    }()
+
     /// Set by `RootCoordinator.bootstrap(...)` once the SwiftUI
     /// hierarchy is up. The `AppDelegate` then forwards APNs payloads
     /// + token uploads through this reference.

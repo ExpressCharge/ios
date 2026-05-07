@@ -10,6 +10,7 @@
 //  web-only).
 //
 
+import CoreLocation
 import Foundation
 import Networking
 import Observation
@@ -36,13 +37,81 @@ public final class ChargerListViewModel {
     public private(set) var loadState: LoadState = .idle
     public var filter: OnlineStatusFilter = .all
 
-    /// Filtered entries, derived from `entries + filter`. The view
-    /// reads this; it changes whenever either input changes.
+    /// User's current location, set by the parent view from
+    /// `LocationService.currentLocation`. `nil` when location
+    /// permission is denied or no fix is available — the list then
+    /// falls back to last-seen ordering.
+    public var currentLocation: CLLocation?
+
+    /// Threshold under which a charger is considered "right here" and
+    /// gets promoted to the tall primary card. ~150 m is comfortable
+    /// for the coarse-accuracy fixes we request (`kCLLocationAccuracy
+    /// HundredMeters`); short enough that two adjacent installations
+    /// at a public charging plaza don't both qualify.
+    public static let proximityThresholdMeters: Double = 150
+
+    /// Filtered + sorted entries. Sort order:
+    ///   1. By distance ascending when location is available; chargers
+    ///      without coordinates fall to the bottom.
+    ///   2. Otherwise by lastSeen descending (server's default).
     public var displayEntries: [ChargerListEntry] {
+        let filtered: [ChargerListEntry]
         switch filter {
-        case .all: return entries
-        case .online: return entries.filter { $0.state.isOnline }
+        case .all:
+            filtered = entries
+        case .online:
+            // Unmanaged chargers (no state) are always considered
+            // online — they're physically present, just not reporting.
+            filtered = entries.filter { ($0.state ?? .idle).isOnline }
         }
+
+        guard let here = currentLocation else { return filtered }
+
+        return filtered.sorted { a, b in
+            let da = distance(from: here, to: a)
+            let db = distance(from: here, to: b)
+            switch (da, db) {
+            case let (.some(la), .some(lb)): return la < lb
+            case (.some, .none): return true
+            case (.none, .some): return false
+            case (.none, .none):
+                let la = a.lastSeenAt ?? .distantPast
+                let lb = b.lastSeenAt ?? .distantPast
+                return la > lb
+            }
+        }
+    }
+
+    /// The single charger close enough to be promoted to the tall
+    /// "primary" card. Always the first of `displayEntries` when its
+    /// distance is under the threshold; `nil` otherwise.
+    public var primaryEntry: ChargerListEntry? {
+        guard let first = displayEntries.first,
+              let here = currentLocation,
+              let d = distance(from: here, to: first),
+              d <= Self.proximityThresholdMeters
+        else { return nil }
+        return first
+    }
+
+    /// Everything else when a primary card is showing; the full list
+    /// otherwise.
+    public var secondaryEntries: [ChargerListEntry] {
+        guard primaryEntry != nil else { return displayEntries }
+        return Array(displayEntries.dropFirst())
+    }
+
+    /// Distance in metres from `here` to the charger's coordinates,
+    /// or `nil` when the entry doesn't carry lat/lon.
+    public func distance(
+        from here: CLLocation,
+        to entry: ChargerListEntry
+    ) -> Double? {
+        guard let lat = entry.latitude, let lon = entry.longitude else {
+            return nil
+        }
+        let target = CLLocation(latitude: lat, longitude: lon)
+        return here.distance(from: target)
     }
 
     /// Whether the list has zero entries to show under the current

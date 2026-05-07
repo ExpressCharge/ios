@@ -37,6 +37,8 @@
 	<false/>
 	<key>NFCReaderUsageDescription</key>
 	<string>ExpressCharge reads the unique ID from your NFC charge card so the charging station can verify your account and start your session.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ExpressCharge uses your approximate location to show the closest charger first. Your location stays on your device — we never receive or store it.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

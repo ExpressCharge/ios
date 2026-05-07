@@ -14,6 +14,15 @@ import SwiftUI
 struct ChargerListRow: View {
 
     let entry: ChargerListEntry
+    /// Distance in metres from the user's current location, when
+    /// known. Rendered as a dimmed top-right caption (e.g. "0.4 mi").
+    /// Track I5; nil hides the label entirely.
+    var distanceMeters: Double? = nil
+
+    init(entry: ChargerListEntry, distanceMeters: Double? = nil) {
+        self.entry = entry
+        self.distanceMeters = distanceMeters
+    }
 
     var body: some View {
         rowContent
@@ -26,6 +35,30 @@ struct ChargerListRow: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(stateBorderColor, lineWidth: stateBorderWidth)
             )
+            .overlay(alignment: .topTrailing) {
+                if let m = distanceMeters {
+                    Text(formatDistance(m))
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, Spacing.sm)
+                        .padding(.trailing, Spacing.md)
+                }
+            }
+    }
+
+    private func formatDistance(_ metres: Double) -> String {
+        // Imperial for the iOS audience — mi/ft. The threshold
+        // mirrors the primary-card rule (<150 m feels like "right
+        // here") so values below it always show as "<X ft".
+        let feet = metres * 3.28084
+        if feet < 1000 {
+            return String(format: "%.0f ft", feet)
+        }
+        let miles = metres / 1609.344
+        if miles < 10 {
+            return String(format: "%.1f mi", miles)
+        }
+        return String(format: "%.0f mi", miles)
     }
 
     private var rowContent: some View {

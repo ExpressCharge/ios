@@ -50,6 +50,21 @@ public struct ChargersTabView: View {
                 self.viewModel = vm
                 await vm.refresh()
             }
+            // Track I5 — request location permission lazily on first
+            // visit, then start streaming fixes. The view model reads
+            // `currentLocation` from `app.locationService` on every
+            // render via the binding below.
+            app.locationService.requestAuthorization()
+            app.locationService.startUpdating()
+        }
+        .onDisappear {
+            // Stop the location indicator when the user leaves the
+            // Chargers tab so the system status bar's "in use" arrow
+            // accurately reflects what we're doing.
+            app.locationService.stopUpdating()
+        }
+        .onChange(of: app.locationService.currentLocation) { _, newValue in
+            viewModel?.currentLocation = newValue
         }
         .onChange(of: viewModel?.displayEntries ?? []) { _, newValue in
             maybeAutoPush(newValue)
@@ -158,11 +173,46 @@ public struct ChargersTabView: View {
                 )
             } else {
                 List {
-                    ForEach(vm.displayEntries) { entry in
+                    // Track I5 — proximity-promoted "primary" card. When
+                    // the user is within ~150 m of any charger, the
+                    // closest one moves into a tall card at the top of
+                    // the list. The remaining chargers render as
+                    // standard rows below it.
+                    if let primary = vm.primaryEntry,
+                       let here = vm.currentLocation
+                    {
+                        Section {
+                            Button {
+                                pushedEntry = primary
+                            } label: {
+                                ChargerPrimaryCard(
+                                    entry: primary,
+                                    distanceMeters: vm.distance(
+                                        from: here, to: primary
+                                    )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .listRowInsets(
+                                EdgeInsets(
+                                    top: 8, leading: 16,
+                                    bottom: 12, trailing: 16
+                                )
+                            )
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                        }
+                    }
+                    ForEach(vm.secondaryEntries) { entry in
                         Button {
                             pushedEntry = entry
                         } label: {
-                            ChargerListRow(entry: entry)
+                            ChargerListRow(
+                                entry: entry,
+                                distanceMeters: vm.currentLocation.flatMap {
+                                    vm.distance(from: $0, to: entry)
+                                }
+                            )
                         }
                         .buttonStyle(.plain)
                         .listRowInsets(
