@@ -267,7 +267,8 @@ struct ChargerDetailView: View {
     /// hides itself rather than showing a disabled button.
     private func mapsNavigationURL(for entry: ChargerListEntry) -> URL? {
         if let address = entry.address?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !address.isEmpty {
+            !address.isEmpty
+        {
             var components = URLComponents(string: "https://maps.apple.com/")
             components?.queryItems = [
                 URLQueryItem(name: "address", value: address),

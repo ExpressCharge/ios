@@ -109,7 +109,8 @@ public struct WelcomeView: View {
             NotificationCenter.default.publisher(
                 for: AppNotifications.qrSignInError)
         ) { note in
-            let message = (note.userInfo?["message"] as? String)
+            let message =
+                (note.userInfo?["message"] as? String)
                 ?? "Couldn't sign in. Try scanning again."
             qrSignInError = message
             qrSignInAutoHide?.cancel()

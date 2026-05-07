@@ -179,7 +179,7 @@ public struct ChargersTabView: View {
                     // the list. The remaining chargers render as
                     // standard rows below it.
                     if let primary = vm.primaryEntry,
-                       let here = vm.currentLocation
+                        let here = vm.currentLocation
                     {
                         Section {
                             Button {

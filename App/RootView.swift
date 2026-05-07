@@ -396,7 +396,7 @@ public struct RootView: View {
         // banner after a few seconds; the user can retry by
         // re-scanning the card.
         let message: String
-        if case let .error(text) = vm.loadState {
+        if case .error(let text) = vm.loadState {
             message = text
         } else {
             message = "Couldn't sign in. Try scanning again."

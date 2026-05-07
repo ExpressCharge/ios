@@ -71,7 +71,7 @@ public final class ChargerListViewModel {
             let da = distance(from: here, to: a)
             let db = distance(from: here, to: b)
             switch (da, db) {
-            case let (.some(la), .some(lb)): return la < lb
+            case (.some(let la), .some(let lb)): return la < lb
             case (.some, .none): return true
             case (.none, .some): return false
             case (.none, .none):
@@ -87,9 +87,9 @@ public final class ChargerListViewModel {
     /// distance is under the threshold; `nil` otherwise.
     public var primaryEntry: ChargerListEntry? {
         guard let first = displayEntries.first,
-              let here = currentLocation,
-              let d = distance(from: here, to: first),
-              d <= Self.proximityThresholdMeters
+            let here = currentLocation,
+            let d = distance(from: here, to: first),
+            d <= Self.proximityThresholdMeters
         else { return nil }
         return first
     }

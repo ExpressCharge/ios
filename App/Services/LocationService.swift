@@ -42,7 +42,7 @@ public final class LocationService: NSObject, CLLocationManagerDelegate {
         // keeps us out of the system's "precise location" UI banner
         // when the user is fine with neighborhood-level fixes.
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        manager.distanceFilter = 25 // metres before a callback fires
+        manager.distanceFilter = 25  // metres before a callback fires
     }
 
     // MARK: - Public surface
@@ -59,8 +59,9 @@ public final class LocationService: NSObject, CLLocationManagerDelegate {
     /// Begin streaming fixes if authorized. Safe to call multiple
     /// times — idempotent.
     public func startUpdating() {
-        guard authorization == .authorizedWhenInUse ||
-            authorization == .authorizedAlways else { return }
+        guard authorization == .authorizedWhenInUse || authorization == .authorizedAlways else {
+            return
+        }
         guard !isUpdating else { return }
         isUpdating = true
         manager.startUpdatingLocation()
