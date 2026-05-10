@@ -37,7 +37,13 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
-    TARGETED_DEVICE_FAMILY: "1,2"
+    # iPhone-only target — `nfc` in `UIRequiredDeviceCapabilities` makes the
+    # app inapplicable to iPad / Mac (Apple silicon) / visionOS, and ASC's
+    # ITMS-90863 / ITMS-90984 warnings on every upload were the symptom of
+    # leaving "1,2" (iPhone + iPad) here. Tightening to "1" suppresses the
+    # iPad designation; the Mac and Apple Vision Pro auto-listings still
+    # need to be turned off in App Store Connect → Distribution.
+    TARGETED_DEVICE_FAMILY: "1"
     DEVELOPMENT_TEAM: "ABC1234XYZ"
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES
