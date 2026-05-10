@@ -41,6 +41,10 @@ public final class PushService {
     private let environment: AppEnvironment
     /// Bound by `RootView` after construction.
     public weak var coordinator: ScanCoordinator?
+    /// Bound by `RootView` after `ensureDeviceStateCoordinator(...)`.
+    /// Used by the Phase 2b `device.locate` silent-push handler to
+    /// trigger an on-demand sync after the cache writes.
+    public weak var deviceState: DeviceStateCoordinator?
 
     /// Last APNs token observed by this process — set on every
     /// `uploadToken(_:)` call regardless of whether the PUT lands.
@@ -129,14 +133,63 @@ public final class PushService {
 
     // MARK: - APNs payload routing
 
-    /// Decode an APNs payload `userInfo` dictionary into a
-    /// `ScanRequest` and forward it to the coordinator. Silently
-    /// returns on payloads that don't carry a scan request.
+    /// Decode an APNs payload `userInfo` dictionary and dispatch on
+    /// the typed `type` field (Phase 2b). Falls back to the legacy
+    /// scan-request path for payloads without a `type` (the original
+    /// scan-arm flow). Silently returns on unrecognised payloads.
     public func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) {
+        // Phase 2b — typed dispatch. The `type` field is set by
+        // `routes/api/admin/devices/[id]/locate.ts`; older scan-arm
+        // pushes don't carry it and fall through to the legacy path.
+        if let type = userInfo["type"] as? String {
+            handleTypedPush(type: type, userInfo: userInfo)
+            return
+        }
         guard let request = Self.decodeScanRequest(from: userInfo) else {
             return
         }
         coordinator?.handleIncomingScanRequest(request, source: .push)
+    }
+
+    /// Typed-payload dispatch. Add new branches as new push types land.
+    private func handleTypedPush(
+        type: String,
+        userInfo: [AnyHashable: Any]
+    ) {
+        switch type {
+        case "device.locate":
+            handleLocatePush(userInfo: userInfo)
+        default:
+            // Unknown type — log once but don't crash. Newer servers
+            // may send types older clients haven't learned yet.
+            authLog.debug(
+                "PushService.handleRemoteNotification: unknown type '\(type, privacy: .public)' — ignored"
+            )
+        }
+    }
+
+    /// Phase 2 Bundle 2b — silent "Locate now" push. Trigger a one-shot
+    /// `requestLocation()` on the managed-location cache, then force a
+    /// sync so the new fix flushes server-side immediately.
+    ///
+    /// The push payload carries a `correlationId` we'd echo back if we
+    /// had a fast-path SSE event for the location update; today the
+    /// admin UI just polls the device row's `last_location_at` after
+    /// posting Locate-now. The correlationId is read for completeness
+    /// in case we add an `expresscharge.locate.completed` SSE later.
+    private func handleLocatePush(userInfo: [AnyHashable: Any]) {
+        let correlationId = userInfo["correlationId"] as? String ?? "<unknown>"
+        authLog.debug(
+            "PushService: device.locate received (correlationId=\(correlationId, privacy: .public))"
+        )
+        let cache = environment.managedLocationCache
+        let coordinator = deviceState
+        Task { @MainActor in
+            _ = await cache.requestOneShot(
+                reason: ManagedLocationOneShotReason.silentPushLocate
+            )
+            await coordinator?.syncOnce()
+        }
     }
 
     /// Convert the canonical APNs payload (see `20-contracts.md`) into

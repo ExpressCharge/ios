@@ -203,6 +203,12 @@ public final class RootCoordinator {
         scan = coordinator
         // Hook the push service to the coordinator now that we have one.
         push?.coordinator = coordinator
+        // Phase 2 Bundle 2b — silent-push `device.locate` dispatch
+        // needs the device-state coordinator to force a `syncOnce`
+        // after the cache writes. Bound here for the same reason
+        // `coordinator` (scan) is — both have the same signed-in
+        // lifetime.
+        push?.deviceState = deviceState
         return coordinator
     }
 
@@ -243,6 +249,7 @@ public final class RootCoordinator {
         deviceState?.stop()
         deviceState = nil
         push?.coordinator = nil
+        push?.deviceState = nil
     }
 
     // MARK: - Transitions
