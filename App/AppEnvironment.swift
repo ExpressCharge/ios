@@ -144,6 +144,16 @@ public final class AppEnvironment: @unchecked Sendable {
         LocationService()
     }()
 
+    /// Phase 2 / Bundle 2a — managed-device location cache. Distinct
+    /// from `locationService` so the Chargers-tab "device-only,
+    /// never-POSTs" privacy contract stays intact. Started/stopped by
+    /// `DeviceStateCoordinator` based on the `managed` capability +
+    /// `device.location.upload` feature flag (gating handled at the
+    /// caller — the cache itself is dumb).
+    @MainActor public lazy var managedLocationCache: ManagedLocationCache = {
+        ManagedLocationCache()
+    }()
+
     /// Set by `RootCoordinator.bootstrap(...)` once the SwiftUI
     /// hierarchy is up. The `AppDelegate` then forwards APNs payloads
     /// + token uploads through this reference.

@@ -15,9 +15,11 @@ struct CapabilitiesTests {
     // MARK: - isLegalSet — exhaustive over the 16 subsets
 
     @Test func isLegalSetExhaustive() {
-        // The all-cases set has 4 elements ⇒ 16 subsets. Build them
-        // bitwise and check legality matches the spec:
+        // Build every subset of `DeviceCapability.allCases` bitwise
+        // and check legality matches the spec:
         //   illegal iff `kiosk ∈ caps` AND |caps ∩ {scanner, user}| ≠ 1.
+        // `.managed` is intentionally orthogonal to the kiosk rule —
+        // its presence neither helps nor hurts legality.
         let all = DeviceCapability.allCases
         for mask in 0..<(1 << all.count) {
             var caps: Set<DeviceCapability> = []
@@ -131,7 +133,44 @@ struct CapabilitiesTests {
 
     @Test func registrationOptionsExcludesCharger() {
         let keys = Set(CapabilityMetadata.registrationOptions.map(\.key))
-        #expect(keys == [.scanner, .user, .kiosk])
+        #expect(keys == [.scanner, .user, .kiosk, .managed])
         #expect(!keys.contains(.charger))
+    }
+
+    // MARK: - .managed (Phase 2 / Bundle 2a)
+
+    @Test func managedCopyMatchesSpec() {
+        let m = CapabilityMetadata.metadata(for: .managed)
+        #expect(m.displayName == "Managed device")
+        #expect(m.description == "Allows admins to locate this device")
+        #expect(!m.sfSymbol.isEmpty)
+    }
+
+    @Test func managedIsOrthogonalToKioskExclusivity() {
+        // Adding `.managed` to a legal set keeps it legal.
+        #expect(DeviceCapability.isLegalSet([.scanner, .managed]))
+        #expect(DeviceCapability.isLegalSet([.user, .managed]))
+        #expect(DeviceCapability.isLegalSet([.scanner, .kiosk, .managed]))
+        #expect(DeviceCapability.isLegalSet([.user, .kiosk, .managed]))
+        // Adding `.managed` to an illegal kiosk set keeps it illegal.
+        #expect(!DeviceCapability.isLegalSet([.kiosk, .managed]))
+        #expect(!DeviceCapability.isLegalSet([.scanner, .user, .kiosk, .managed]))
+    }
+
+    @Test func managedIsNotAppCanonical() {
+        // The "main screen" gates are scanner/user/kiosk — not managed.
+        #expect(!DeviceCapability.managed.isAppCanonicalCapability)
+    }
+
+    @Test func managedDoesNotAffectDerivedHelpers() {
+        #expect(!DeviceCapability.canSeeChargersTab([.managed]))
+        #expect(!DeviceCapability.canScan([.managed]))
+        #expect(!DeviceCapability.isKiosk([.managed]))
+        #expect(!DeviceCapability.tabBarVisible([.managed]))
+    }
+
+    @Test func appRegistrationOptionsIncludesManaged() {
+        #expect(DeviceCapability.appRegistrationOptions.contains(.managed))
+        #expect(!DeviceCapability.appRegistrationOptions.contains(.charger))
     }
 }

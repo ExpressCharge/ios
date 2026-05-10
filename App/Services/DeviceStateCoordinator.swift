@@ -116,6 +116,19 @@ public final class DeviceStateCoordinator {
     @ObservationIgnored
     private let logDrain: LogDrain?
 
+    /// Phase 2 / Bundle 2a — managed-device location cache. When `nil`
+    /// the sync envelope omits the `location` field. Wired by
+    /// `RootCoordinator.ensureDeviceStateCoordinator(...)`.
+    @ObservationIgnored
+    private let managedLocationCache: ManagedLocationCache?
+
+    /// Feature-flag key gating managed-device location upload. Read
+    /// from `featureFlagReader` on every sync — falls back to `false`
+    /// so we never POST a fix unless the server has explicitly
+    /// enabled the flag for this device.
+    @ObservationIgnored
+    public static let locationUploadFlagKey = "device.location.upload"
+
     @ObservationIgnored
     private weak var router: RootCoordinator?
 
@@ -148,7 +161,8 @@ public final class DeviceStateCoordinator {
         service: DeviceStateService? = nil,
         now: @escaping @Sendable () -> Date = { Date() },
         diagnosticsProvider: (@MainActor () async -> SyncRequest.Diagnostics)? = nil,
-        logDrain: LogDrain? = nil
+        logDrain: LogDrain? = nil,
+        managedLocationCache: ManagedLocationCache? = nil
     ) {
         self.api = api
         self.settingsStore = settingsStore
@@ -160,6 +174,7 @@ public final class DeviceStateCoordinator {
                 await Self.defaultDiagnostics()
             }
         self.logDrain = logDrain
+        self.managedLocationCache = managedLocationCache
         self.featureFlagReader = FeatureFlagReader()
         self.settingsReader = SettingsReader(store: settingsStore)
 
@@ -266,6 +281,10 @@ public final class DeviceStateCoordinator {
         if let drain = logDrain {
             Task { await drain.purge() }
         }
+        // Phase 2 / Bundle 2a — clear the cached managed-device
+        // location and stop sig-change monitoring. Coords are
+        // owner-scoped PII; the next user must not inherit them.
+        managedLocationCache?.clear()
         stop()
     }
 
@@ -340,11 +359,20 @@ public final class DeviceStateCoordinator {
             (drained?.records).flatMap { $0.isEmpty ? nil : $0 }
         let cursorForRequest: String? = drained?.cursor.map { "\($0)" }
 
+        // Phase 2 / Bundle 2a — attach the cached managed-device
+        // location if the capability+flag gate passes. The cache
+        // populates itself via sig-change while the app is foregrounded;
+        // a `nil` here means either the gate is off, the cache hasn't
+        // captured a fix yet, or no cache is wired (test path).
+        let locationForRequest: LocationSnapshot? =
+            shouldUploadLocation ? managedLocationCache?.current() : nil
+
         let body = SyncRequest(
             pendingSettings: pending,
             diagnostics: diagnostics,
             logs: logsForRequest,
-            logCursor: cursorForRequest
+            logCursor: cursorForRequest,
+            location: locationForRequest
         )
 
         do {
@@ -407,6 +435,27 @@ public final class DeviceStateCoordinator {
         if envelope.needsPushToken == true {
             UIApplication.shared.registerForRemoteNotifications()
         }
+        // Phase 2 / Bundle 2a — start (or stop) sig-change monitoring
+        // based on the latest capability set + feature flag. Idempotent
+        // on the cache side, so re-running this on every envelope apply
+        // is fine.
+        if let cache = managedLocationCache {
+            if shouldUploadLocation {
+                cache.startSignificantChangeMonitoring()
+            } else {
+                cache.stop()
+            }
+        }
+    }
+
+    /// Whether the managed-device location upload gate is currently
+    /// satisfied: the device must have the `managed` capability AND the
+    /// `device.location.upload` feature flag must be `true`. Read on
+    /// every sync so toggling either side takes effect on the next
+    /// tick without a relaunch.
+    private var shouldUploadLocation: Bool {
+        guard capabilities.contains(.managed) else { return false }
+        return featureFlagReader.bool(Self.locationUploadFlagKey, default: false)
     }
 
     private func routeRevocation() async {

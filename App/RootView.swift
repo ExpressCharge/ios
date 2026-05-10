@@ -228,7 +228,8 @@ public final class RootCoordinator {
         let coordinator = DeviceStateCoordinator(
             api: environment.api,
             settingsStore: store,
-            logDrain: environment.logDrain
+            logDrain: environment.logDrain,
+            managedLocationCache: environment.managedLocationCache
         )
         coordinator.attach(router: self)
         deviceState = coordinator

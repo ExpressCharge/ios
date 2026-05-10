@@ -20,16 +20,38 @@ public struct CapabilityPickerSection: View {
 
     @Binding var selected: Set<DeviceCapability>
 
-    public init(selected: Binding<Set<DeviceCapability>>) {
+    /// Owner role of the account this device is being registered under.
+    /// `.managed` is hidden when the role is `customer` — managed-device
+    /// admin-locate is an admin-fleet feature, not a consumer feature.
+    let isCustomerOwner: Bool
+
+    public init(
+        selected: Binding<Set<DeviceCapability>>,
+        isCustomerOwner: Bool = false
+    ) {
         self._selected = selected
+        self.isCustomerOwner = isCustomerOwner
+    }
+
+    /// Visible options for this render. Filters `.managed` out for
+    /// customer-owned registrations; otherwise mirrors
+    /// `CapabilityMetadata.registrationOptions`.
+    private var visibleOptions: [CapabilityMetadata] {
+        CapabilityMetadata.registrationOptions.filter { meta in
+            if meta.key == .managed && isCustomerOwner { return false }
+            return true
+        }
     }
 
     public var body: some View {
         Section {
-            ForEach(CapabilityMetadata.registrationOptions, id: \.key) { meta in
+            ForEach(visibleOptions, id: \.key) { meta in
                 row(for: meta)
                 if meta.key == .kiosk, !isLegal {
                     illegalKioskFooter
+                }
+                if meta.key == .managed {
+                    managedFooter
                 }
             }
         } header: {
@@ -78,6 +100,14 @@ public struct CapabilityPickerSection: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityIdentifier("capabilityPicker_kioskIllegalError")
+    }
+
+    private var managedFooter: some View {
+        Text("Allows your admin to request this device's location.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("capabilityPicker_managedFooter")
     }
 
     // MARK: - Binding helpers

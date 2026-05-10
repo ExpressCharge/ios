@@ -134,7 +134,10 @@ public struct RegistrationView: View {
                 // gate here is defence-in-depth in case a customer
                 // somehow lands here mid-flow.
                 if !isCustomer {
-                    CapabilityPickerSection(selected: $vm.selectedCapabilities)
+                    CapabilityPickerSection(
+                        selected: $vm.selectedCapabilities,
+                        isCustomerOwner: isCustomer
+                    )
                 }
 
                 // Error.

@@ -29,18 +29,23 @@ public enum DeviceKind: String, Codable, Sendable, CaseIterable {
 ///   start/stop, cancel reservations).
 /// - `kiosk`: app device runs in single-screen appliance mode. Legal only
 ///   when the set contains exactly one of `{scanner, user}`.
+/// - `managed`: device opts in to admin-initiated location reporting via
+///   the silent-push "Locate now" flow. Orthogonal to `kiosk` — a kiosk
+///   may also be managed. Hidden in the registration picker for
+///   customer-owned devices.
 public enum DeviceCapability: String, Codable, Sendable, CaseIterable {
     case scanner
     case charger
     case user
     case kiosk
+    case managed
 }
 
 /// Capabilities the iOS registration picker may offer. Apps can never be
 /// chargers, so `charger` is excluded from the picker.
 extension DeviceCapability {
     public static let appRegistrationOptions: [DeviceCapability] = [
-        .scanner, .user, .kiosk,
+        .scanner, .user, .kiosk, .managed,
     ]
 }
 

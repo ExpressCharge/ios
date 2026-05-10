@@ -23,7 +23,7 @@ extension DeviceCapability {
     public var isAppCanonicalCapability: Bool {
         switch self {
         case .scanner, .user, .kiosk: return true
-        case .charger: return false
+        case .charger, .managed: return false
         }
     }
 
@@ -113,6 +113,12 @@ public struct CapabilityMetadata: Sendable, Equatable {
             displayName: "Kiosk mode",
             description: "Single-purpose appliance, no chrome / no settings",
             sfSymbol: "lock.display"
+        ),
+        CapabilityMetadata(
+            key: .managed,
+            displayName: "Managed device",
+            description: "Allows admins to locate this device",
+            sfSymbol: "location.viewfinder"
         ),
     ]
 

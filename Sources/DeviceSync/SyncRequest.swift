@@ -36,16 +36,24 @@ public struct SyncRequest: Sendable, Equatable, Codable {
     /// Number precision loss; `LogDrain.acknowledge` parses it back.
     public var logCursor: String?
 
+    /// Phase 2 / Bundle 2a — last-known location snapshot for managed
+    /// devices. `nil` when the device lacks the `managed` capability,
+    /// when the `device.location.upload` feature flag is off, or when
+    /// no fix has ever been recorded. Older servers ignore the field.
+    public var location: LocationSnapshot?
+
     public init(
         pendingSettings: [PendingSetting],
         diagnostics: Diagnostics,
         logs: [OTelLogRecord]? = nil,
-        logCursor: String? = nil
+        logCursor: String? = nil,
+        location: LocationSnapshot? = nil
     ) {
         self.pendingSettings = pendingSettings
         self.diagnostics = diagnostics
         self.logs = logs
         self.logCursor = logCursor
+        self.location = location
     }
 
     public struct PendingSetting: Sendable, Equatable, Codable {

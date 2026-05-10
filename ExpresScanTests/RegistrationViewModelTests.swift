@@ -24,9 +24,11 @@ final class RegistrationViewModelTests: XCTestCase {
 
     func test_capabilityPickerOffersAppEligibleSet() {
         // Apps cannot self-register as chargers, so the picker must
-        // expose exactly {.scanner, .user, .kiosk}.
+        // expose every app-eligible capability — including `.managed`
+        // (Phase 2 / Bundle 2a) which is hidden at render time for
+        // customer-owned registrations but otherwise selectable.
         let keys = Set(CapabilityMetadata.registrationOptions.map(\.key))
-        XCTAssertEqual(keys, Set([.scanner, .user, .kiosk]))
+        XCTAssertEqual(keys, Set([.scanner, .user, .kiosk, .managed]))
         XCTAssertFalse(keys.contains(.charger))
     }
 
