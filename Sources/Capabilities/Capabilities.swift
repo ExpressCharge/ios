@@ -116,9 +116,9 @@ public struct CapabilityMetadata: Sendable, Equatable {
         ),
         CapabilityMetadata(
             key: .managed,
-            displayName: "Managed device",
-            description: "Allows admins to locate this device",
-            sfSymbol: "location.viewfinder"
+            displayName: "Managed",
+            description: "Admin-fleet posture; allows admins to read this device's location",
+            sfSymbol: "gearshape.2.fill"
         ),
     ]
 
