@@ -29,7 +29,9 @@ public final class ChargerDetailViewModel {
         case idle
         case loading
         case ok
-        case error(String)
+        /// `message` is the customer-friendly copy; `raw` carries the
+        /// underlying `APIError` for the admin-only diagnostic block.
+        case error(message: String, raw: APIError?)
     }
 
     // MARK: - Inputs
@@ -238,9 +240,9 @@ public final class ChargerDetailViewModel {
             // Refresh shortly after so kwh/kw/elapsed catch up.
             await loadSessionAndReservations()
         } catch let error as APIError {
-            loadState = .error(messageForStartStop(error))
+            loadState = .error(message: messageForStartStop(error), raw: error)
         } catch {
-            loadState = .error("Couldn't start charging. Try again.")
+            loadState = .error(message: "Couldn't start charging. Try again.", raw: nil)
         }
     }
 
@@ -277,9 +279,9 @@ public final class ChargerDetailViewModel {
             }
             await loadSessionAndReservations()
         } catch let error as APIError {
-            loadState = .error(messageForStartStop(error))
+            loadState = .error(message: messageForStartStop(error), raw: error)
         } catch {
-            loadState = .error("Couldn't stop charging. Try again.")
+            loadState = .error(message: "Couldn't stop charging. Try again.", raw: nil)
         }
     }
 
@@ -305,10 +307,10 @@ public final class ChargerDetailViewModel {
         } catch let error as APIError {
             // Rollback on hard failure (offline / 4xx).
             reservations = snapshot
-            loadState = .error(messageForCancel(error))
+            loadState = .error(message: messageForCancel(error), raw: error)
         } catch {
             reservations = snapshot
-            loadState = .error("Couldn't cancel reservation. Try again.")
+            loadState = .error(message: "Couldn't cancel reservation. Try again.", raw: nil)
         }
     }
 
@@ -338,8 +340,8 @@ public final class ChargerDetailViewModel {
         let (session, reservations) = await (sessionResult, reservationsResult)
 
         // First-error wins; otherwise both succeeded.
-        if let error = [session.error, reservations.error].compactMap({ $0 }).first {
-            loadState = .error(error)
+        if let failure = [session.failure, reservations.failure].compactMap({ $0 }).first {
+            loadState = .error(message: failure.message, raw: failure.raw)
             return
         }
         if let s = session.value { self.session = s }
@@ -347,9 +349,14 @@ public final class ChargerDetailViewModel {
         loadState = .ok
     }
 
+    private struct PartialFailure: Sendable {
+        let message: String
+        let raw: APIError?
+    }
+
     private struct PartialResult<T: Sendable>: Sendable {
         let value: T?
-        let error: String?
+        let failure: PartialFailure?
     }
 
     private func loadSession() async -> PartialResult<ChargerSession?> {
@@ -359,11 +366,17 @@ public final class ChargerDetailViewModel {
         )
         do {
             let response: ChargerSessionResponse = try await api.request(endpoint)
-            return PartialResult(value: .some(response.session), error: nil)
+            return PartialResult(value: .some(response.session), failure: nil)
         } catch let error as APIError {
-            return PartialResult(value: nil, error: messageForLoad(error))
+            return PartialResult(
+                value: nil,
+                failure: PartialFailure(message: messageForLoad(error), raw: error)
+            )
         } catch {
-            return PartialResult(value: nil, error: "Couldn't load session.")
+            return PartialResult(
+                value: nil,
+                failure: PartialFailure(message: "Couldn't load session.", raw: nil)
+            )
         }
     }
 
@@ -374,48 +387,30 @@ public final class ChargerDetailViewModel {
         )
         do {
             let response: ReservationsResponse = try await api.request(endpoint)
-            return PartialResult(value: response.reservations, error: nil)
+            return PartialResult(value: response.reservations, failure: nil)
         } catch let error as APIError {
-            return PartialResult(value: nil, error: messageForLoad(error))
+            return PartialResult(
+                value: nil,
+                failure: PartialFailure(message: messageForLoad(error), raw: error)
+            )
         } catch {
-            return PartialResult(value: nil, error: "Couldn't load reservations.")
+            return PartialResult(
+                value: nil,
+                failure: PartialFailure(message: "Couldn't load reservations.", raw: nil)
+            )
         }
     }
 
     private func messageForLoad(_ error: APIError) -> String {
-        switch error {
-        case .unauthorized: return "Sign in again."
-        case .forbidden: return "Access denied."
-        case .gone: return "This iPhone was deregistered."
-        case .network: return "Connect to Wi-Fi or cellular and try again."
-        default: return "Couldn't load charger details."
-        }
+        error.customerFacingMessage(in: .chargerDetailLoad)
     }
 
     private func messageForStartStop(_ error: APIError) -> String {
-        switch error {
-        case .server(let code, _) where code == 409:
-            return "Charger offline"
-        case .notFound:
-            return "Charger not found."
-        case .forbidden:
-            return "Access denied."
-        case .network:
-            return "Couldn't reach the server. Try again."
-        default:
-            return "Charger couldn't accept that command."
-        }
+        error.customerFacingMessage(in: .chargerCommand)
     }
 
     private func messageForCancel(_ error: APIError) -> String {
-        switch error {
-        case .server(let code, _) where code == 409:
-            return "Charger offline"
-        case .notFound:
-            return "Reservation already gone."
-        default:
-            return "Couldn't cancel reservation. Try again."
-        }
+        error.customerFacingMessage(in: .reservationCancel)
     }
 
     // MARK: - Wire-body shapes

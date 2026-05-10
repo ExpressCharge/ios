@@ -143,12 +143,17 @@ public struct ChargersTabView: View {
                 .controlSize(.large)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-        case .error(let message) where vm.entries.isEmpty:
+        case .error(let message, let raw) where vm.entries.isEmpty:
             ContentUnavailableView(
                 label: {
                     Label("Couldn't load chargers", systemImage: "exclamationmark.triangle")
                 },
-                description: { Text(message) },
+                description: {
+                    VStack(spacing: Spacing.sm) {
+                        Text(message)
+                        AdminErrorDetail(error: raw)
+                    }
+                },
                 actions: {
                     Button("Try again") { Task { await vm.refresh() } }
                 }

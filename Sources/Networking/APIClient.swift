@@ -113,10 +113,11 @@ public actor APIClient {
             // Surface the underlying DecodingError before flattening to
             // APIError.decode — without this, response-shape drift is
             // invisible to anyone reading the console.
+            let detail = String(describing: error)
             netLog.error(
-                "APIClient.request: decode failed for \(endpoint.path, privacy: .public): \(String(describing: error), privacy: .public)"
+                "APIClient.request: decode failed for \(endpoint.path, privacy: .public): \(detail, privacy: .public)"
             )
-            throw APIError.decode
+            throw APIError.decode(detail: detail)
         }
     }
 
@@ -137,18 +138,24 @@ public actor APIClient {
         do {
             (data, response) = try await transport.data(for: urlRequest)
         } catch {
+            let detail: String
+            if let urlError = error as? URLError {
+                detail = "\(urlError.code.rawValue) \(urlError.localizedDescription)"
+            } else {
+                detail = String(describing: error)
+            }
             netLog.error(
-                "APIClient.rawRequest: transport failed for \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public): \(String(describing: error), privacy: .public)"
+                "APIClient.rawRequest: transport failed for \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public): \(detail, privacy: .public)"
             )
             failureReporter?()
-            throw APIError.network
+            throw APIError.network(detail: detail)
         }
 
         guard let http = response as? HTTPURLResponse else {
             netLog.error(
                 "APIClient.rawRequest: non-HTTP response for \(endpoint.path, privacy: .public)")
             failureReporter?()
-            throw APIError.network
+            throw APIError.network(detail: "non-HTTP response")
         }
 
         netLog.debug(
@@ -204,13 +211,13 @@ public actor APIClient {
                 resolvingAgainstBaseURL: false
             )
         else {
-            throw APIError.network
+            throw APIError.network(detail: "URL components failed for \(endpoint.path)")
         }
         if !endpoint.queryItems.isEmpty {
             components.queryItems = endpoint.queryItems
         }
         guard let url = components.url else {
-            throw APIError.network
+            throw APIError.network(detail: "URL build failed for \(endpoint.path)")
         }
 
         var request = URLRequest(url: url)
@@ -222,7 +229,7 @@ public actor APIClient {
             do {
                 request.httpBody = try body(encoder)
             } catch {
-                throw APIError.decode
+                throw APIError.decode(detail: "request body encode: \(String(describing: error))")
             }
         }
 

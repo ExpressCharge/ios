@@ -54,6 +54,17 @@ public enum AppNotifications {
     /// `RootView.runQrSignIn` on `QrSignInViewModel.signIn` failure.
     public static let qrSignInError = Notification.Name(
         "ExpresScan.QrSignInError")
+    /// `userInfo["token"] : String` — magic-email sign-in token
+    /// extracted from a `https://example.com/m/<token>` link.
+    /// Observed by `RootView` to drive the customer-progress UX via
+    /// `MagicEmailSignInViewModel`. Plan B2 / task #8.
+    public static let magicEmailSignInRequested = Notification.Name(
+        "ExpresScan.MagicEmailSignInRequested")
+    /// Posted when the failure state in `CustomerSignInProgressView`
+    /// is dismissed via "Try again" — observed by `RootView` to
+    /// return the route to `.welcome`.
+    public static let customerSignInRetryRequested = Notification.Name(
+        "ExpresScan.CustomerSignInRetryRequested")
 }
 
 /// Identifier of the single notification category we register.

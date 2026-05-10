@@ -166,7 +166,7 @@ public actor ScanResultQueue {
             try await api.send(endpoint)
             try? fileManager.removeItem(at: url)
             return true
-        } catch APIError.network {
+        } catch APIError.network(_) {
             return false
         } catch {
             // Permanent failure. Drop the item so we don't loop.

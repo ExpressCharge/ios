@@ -13,6 +13,7 @@
 //  hero alone exceeds the visible safe area.
 //
 
+import Networking
 import SwiftUI
 
 struct ChargerDetailView: View {
@@ -100,8 +101,8 @@ struct ChargerDetailView: View {
                     DumbChargerInstructionsView()
                 }
 
-                if case .error(let message) = vm.loadState {
-                    errorBanner(message: message)
+                if case .error(let message, let raw) = vm.loadState {
+                    errorBanner(message: message, raw: raw)
                 }
             }
             .padding(.horizontal, Spacing.base)
@@ -197,13 +198,16 @@ struct ChargerDetailView: View {
     }
 
     @ViewBuilder
-    private func errorBanner(message: String) -> some View {
-        HStack(spacing: Spacing.sm) {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(message)
-                .font(.subheadline)
+    private func errorBanner(message: String, raw: APIError?) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text(message)
+                    .font(.subheadline)
+            }
+            .foregroundStyle(ColorPalette.destructiveRose)
+            AdminErrorDetail(error: raw)
         }
-        .foregroundStyle(ColorPalette.destructiveRose)
         .padding(Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(

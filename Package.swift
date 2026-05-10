@@ -16,7 +16,7 @@ import PackageDescription
 let package = Package(
     name: "ExpresScanCore",
     platforms: [
-        .macOS(.v13),
+        .macOS(.v14),
         .iOS(.v26),
     ],
     products: [

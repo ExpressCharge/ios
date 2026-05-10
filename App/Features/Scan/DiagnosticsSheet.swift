@@ -2,11 +2,15 @@
 //  DiagnosticsSheet.swift
 //  ExpresScan
 //
-//  Hidden gear-meets-developer sheet surfaced from the home screen's
-//  status pill (long-press) and the Settings sheet's "Diagnostics"
-//  row. Lets QA verify that the heartbeat is live, that the SSE has
-//  reconnected at least once, that the push token is registered, and
-//  that a "Test scan" round-trip works without a real card.
+//  Admin-only diagnostics surface, redesigned for visual consistency
+//  with the rest of the app: card-grouped scroll view, no system
+//  `Form`. Reachable from the redesigned Settings page's
+//  `DiagnosticsLinkCard` (which is omitted in customer mode), so this
+//  view never sees a customer account.
+//
+//  Every row + behavior from the original sheet is preserved:
+//  Connection status, Device IDs, Account info, "Run test sync"
+//  button, and the copy-to-clipboard toast.
 //
 //  Spec: `50-ios.md` § "Diagnostics sheet (tap connection pill)"
 //
@@ -27,24 +31,15 @@ public struct DiagnosticsSheet: View {
     @State private var deviceId: String? = nil
     @State private var copyToast: String? = nil
     @State private var testScanInFlight: Bool = false
-    /// Account info loaded from `GET /api/devices/me`. Lives here
-    /// rather than in `SettingsViewModel` because the UI it backs
-    /// (Diagnostics → Account section) lives in this sheet.
     @State private var accountInfo: AccountInfo? = nil
     @State private var accountLoading: Bool = false
     @State private var accountError: String? = nil
 
     /// Trimmed view-model for the Account section. Mirrors the
     /// `DeviceMeResponse` shape returned by `GET /api/devices/me`.
-    private struct AccountInfo: Sendable {
-        /// Server-side resolved label (priority: name → email → user
-        /// id). The view falls back to `name`/`email`/`userId` only
-        /// for older server builds that don't ship `ownerDisplayName`.
+    fileprivate struct AccountInfo: Sendable {
         let displayName: String?
-        /// `users.name` from BetterAuth (may be null).
         let name: String?
-        /// `users.email` from BetterAuth (may be null on
-        /// auto-provisioned rows).
         let email: String?
         let userId: String?
         let registeredAtIso: String?
@@ -54,15 +49,33 @@ public struct DiagnosticsSheet: View {
 
     public var body: some View {
         NavigationStack {
-            Form {
-                connectionSection
-                deviceSection
-                accountSection
-                testSection
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: Spacing.lg) {
+                    DiagnosticsConnectionCard(coordinator: coordinator)
+                    DiagnosticsDeviceCard(
+                        pushTokenStatus: pushTokenStatus,
+                        deviceId: deviceId,
+                        serverURL: app.api.baseURL.absoluteString,
+                        onCopy: showToast
+                    )
+                    DiagnosticsAccountCard(
+                        info: accountInfo,
+                        loading: accountLoading,
+                        error: accountError,
+                        onRetry: { Task { await loadAccount() } }
+                    )
+                    DiagnosticsTestCard(
+                        inFlight: testScanInFlight,
+                        onRun: { Task { await runTestScan() } }
+                    )
+                }
+                .padding(.horizontal, Spacing.base)
+                .padding(.vertical, Spacing.lg)
             }
             .navigationTitle("Diagnostics")
             .navigationBarTitleDisplayMode(.inline)
             .expressBackground()
+            .toast($copyToast)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -72,137 +85,13 @@ public struct DiagnosticsSheet: View {
                 await loadDiagnostics()
                 await loadAccount()
             }
-            .overlay(alignment: .bottom) {
-                if let copyToast {
-                    Text(copyToast)
-                        .font(.callout)
-                        .padding(Spacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                .fill(.ultraThinMaterial)
-                        )
-                        .padding(.bottom, Spacing.lg)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-            }
-        }
-    }
-
-    // MARK: - Sections
-
-    @ViewBuilder
-    private var connectionSection: some View {
-        Section("Connection") {
-            if let scan = coordinator.scan {
-                let status = coordinator.deviceState?.connectionStatus ?? scan.connectionStatus
-                let lastSync = coordinator.deviceState?.lastHeartbeatAt ?? scan.lastHeartbeatAt
-                let reconnects = coordinator.deviceState?.reconnectCount ?? scan.reconnectCount
-                LabeledContent("Status", value: connectionLabel(status))
-                LabeledContent("Reconnects", value: "\(reconnects)")
-                LabeledContent(
-                    "Last sync",
-                    value: lastSync.map { Self.relative(from: $0) } ?? "—"
-                )
-                LabeledContent("Pending uploads", value: "\(scan.pendingScanResultCount)")
-            } else {
-                Text("No active session.").foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var deviceSection: some View {
-        Section("Device") {
-            LabeledContent("Push permission", value: pushTokenStatus.diagnosticLabel)
-            LabeledContent("APNs environment", value: BuildConfig.apnsEnvironment)
-            CopyableValueRow(
-                "Server",
-                value: app.api.baseURL.absoluteString,
-                onCopy: { _ in showToast("Server URL copied") }
-            )
-            CopyableValueRow(
-                "Device ID",
-                value: deviceId,
-                onCopy: { _ in showToast("Device ID copied") }
-            )
-            LabeledContent("Build", value: BuildConfig.appVersion)
-        }
-    }
-
-    /// Account info that used to live on the Settings page. Moved
-    /// here so Settings stays focused on user-mutable state — account
-    /// metadata is read-only context that QA / support need at hand.
-    @ViewBuilder
-    private var accountSection: some View {
-        Section("Account") {
-            if let me = accountInfo {
-                // Priority: name → email → user id (matches the
-                // server's `ownerDisplayName` resolver). The server
-                // already collapses these in `ownerDisplayName`; we
-                // re-derive locally only as a defense for older
-                // server builds that don't yet ship the field.
-                let label =
-                    me.displayName
-                    ?? me.name
-                    ?? me.email
-                    ?? me.userId
-                    ?? "—"
-                LabeledContent("Signed in as", value: label)
-                if let email = me.email, email != label {
-                    LabeledContent("Email", value: email)
-                }
-                if let registered = me.registeredAtIso {
-                    LabeledContent("Registered", value: Self.formattedRegistered(registered))
-                }
-            } else if accountLoading {
-                HStack {
-                    ProgressView().controlSize(.small)
-                    Text("Loading…")
-                }
-            } else if let err = accountError {
-                Text(err).font(.caption).foregroundStyle(.secondary)
-                Button("Retry") { Task { await loadAccount() } }
-            } else {
-                LabeledContent("Signed in as", value: "—")
-            }
-        }
-    }
-
-    private var testSection: some View {
-        Section("Test") {
-            Button {
-                Task { await runTestScan() }
-            } label: {
-                HStack {
-                    if testScanInFlight {
-                        ProgressView()
-                    }
-                    Text("Run test sync")
-                }
-            }
-            .disabled(testScanInFlight)
-            Text(
-                "Forces an immediate device-state sync so QA can confirm bearer auth + connectivity without holding a card."
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
     }
 
     // MARK: - Helpers
 
-    private func connectionLabel(_ status: ConnectionStatus) -> String {
-        switch status {
-        case .offline: return "Offline"
-        case .connecting: return "Connecting"
-        case .online: return "Online"
-        case .reconnecting: return "Reconnecting"
-        }
-    }
-
-    private static func relative(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
+    private func showToast(_ message: String) {
+        copyToast = message
     }
 
     private func loadDiagnostics() async {
@@ -210,16 +99,13 @@ public struct DiagnosticsSheet: View {
         await MainActor.run {
             self.pushTokenStatus = settings.authorizationStatus
         }
-        let deviceId = (try? await app.authStore.loadDeviceID()) ?? nil
+        let id = (try? await app.authStore.loadDeviceID()) ?? nil
         await MainActor.run {
-            self.deviceId = deviceId
+            self.deviceId = id
         }
     }
 
-    /// Calls `GET /api/devices/me` and populates the Account section.
-    /// Mirrors the SettingsViewModel.refreshAccount logic so the row
-    /// renders the same display-name / userId / registered triple
-    /// that used to live on the Settings page.
+    /// Calls `GET /api/devices/me` and populates the Account card.
     private func loadAccount() async {
         accountLoading = true
         accountError = nil
@@ -239,6 +125,175 @@ public struct DiagnosticsSheet: View {
         }
     }
 
+    private func runTestScan() async {
+        testScanInFlight = true
+        defer { testScanInFlight = false }
+        guard let dsc = coordinator.deviceState else {
+            showToast("No active session")
+            return
+        }
+        let ok = await dsc.syncOnce()
+        showToast(ok ? "Sync OK" : "Sync failed")
+    }
+}
+
+// MARK: - Cards
+
+private struct DiagnosticsConnectionCard: View {
+    let coordinator: RootCoordinator
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            SectionHeader("Connection") {
+                if let scan = coordinator.scan {
+                    let status =
+                        coordinator.deviceState?.connectionStatus
+                        ?? scan.connectionStatus
+                    StatusPill(
+                        label: status.diagnosticsLabel,
+                        systemImage: status.diagnosticsIcon,
+                        tone: status.diagnosticsTone
+                    )
+                }
+            }
+            if let scan = coordinator.scan {
+                let lastSync =
+                    coordinator.deviceState?.lastHeartbeatAt
+                    ?? scan.lastHeartbeatAt
+                let reconnects =
+                    coordinator.deviceState?.reconnectCount
+                    ?? scan.reconnectCount
+                LabeledContent("Reconnects") {
+                    Text("\(reconnects)")
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("Last sync") {
+                    Text(lastSync.map(Self.relative) ?? "—")
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("Pending uploads") {
+                    Text("\(scan.pendingScanResultCount)")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("No active session.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(Spacing.base)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface()
+    }
+
+    private static func relative(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+private struct DiagnosticsDeviceCard: View {
+    let pushTokenStatus: UNAuthorizationStatus
+    let deviceId: String?
+    let serverURL: String
+    let onCopy: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            SectionHeader("Device")
+            LabeledContent("Push permission") {
+                Text(pushTokenStatus.diagnosticLabel)
+                    .foregroundStyle(.secondary)
+            }
+            LabeledContent("APNs environment") {
+                Text(BuildConfig.apnsEnvironment)
+                    .foregroundStyle(.secondary)
+            }
+            CopyableValueRow(
+                "Server",
+                value: serverURL,
+                onCopy: { _ in onCopy("Server URL copied") }
+            )
+            CopyableValueRow(
+                "Device ID",
+                value: deviceId,
+                onCopy: { _ in onCopy("Device ID copied") }
+            )
+            LabeledContent("Build") {
+                Text(BuildConfig.appVersion)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(Spacing.base)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface()
+    }
+}
+
+private struct DiagnosticsAccountCard: View {
+    let info: DiagnosticsSheet.AccountInfo?
+    let loading: Bool
+    let error: String?
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            SectionHeader("Account")
+            if let me = info {
+                let label =
+                    me.displayName
+                    ?? me.name
+                    ?? me.email
+                    ?? me.userId
+                    ?? "—"
+                LabeledContent("Signed in as") {
+                    Text(label)
+                        .foregroundStyle(.secondary)
+                }
+                if let email = me.email, email != label {
+                    LabeledContent("Email") {
+                        Text(email)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let userId = me.userId {
+                    LabeledContent("User ID") {
+                        Text(userId)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let registered = me.registeredAtIso {
+                    LabeledContent("Registered") {
+                        Text(Self.formattedRegistered(registered))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if loading {
+                HStack {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading…")
+                        .foregroundStyle(.secondary)
+                }
+            } else if let err = error {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Retry", action: onRetry)
+                    .buttonStyle(.bordered)
+            } else {
+                LabeledContent("Signed in as") {
+                    Text("—")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(Spacing.base)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface()
+    }
+
     private static func formattedRegistered(_ iso: String) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -249,33 +304,63 @@ public struct DiagnosticsSheet: View {
         display.timeStyle = .short
         return display.string(from: date)
     }
+}
 
-    private func runTestScan() async {
-        testScanInFlight = true
-        defer { testScanInFlight = false }
+private struct DiagnosticsTestCard: View {
+    let inFlight: Bool
+    let onRun: () -> Void
 
-        // The `/heartbeat` endpoint was retired in slice C — sync via
-        // the consolidated `/me/state/sync` route instead.
-        guard let dsc = coordinator.deviceState else {
-            showToast("No active session")
-            return
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            SectionHeader("Test")
+            PrimaryButton(
+                "Run test sync",
+                systemImage: "arrow.triangle.2.circlepath",
+                state: inFlight ? .loading : .default,
+                action: onRun
+            )
+            Text(
+                "Forces an immediate device-state sync so QA can confirm bearer auth + connectivity without holding a card."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
-        let ok = await dsc.syncOnce()
-        showToast(ok ? "Sync OK" : "Sync failed")
+        .padding(Spacing.base)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface()
     }
+}
 
-    private func showToast(_ message: String) {
-        copyToast = message
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            await MainActor.run {
-                if copyToast == message { copyToast = nil }
-            }
+// MARK: - ConnectionStatus pill mapping (Diagnostics)
+
+extension ConnectionStatus {
+    fileprivate var diagnosticsLabel: String {
+        switch self {
+        case .offline: return "Offline"
+        case .connecting: return "Connecting"
+        case .online: return "Online"
+        case .reconnecting: return "Reconnecting"
+        }
+    }
+    fileprivate var diagnosticsIcon: String {
+        switch self {
+        case .offline: return "wifi.slash"
+        case .connecting: return "arrow.triangle.2.circlepath"
+        case .online: return "checkmark.circle.fill"
+        case .reconnecting: return "arrow.triangle.2.circlepath.circle"
+        }
+    }
+    fileprivate var diagnosticsTone: StatusPill.Tone {
+        switch self {
+        case .offline: return .negative
+        case .connecting: return .info
+        case .online: return .positive
+        case .reconnecting: return .warning
         }
     }
 }
 
-// MARK: - Local helpers
+// MARK: - UN auth-status helpers
 
 extension UNAuthorizationStatus {
     fileprivate var diagnosticLabel: String {

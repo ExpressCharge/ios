@@ -50,7 +50,7 @@ public struct WelcomeView: View {
 
                 // Subhead body copy.
                 Text(
-                    "Welcome to ExpressCharge. Sign in to control your chargers and use this iPhone as an NFC tap reader."
+                    "Welcome to ExpressCharge. Sign in to control your chargers and scan cards with this iPhone."
                 )
                 .font(.body)
                 .foregroundStyle(.secondary)
@@ -68,7 +68,7 @@ public struct WelcomeView: View {
                 )
                 .padding(.horizontal, Spacing.lg)
                 .padding(.bottom, Spacing.xl)
-                .accessibilityHint("Opens Safari to sign in to your ExpressCharge account.")
+                .accessibilityHint("Opens sign-in for your ExpressCharge account.")
             }
 
             // QR sign-in error banner. Renders only when set; the
@@ -137,6 +137,27 @@ public struct WelcomeView: View {
             {
                 // User cancelled the web sheet.
                 coordinator.cancelLogin()
+            }
+        }
+        .onChange(of: loginViewModel.error) { _, newError in
+            // Web-auth failures used to disappear silently; now they
+            // surface through the same red banner the QR-error path uses.
+            // `.canceled` is intentional user input — no banner.
+            guard let newError else { return }
+            let copy: String? =
+                switch newError {
+                case .canceled: nil
+                case .urlConstruction: "Couldn't open sign-in. Try again."
+                case .sessionStartFailed: "Couldn't open sign-in. Try again."
+                case .presentation: "Couldn't open sign-in. Try again."
+                case .unknown: "Something went wrong. Please try again."
+                }
+            if let copy {
+                NotificationCenter.default.post(
+                    name: AppNotifications.qrSignInError,
+                    object: nil,
+                    userInfo: ["message": copy]
+                )
             }
         }
     }

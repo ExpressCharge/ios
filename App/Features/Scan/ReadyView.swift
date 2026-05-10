@@ -21,6 +21,7 @@ public struct ReadyView: View {
 
     @Environment(\.app) private var app
     @Environment(RootCoordinator.self) private var coordinator
+    @Environment(\.isCustomerAccount) private var isCustomerAccount
     @State private var isShowingHow: Bool = false
     @State private var isShowingDiagnostics: Bool = false
     /// Shared namespace for the matched-geometry icon morph between the
@@ -146,8 +147,9 @@ public struct ReadyView: View {
                 }
                 if let scan, scan.pendingScanResultCount > 0 {
                     StatusPill(
-                        label:
-                            "\(scan.pendingScanResultCount) pending upload\(scan.pendingScanResultCount == 1 ? "" : "s")",
+                        label: isCustomerAccount
+                            ? "Saving your scans…"
+                            : "\(scan.pendingScanResultCount) pending upload\(scan.pendingScanResultCount == 1 ? "" : "s")",
                         systemImage: "clock.fill",
                         tone: .warning
                     )

@@ -410,7 +410,7 @@ public final class ScanCoordinator {
                 state = .success(result)
                 armedAt = nil
             }
-        } catch APIError.network {
+        } catch APIError.network(_) {
             // Persist to the offline queue and surface a soft toast.
             await queue.enqueue(body: body)
             let count = await queue.count()
@@ -484,6 +484,11 @@ public final class ScanCoordinator {
             // Slice G — pull merged settings; SettingsStore is updated
             // inside the coordinator's refresh path.
             deviceState?.handleSettingsChanged()
+
+        case "device.feature-flags.changed":
+            // Refresh the live envelope; the FeatureFlagReader is
+            // updated inside `applyEnvelope(_:)`.
+            deviceState?.handleFeatureFlagsChanged()
 
         case "scan.requested":
             guard let data = event.data.data(using: .utf8) else { return }

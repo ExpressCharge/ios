@@ -19,6 +19,20 @@ import DeviceSync
 import Models
 import SwiftUI
 
+/// Environment key carrying the live `isCustomerAccount` flag derived
+/// from `RootCoordinator.deviceState?.state?.ownerUser.role`. Defaults
+/// to `false` so admin chrome never accidentally hides at cold launch.
+private struct IsCustomerAccountEnvironmentKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
+extension EnvironmentValues {
+    public var isCustomerAccount: Bool {
+        get { self[IsCustomerAccountEnvironmentKey.self] }
+        set { self[IsCustomerAccountEnvironmentKey.self] = newValue }
+    }
+}
+
 /// Top-level routing state. Order matches the user's first-launch path
 /// for readability.
 public enum RootRoute: Equatable {
@@ -39,6 +53,10 @@ public enum RootRoute: Equatable {
     case priming
     /// Loading the keychain on first launch (very brief).
     case launching
+    /// Customer sign-in in flight (QR / magic-email / future NFC tap)
+    /// — drives `CustomerSignInProgressView` through a phased status
+    /// sequence between `.welcome` and `.ready`. Plan B2 / task #8.
+    case customerSigningIn(method: CustomerSignInMethod, phase: CustomerSignInPhase)
 }
 
 /// `@Observable`-style app router. Lifted out of `RootView` so child
@@ -69,6 +87,45 @@ public final class RootCoordinator {
     public private(set) var push: PushService?
 
     public init() {}
+
+    // MARK: - Capability / role proxies for SwiftUI descendants
+    //
+    // These are computed proxies over the live `DeviceStateCoordinator`,
+    // so the @Observable change-tracking on `deviceState` propagates to
+    // descendants reading these properties.
+
+    /// SwiftUI-observable feature-flag reader. Returns a fresh empty
+    /// reader when the device-state coordinator hasn't been constructed
+    /// yet (cold launch / unauthenticated states) — callers always get
+    /// the registry default for any key.
+    public var featureFlagReader: FeatureFlagReader {
+        deviceState?.featureFlagReader ?? Self.emptyFlagReader
+    }
+
+    /// SwiftUI-observable settings reader. Same fallback as above.
+    public var settingsReader: SettingsReader {
+        deviceState?.settingsReader ?? Self.emptySettingsReader
+    }
+
+    /// `true` when the signed-in user's role is `.customer`. Defaults to
+    /// `false` whenever the role is unknown (no envelope yet, signed
+    /// out, etc.) so admin chrome never accidentally hides at cold
+    /// launch.
+    public var isCustomerAccount: Bool {
+        deviceState?.state?.ownerUser.role == .customer
+    }
+
+    @ObservationIgnored
+    private static let emptyFlagReader = FeatureFlagReader()
+    @ObservationIgnored
+    private static let emptySettingsReader: SettingsReader = {
+        // Process-wide fallback store rooted in tmp; only used for the
+        // unauthenticated shell so writes here are inert.
+        let store =
+            (try? SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
+            ?? (try! SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
+        return SettingsReader(store: store)
+    }()
 
     /// Loads credentials and transitions to `.ready` or `.welcome`.
     public func bootstrap(environment: AppEnvironment) async {
@@ -231,6 +288,11 @@ public struct RootView: View {
             case .priming:
                 NotificationPrimingView()
                     .environment(coordinator)
+            case .customerSigningIn(_, let phase):
+                CustomerSignInProgressView(
+                    phase: phase,
+                    onTryAgain: { coordinator.route = .welcome }
+                )
             case .ready:
                 // Capabilities sourced from the live
                 // `DeviceStateCoordinator`. Until `bootstrap()` resolves
@@ -243,6 +305,14 @@ public struct RootView: View {
                 readyShell
             }
         }
+        // Plumb the SwiftUI-observable readers + customer-role flag into
+        // the environment so descendants (Settings, Diagnostics, etc.)
+        // can read them without prop-drilling. The proxies on
+        // RootCoordinator fall back to inert empty readers when the
+        // device-state coordinator isn't constructed yet.
+        .environment(coordinator.featureFlagReader)
+        .environment(coordinator.settingsReader)
+        .environment(\.isCustomerAccount, coordinator.isCustomerAccount)
         .background(Theme.color(.background))
         .preferredColorScheme(nil)  // honor system setting
         .fullScreenCover(isPresented: connectivityOverlayBinding) {
@@ -280,8 +350,22 @@ public struct RootView: View {
             // shell — once we're past .ready the user is already signed
             // in and the URL is a no-op.
             switch coordinator.route {
-            case .welcome, .loggingIn, .launching:
+            case .welcome, .loggingIn, .launching, .customerSigningIn:
                 Task { await runQrSignIn(publicId: publicId) }
+            default:
+                return
+            }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: AppNotifications.magicEmailSignInRequested)
+        ) { note in
+            guard let token = note.userInfo?["token"] as? String else {
+                return
+            }
+            switch coordinator.route {
+            case .welcome, .loggingIn, .launching, .customerSigningIn:
+                Task { await runMagicEmailSignIn(token: token) }
             default:
                 return
             }
@@ -346,6 +430,20 @@ public struct RootView: View {
             return
         }
 
+        // 2a. Magic-email customer sign-in — Plan B2 / task #8.
+        // Universal: `https://example.com/m/<token>`. The token is
+        // verified by the server; the iOS side only enforces a length
+        // + URL-safe alphabet so a crafted /m/ URL doesn't cause a
+        // wasted POST.
+        if let token = MagicEmailDeepLinkHandler.parse(components) {
+            NotificationCenter.default.post(
+                name: AppNotifications.magicEmailSignInRequested,
+                object: nil,
+                userInfo: ["token": token]
+            )
+            return
+        }
+
         // 2. User QR sign-in deep link — Track I7.
         // Universal: `https://example.com/u/<publicId>` printed on
         // the customer's charge card. Camera scan → AASA matches /u/* →
@@ -385,26 +483,55 @@ public struct RootView: View {
     /// so the AuthStore lookup picks up the new tokens and advances the
     /// route to `.ready`.
     private func runQrSignIn(publicId: String) async {
+        let method: CustomerSignInMethod = .qrCode(publicId: publicId)
+        coordinator.route = .customerSigningIn(method: method, phase: .confirming)
+
         let vm = QrSignInViewModel(api: app.api, authStore: app.authStore)
         let ok = await vm.signIn(publicId: publicId)
         if ok {
+            coordinator.route = .customerSigningIn(method: method, phase: .finalizing)
+            coordinator.route = .customerSigningIn(method: method, phase: .success)
+            try? await Task.sleep(nanoseconds: 600_000_000)
             await coordinator.bootstrap(environment: app)
             return
         }
-        // Failure path — surface the user-facing message back to
-        // WelcomeView via notification. The view auto-hides the
-        // banner after a few seconds; the user can retry by
-        // re-scanning the card.
+        // Failure stays on the progress view; the retry CTA returns
+        // the user to Welcome via `onTryAgain`.
         let message: String
-        if case .error(let text) = vm.loadState {
+        if case .error(let text, _) = vm.loadState {
             message = text
         } else {
             message = "Couldn't sign in. Try scanning again."
         }
-        NotificationCenter.default.post(
-            name: AppNotifications.qrSignInError,
-            object: nil,
-            userInfo: ["message": message]
+        coordinator.route = .customerSigningIn(
+            method: method,
+            phase: .failure(message: message)
+        )
+    }
+
+    /// Counterpart to `runQrSignIn` for the magic-email flow.
+    private func runMagicEmailSignIn(token: String) async {
+        let method: CustomerSignInMethod = .magicEmail(token: token)
+        coordinator.route = .customerSigningIn(method: method, phase: .confirming)
+
+        let vm = MagicEmailSignInViewModel(api: app.api, authStore: app.authStore)
+        let ok = await vm.signIn(token: token)
+        if ok {
+            coordinator.route = .customerSigningIn(method: method, phase: .finalizing)
+            coordinator.route = .customerSigningIn(method: method, phase: .success)
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            await coordinator.bootstrap(environment: app)
+            return
+        }
+        let message: String
+        if case .failure(let text) = vm.phase {
+            message = text
+        } else {
+            message = "Couldn't sign in. Open the link from your email again."
+        }
+        coordinator.route = .customerSigningIn(
+            method: method,
+            phase: .failure(message: message)
         )
     }
 

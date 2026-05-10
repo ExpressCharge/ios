@@ -19,6 +19,7 @@ public struct RegistrationView: View {
     @Environment(\.app) private var app
     @Environment(RootCoordinator.self) private var coordinator
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isCustomerAccount) private var isCustomerAccount
 
     @State private var viewModel: RegistrationViewModel?
 
@@ -49,16 +50,24 @@ public struct RegistrationView: View {
         }
         .task {
             if viewModel == nil {
-                self.viewModel = RegistrationViewModel(
+                let vm = RegistrationViewModel(
                     environment: app,
                     oneTimeCode: oneTimeCode,
                     codeVerifier: codeVerifier
                 )
-                self.viewModel?.startObservingApnsToken()
+                // Customer-flow safety net: if a non-admin somehow
+                // reaches the admin PKCE registration path, force the
+                // capability set to `[.user]` only, matching the
+                // backend rule in `customerCapabilityDefaults`.
+                if isCustomerAccount {
+                    vm.selectedCapabilities = [.user]
+                }
+                self.viewModel = vm
+                vm.startObservingApnsToken()
                 // Best-effort: wait briefly for an APNs token before
                 // submitting. RegistrationViewModel.submit() reads the
                 // last token observed at call-time.
-                self.viewModel?.startWaitingForApnsToken()
+                vm.startWaitingForApnsToken()
             }
         }
         .onDisappear {
@@ -70,6 +79,7 @@ public struct RegistrationView: View {
     @ViewBuilder
     private func content(_ vm: RegistrationViewModel) -> some View {
         @Bindable var vm = vm
+        let isCustomer = isCustomerAccount
 
         VStack(spacing: 0) {
             Form {
@@ -87,7 +97,9 @@ public struct RegistrationView: View {
                             .font(.title2.weight(.bold))
 
                         Text(
-                            "Give your iPhone a name and pick what it will do. You can change these later."
+                            isCustomer
+                                ? "Setting up this iPhone for your account."
+                                : "Give your iPhone a name and pick what it will do. You can change these later."
                         )
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -109,11 +121,21 @@ public struct RegistrationView: View {
                 } header: {
                     Text("Device name")
                 } footer: {
-                    Text("Visible to admins.")
+                    if !isCustomer {
+                        Text("Visible to admins.")
+                    }
                 }
 
-                // Capability picker.
-                CapabilityPickerSection(selected: $vm.selectedCapabilities)
+                // Capability picker — admin-only. Customer flows seed
+                // `[.user]` server-side via /api/auth/qr-sign-in or
+                // /api/auth/magic-link/verify (see
+                // `customerCapabilityDefaults` on the backend), and
+                // never reach this admin-PKCE registration path. The
+                // gate here is defence-in-depth in case a customer
+                // somehow lands here mid-flow.
+                if !isCustomer {
+                    CapabilityPickerSection(selected: $vm.selectedCapabilities)
+                }
 
                 // Error.
                 if let error = vm.error {
@@ -164,9 +186,9 @@ public struct RegistrationView: View {
         case .network:
             return "Network problem. Check your connection and try again."
         case .keychain:
-            return "Couldn't save credentials securely on this device."
+            return "Couldn't set up this device. Try again, or contact support if the problem persists."
         case .server:
-            return "The server returned an error. Please try again."
+            return "Something went wrong on our end. Please try again."
         case .invalidCapabilities:
             return "That combination of capabilities isn't allowed. Please adjust your selection."
         case .other:

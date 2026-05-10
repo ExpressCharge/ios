@@ -24,6 +24,7 @@
 //
 
 import AuthCore
+import DeviceSync
 import Foundation
 import Models
 import Networking
@@ -73,6 +74,7 @@ public final class SettingsViewModel {
 
     private let environment: AppEnvironment
     private weak var router: RootCoordinator?
+    private let settingsReader: SettingsReader
 
     public private(set) var me: DeviceMeResponse?
     public private(set) var meIsLoading: Bool = false
@@ -81,18 +83,28 @@ public final class SettingsViewModel {
     public private(set) var isSigningOut: Bool = false
     public private(set) var signOutError: String?
 
-    /// Local-only label edit. The renamed value is kept as the user
-    /// types; calling `commitLocalRename()` writes it to UserDefaults
-    /// so the next launch shows the user's preferred name.
+    /// Local-only label edit, bound to `device.label` via `SettingsReader`.
+    /// The renamed value is held here as the user types; `commitLocalRename()`
+    /// flushes it to `SettingsStore` (and thus the next sync envelope).
     public var label: String
 
-    public init(environment: AppEnvironment, router: RootCoordinator?) {
+    /// Setting key for the device's user-visible label. Mirrors the
+    /// backend registry in `expresscharge/src/lib/devices/settings-keys.ts`.
+    private static let labelSettingKey = "device.label"
+
+    public init(
+        environment: AppEnvironment,
+        router: RootCoordinator?,
+        settingsReader: SettingsReader
+    ) {
         self.environment = environment
         self.router = router
-        self.label = UserDefaults.standard.string(forKey: Self.localLabelKey) ?? ""
+        self.settingsReader = settingsReader
+        self.label = settingsReader.string(
+            Self.labelSettingKey,
+            default: ""
+        )
     }
-
-    private static let localLabelKey = "ExpresScan.LocalDeviceLabel"
 
     // MARK: - Account refresh
 
@@ -116,8 +128,8 @@ public final class SettingsViewModel {
         } catch APIError.unauthorized {
             meError = "Signed out by an admin."
             await router?.scan?.handleTokenRevoked()
-        } catch APIError.network {
-            meError = "Couldn't reach ExpresSync."
+        } catch let api as APIError {
+            meError = api.customerFacingMessage(in: .general)
         } catch {
             meError = "Couldn't load account info."
         }
@@ -149,14 +161,16 @@ public final class SettingsViewModel {
                 } catch APIError.unauthorized, APIError.notFound, APIError.gone {
                     // Server already considers us deregistered. Carry
                     // on with the local wipe.
-                } catch APIError.network {
+                } catch APIError.network(_) {
                     // Offline. We still wipe local state — see comment
                     // above. The server-side row will be GC'd by the
                     // device-token expiry sweep.
                     signOutError =
-                        "Signed out locally. We'll finish on the server next time you're online."
+                        "You're signed out on this iPhone. We'll finish up next time you're online."
+                } catch let api as APIError {
+                    signOutError = api.customerFacingMessage(in: .signOut)
                 } catch {
-                    signOutError = "Server reported an error during sign-out."
+                    signOutError = "Couldn't complete sign-out. Try again when online."
                 }
             }
         } catch {
@@ -166,25 +180,26 @@ public final class SettingsViewModel {
 
         // Always wipe local state.
         try? await environment.authStore.deleteAll()
-        // Clear locally-cached label so re-register starts fresh.
-        UserDefaults.standard.removeObject(forKey: Self.localLabelKey)
 
         router?.didSignOut()
     }
 
     // MARK: - Local rename
 
-    /// Persists the current `label` to UserDefaults so the home screen
-    /// + future Account sheet show the user's preferred name. The
-    /// admin-side rename endpoint is gated on a cookie session and is
-    /// not exposed here in v1; the developer Mac milestone tracks a
-    /// follow-up.
+    /// Flushes the current `label` through `SettingsReader` →
+    /// `SettingsStore.setLocal`, which marks the key dirty and lets the
+    /// next sync POST it to the server. The admin-side rename endpoint
+    /// is gated on a cookie session and is not exposed in the iOS app
+    /// in v1; this local write is reconciled into the canonical
+    /// `device.label` server-side via the LWW merge.
     public func commitLocalRename() {
         let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            UserDefaults.standard.removeObject(forKey: Self.localLabelKey)
-        } else {
-            UserDefaults.standard.set(trimmed, forKey: Self.localLabelKey)
+        let value: AnyCodableJSON = trimmed.isEmpty ? .null : .string(trimmed)
+        Task { [settingsReader] in
+            try? await settingsReader.setLocal(
+                key: Self.labelSettingKey,
+                value: value
+            )
         }
     }
 }

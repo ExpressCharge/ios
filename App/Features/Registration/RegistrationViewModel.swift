@@ -284,7 +284,7 @@ public final class RegistrationViewModel {
         case .gone: return .codeExpired
         case .unauthorized: return .unauthorized
         case .rateLimited: return .rateLimited
-        case .network: return .network
+        case .network(_): return .network
         case .server(_, let code): return .server(code: code)
         default: return .other
         }

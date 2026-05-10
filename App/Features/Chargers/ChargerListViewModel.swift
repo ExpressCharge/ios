@@ -23,7 +23,11 @@ public final class ChargerListViewModel {
         case idle
         case loading
         case ok
-        case error(String)
+        /// `message` is the customer-friendly copy; `raw` carries the
+        /// underlying `APIError` for the admin-only diagnostic block.
+        /// `nil` raw means a non-`APIError` Swift error reached the
+        /// generic catch — shown only as the customer copy.
+        case error(message: String, raw: APIError?)
     }
 
     public enum OnlineStatusFilter: String, Sendable, CaseIterable, Identifiable {
@@ -137,24 +141,13 @@ public final class ChargerListViewModel {
             entries = response.chargers
             loadState = .ok
         } catch let error as APIError {
-            loadState = .error(message(for: error))
+            loadState = .error(message: message(for: error), raw: error)
         } catch {
-            loadState = .error("Couldn't load chargers. Try again.")
+            loadState = .error(message: "Couldn't load chargers. Try again.", raw: nil)
         }
     }
 
     private func message(for error: APIError) -> String {
-        switch error {
-        case .unauthorized:
-            return "Sign in again to see chargers."
-        case .forbidden:
-            return "You don't have access to manage chargers."
-        case .gone:
-            return "This iPhone was deregistered. Sign in again."
-        case .network:
-            return "Connect to Wi-Fi or cellular and pull to refresh."
-        default:
-            return "Couldn't load chargers. Try again."
-        }
+        error.customerFacingMessage(in: .chargerLoad)
     }
 }

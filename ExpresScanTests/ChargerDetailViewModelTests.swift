@@ -460,7 +460,7 @@ final class ChargerDetailViewModelTests: XCTestCase {
         )
         await vm.submitStart(customer: customer)
         switch vm.loadState {
-        case .error(let msg):
+        case .error(let msg, _):
             XCTAssertTrue(
                 msg.lowercased().contains("offline"),
                 "Expected 'Charger offline'; got: \(msg)"
@@ -507,7 +507,10 @@ final class ChargerDetailViewModelTests: XCTestCase {
         await vm.bootstrap()
         XCTAssertEqual(vm.session?.state, .charging)
         await vm.stopCharging(confirmed: true)
-        XCTAssertNotEqual(vm.loadState, .error("Couldn't stop charging. Try again."))
+        XCTAssertNotEqual(
+            vm.loadState,
+            .error(message: "Couldn't stop charging. Try again.", raw: nil)
+        )
     }
 
     func test_stopChargingNotConfirmedDoesNothing() async {

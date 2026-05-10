@@ -24,6 +24,11 @@ public struct DeviceState: Sendable, Equatable, Codable {
     /// Per-key reconciled settings, keyed by setting name (e.g.
     /// `"device.label"`).
     public var settings: [String: DeviceSettingValue]
+    /// Per-key feature flags (default-omit on the wire — only flags whose
+    /// effective value differs from the registry default are present).
+    /// Absent for charger-kind devices; defaults to `[:]` for back-compat
+    /// with older servers / fixtures that don't emit the field.
+    public var flags: [String: DeviceSettingValue]
     /// `nil` when the device does not have the `.scanner` capability.
     public var scanStatus: ScanStatus?
     /// `nil` when the device has no APNs token registered.
@@ -42,6 +47,7 @@ public struct DeviceState: Sendable, Equatable, Codable {
         kioskAllowed: Bool,
         ownerUser: OwnerUser,
         settings: [String: DeviceSettingValue],
+        flags: [String: DeviceSettingValue] = [:],
         scanStatus: ScanStatus?,
         pushToken: PushTokenInfo?,
         connectivity: Connectivity,
@@ -52,10 +58,33 @@ public struct DeviceState: Sendable, Equatable, Codable {
         self.kioskAllowed = kioskAllowed
         self.ownerUser = ownerUser
         self.settings = settings
+        self.flags = flags
         self.scanStatus = scanStatus
         self.pushToken = pushToken
         self.connectivity = connectivity
         self.needsPushToken = needsPushToken
+    }
+
+    // Custom decode so `flags` is tolerant of missing field — the server
+    // omits it for charger-kind devices and older fixtures don't emit it.
+    private enum CodingKeys: String, CodingKey {
+        case device, capabilities, kioskAllowed, ownerUser, settings, flags
+        case scanStatus, pushToken, connectivity, needsPushToken
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.device = try c.decode(DeviceSummary.self, forKey: .device)
+        self.capabilities = try c.decode([DeviceCapability].self, forKey: .capabilities)
+        self.kioskAllowed = try c.decode(Bool.self, forKey: .kioskAllowed)
+        self.ownerUser = try c.decode(OwnerUser.self, forKey: .ownerUser)
+        self.settings = try c.decode([String: DeviceSettingValue].self, forKey: .settings)
+        self.flags =
+            try c.decodeIfPresent([String: DeviceSettingValue].self, forKey: .flags) ?? [:]
+        self.scanStatus = try c.decodeIfPresent(ScanStatus.self, forKey: .scanStatus)
+        self.pushToken = try c.decodeIfPresent(PushTokenInfo.self, forKey: .pushToken)
+        self.connectivity = try c.decode(Connectivity.self, forKey: .connectivity)
+        self.needsPushToken = try c.decodeIfPresent(Bool.self, forKey: .needsPushToken)
     }
 
     // MARK: - Nested

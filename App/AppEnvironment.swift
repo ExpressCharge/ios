@@ -100,12 +100,22 @@ public enum BuildConfig {
     public static let registrationStartURL = URL(
         string: "https://manage.example.com/app/register")!
 
-    /// User-facing app version, sourced from the bundle.
+    /// User-facing app version, sourced from the bundle. Includes the
+    /// build number in parens — used in admin-only Settings + the
+    /// Diagnostics sheet.
     public static var appVersion: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "0.0.0"
         let build = info?["CFBundleVersion"] as? String ?? "0"
         return "\(short) (\(build))"
+    }
+
+    /// Marketing version only (no build number). Shown in the
+    /// customer-mode Settings page where the build counter is internal
+    /// noise.
+    public static var shortVersion: String {
+        let info = Bundle.main.infoDictionary
+        return info?["CFBundleShortVersionString"] as? String ?? "0.0.0"
     }
 }
 

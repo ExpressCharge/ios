@@ -55,11 +55,15 @@ final class ExpresScanUITests: XCTestCase {
     func testWelcomeShowsExplanatoryCopy() {
         app.launch()
         // Substring match — full sentence is too long for a stable
-        // accessibility identifier.
+        // accessibility identifier. Asserts the customer-facing copy
+        // mentions card scanning (any iteration of the wording).
         let bodyExists = app.staticTexts.containing(
-            NSPredicate(format: "label CONTAINS[c] 'NFC tap reader'")
+            NSPredicate(format: "label CONTAINS[c] 'scan cards'")
         ).element.waitForExistence(timeout: 5)
-        XCTAssertTrue(bodyExists, "Expected welcome body copy to mention NFC")
+        XCTAssertTrue(
+            bodyExists,
+            "Expected welcome body copy to mention card scanning"
+        )
     }
 
     func testWelcomeShowsSignInButton() {

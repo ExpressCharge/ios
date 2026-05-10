@@ -135,7 +135,7 @@ final class ChargerListViewModelTests: XCTestCase {
         await vm.refresh()
 
         switch vm.loadState {
-        case .error(let msg):
+        case .error(let msg, _):
             XCTAssertTrue(
                 msg.lowercased().contains("access"),
                 "Expected access-denied messaging, got: \(msg)"
@@ -158,7 +158,7 @@ final class ChargerListViewModelTests: XCTestCase {
         await vm.refresh()
 
         switch vm.loadState {
-        case .error(let msg):
+        case .error(let msg, _):
             XCTAssertTrue(
                 msg.lowercased().contains("deregistered")
                     || msg.lowercased().contains("sign in"),

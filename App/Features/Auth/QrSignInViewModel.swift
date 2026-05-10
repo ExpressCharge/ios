@@ -38,7 +38,9 @@ public final class QrSignInViewModel {
         case idle
         case loading
         case ok
-        case error(String)
+        /// `message` is the customer-friendly copy; `raw` carries the
+        /// underlying `APIError` for the admin-only diagnostic block.
+        case error(message: String, raw: APIError?)
     }
 
     public private(set) var loadState: LoadState = .idle
@@ -93,25 +95,17 @@ public final class QrSignInViewModel {
             loadState = .ok
             return true
         } catch let error as APIError {
-            loadState = .error(message(for: error))
+            loadState = .error(message: message(for: error), raw: error)
             return false
         } catch {
-            loadState = .error("Couldn't sign in. Try scanning again.")
+            loadState = .error(
+                message: "Couldn't sign in. Try scanning again.", raw: nil)
             return false
         }
     }
 
     private func message(for error: APIError) -> String {
-        switch error {
-        case .notFound:
-            return "We don't recognise this card. Check the QR isn't damaged."
-        case .rateLimited:
-            return "Too many sign-in attempts. Wait a minute and try again."
-        case .network:
-            return "Connect to Wi-Fi or cellular and try again."
-        default:
-            return "Couldn't sign in. Try scanning again."
-        }
+        error.customerFacingMessage(in: .signIn)
     }
 }
 

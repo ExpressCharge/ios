@@ -142,7 +142,7 @@ struct APIClientTests {
             (200, [:], Data("not json".utf8))
         }
         let client = makeClient(session: makeSession())
-        await #expect(throws: APIError.decode) {
+        await #expect(throws: APIError.decode()) {
             let _: Echo = try await client.request(Endpoint(path: "/x", method: .get))
         }
     }
@@ -250,7 +250,7 @@ struct APIClientTests {
         defer { StubURLProtocol.reset() }
         StubURLProtocol.failureMode = .networkError
         let client = makeClient(session: makeSession())
-        await #expect(throws: APIError.network) {
+        await #expect(throws: APIError.network()) {
             let _: Echo = try await client.request(Endpoint(path: "/x", method: .get))
         }
     }

@@ -84,6 +84,15 @@ public final class DeviceStateCoordinator {
     /// Sync cadence. Public for tests.
     public static let syncInterval: TimeInterval = 60
 
+    /// SwiftUI-observable reader over the latest envelope's `flags` map.
+    /// Refreshed in `applyEnvelope(_:)`.
+    public let featureFlagReader: FeatureFlagReader
+
+    /// SwiftUI-observable reader over the on-disk per-device settings.
+    /// Refreshed in `applyEnvelope(_:)`. Views may also call
+    /// `setLocal(...)` on this reader to write through to the store.
+    public let settingsReader: SettingsReader
+
     // MARK: - Dependencies
 
     @ObservationIgnored
@@ -141,6 +150,8 @@ public final class DeviceStateCoordinator {
             diagnosticsProvider ?? { @MainActor in
                 await Self.defaultDiagnostics()
             }
+        self.featureFlagReader = FeatureFlagReader()
+        self.settingsReader = SettingsReader(store: settingsStore)
 
         // Best-effort cache read so the first capability surface is the
         // last-known set, not the hard default.
@@ -218,6 +229,14 @@ public final class DeviceStateCoordinator {
     /// Apply server-merged settings and refresh the envelope. Triggered
     /// by the `device.settings.changed` SSE event.
     public func handleSettingsChanged() {
+        Task { [weak self] in
+            await self?.refreshState()
+        }
+    }
+
+    /// Refresh the full envelope after a server-side feature-flag change.
+    /// Triggered by the `device.feature-flags.changed` SSE event.
+    public func handleFeatureFlagsChanged() {
         Task { [weak self] in
             await self?.refreshState()
         }
@@ -340,6 +359,10 @@ public final class DeviceStateCoordinator {
         // a failure here doesn't fail the sync (the next tick retries
         // via the LWW path).
         try? await settingsStore.applyMerged(envelope.settings)
+        // Refresh the SwiftUI-observable readers so views see the new
+        // snapshot on the same tick the envelope lands.
+        featureFlagReader.update(envelope.flags)
+        settingsReader.update(envelope.settings)
         // Server-driven self-healing: if the server has no APNs token
         // stored but the device thinks notifications are authorized,
         // it sets `needsPushToken`. Re-register to make iOS re-fire the
