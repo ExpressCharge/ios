@@ -262,8 +262,14 @@ public struct ConnectivityCheckCard: View {
     @Environment(RootCoordinator.self) private var coordinator
     @Bindable var viewModel: ConnectivityCheckViewModel
 
-    public init(viewModel: ConnectivityCheckViewModel) {
+    /// Render WITHOUT the outer `cardSurface` so the parent can
+    /// embed the check rows inline (e.g. inside `ConnectivityCard`
+    /// in Settings, post-2026-05 UX merge of the two cards).
+    private let inline: Bool
+
+    public init(viewModel: ConnectivityCheckViewModel, inline: Bool = false) {
         self.viewModel = viewModel
+        self.inline = inline
     }
 
     private func runCheck() async {
@@ -271,9 +277,30 @@ public struct ConnectivityCheckCard: View {
     }
 
     public var body: some View {
+        if inline {
+            inlineBody
+        } else {
+            inlineBody
+                .padding(Spacing.base)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardSurface(.tinted(overallTone))
+        }
+    }
+
+    private var inlineBody: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            SectionHeader("Connectivity check") {
-                overallPill
+            if !inline {
+                SectionHeader("Connectivity check") {
+                    overallPill
+                }
+            } else {
+                HStack {
+                    Text("Self-test")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 0)
+                    overallPill
+                }
             }
 
             VStack(spacing: Spacing.sm) {
@@ -287,9 +314,6 @@ public struct ConnectivityCheckCard: View {
 
             actionButton
         }
-        .padding(Spacing.base)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardSurface(.tinted(overallTone))
     }
 
     private var overallTone: StatusPill.Tone {

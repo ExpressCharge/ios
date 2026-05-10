@@ -81,10 +81,9 @@ public struct SettingsView: View {
 
                 ConnectivityCard(
                     coordinator: coordinator,
-                    isCustomerAccount: isCustomerAccount
+                    isCustomerAccount: isCustomerAccount,
+                    connectivityCheck: connectivityCheck
                 )
-
-                ConnectivityCheckCard(viewModel: connectivityCheck)
 
                 PermissionsCard(
                     notificationStatus: notificationStatus,
@@ -212,6 +211,11 @@ private struct AccountIdentityCard: View {
 private struct ConnectivityCard: View {
     let coordinator: RootCoordinator
     let isCustomerAccount: Bool
+    /// Embedded self-test (formerly the standalone
+    /// `ConnectivityCheckCard`). Per 2026-05 UX feedback the two
+    /// surfaces are merged so the user sees status + active check
+    /// in one card.
+    let connectivityCheck: ConnectivityCheckViewModel
 
     private var status: ConnectionStatus {
         coordinator.deviceState?.connectionStatus
@@ -255,6 +259,13 @@ private struct ConnectivityCard: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            // Inline self-test rows. The user can run a fresh check
+            // without leaving the Settings card; results land
+            // in-place under the status block above.
+            Divider()
+                .padding(.vertical, Spacing.xs)
+            ConnectivityCheckCard(viewModel: connectivityCheck, inline: true)
         }
         .padding(Spacing.base)
         .frame(maxWidth: .infinity, alignment: .leading)

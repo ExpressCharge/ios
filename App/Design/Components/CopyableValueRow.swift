@@ -19,15 +19,18 @@ public struct CopyableValueRow: View {
 
     private let label: String
     private let value: String?
+    private let valueMaxWidth: CGFloat?
     private let onCopy: (String) -> Void
 
     public init(
         _ label: String,
         value: String?,
+        valueMaxWidth: CGFloat? = nil,
         onCopy: @escaping (String) -> Void
     ) {
         self.label = label
         self.value = value
+        self.valueMaxWidth = valueMaxWidth
         self.onCopy = onCopy
     }
 
@@ -41,6 +44,7 @@ public struct CopyableValueRow: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: valueMaxWidth, alignment: .trailing)
                 Button {
                     UIPasteboard.general.string = value
                     onCopy(value)

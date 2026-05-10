@@ -373,6 +373,10 @@ private struct DiagnosticsDeviceCard: View {
             CopyableValueRow(
                 "Device ID",
                 value: deviceId,
+                // Tighter width forces middle-truncation so a UUID
+                // doesn't dominate the row. Tap the copy button to
+                // get the full value.
+                valueMaxWidth: 120,
                 onCopy: { _ in onCopy("Device ID copied") }
             )
             LabeledContent("Build") {
@@ -417,14 +421,13 @@ private struct DiagnosticsAccountCard: View {
                         Text(userId)
                             .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
-                if let registered = me.registeredAtIso {
-                    LabeledContent("Registered") {
-                        Text(Self.formattedRegistered(registered))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                // Registration time deliberately omitted — admin
+                // diagnostics surface; the date isn't actionable
+                // information for the user (per UX feedback 2026-05).
             } else if loading {
                 HStack {
                     ProgressView()
