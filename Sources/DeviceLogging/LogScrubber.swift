@@ -78,7 +78,7 @@ public enum LogScrubber {
 
     /// Attribute KEYS matching this prefix get wholesale-redacted.
     private static let sensitiveAttributeKeyPrefixes: [String] = [
-        "card_",
+        "card_"
     ]
 
     // MARK: - Public API

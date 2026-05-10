@@ -45,6 +45,10 @@ public struct DeviceMeResponse: Codable, Sendable, Equatable {
     public let ownerDisplayName: String?
     public let ownerName: String?
     public let ownerEmail: String?
+    /// 8-char nanoid identity for the owning user (e.g. `ABCD2345`).
+    /// Server-mapped from `users.public_id`. Optional on the wire so
+    /// older server builds don't break.
+    public let ownerPublicId: String?
     public let registeredAtIso: String?
     /// `"admin"` or `"customer"`. Drives the AccountIdentityCard
     /// badge — admins get an "Admin" pill, customers get their plan
@@ -65,6 +69,7 @@ public struct DeviceMeResponse: Codable, Sendable, Equatable {
         ownerDisplayName: String? = nil,
         ownerName: String? = nil,
         ownerEmail: String? = nil,
+        ownerPublicId: String? = nil,
         registeredAtIso: String? = nil,
         ownerRole: String? = nil,
         planCode: String? = nil,
@@ -77,6 +82,7 @@ public struct DeviceMeResponse: Codable, Sendable, Equatable {
         self.ownerDisplayName = ownerDisplayName
         self.ownerName = ownerName
         self.ownerEmail = ownerEmail
+        self.ownerPublicId = ownerPublicId
         self.registeredAtIso = registeredAtIso
         self.ownerRole = ownerRole
         self.planCode = planCode

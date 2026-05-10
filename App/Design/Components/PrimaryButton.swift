@@ -47,17 +47,20 @@ public struct PrimaryButton: View {
     }
 
     /// Visual size of the CTA. `.standard` is the everyday 44pt-tall
-    /// button used throughout settings + auth flows. `.hero` is the
+    /// button used throughout auth flows. `.compact` is a denser ~28pt
+    /// variant for settings rows where the button sits adjacent to
+    /// status pills and should not dominate the surface. `.hero` is the
     /// car-app-style ~80pt-tall variant used by the customer-grade
-    /// charger Start/Stop buttons (Slice J). Don't introduce a third —
-    /// extend this enum if more sizes are needed.
+    /// charger Start/Stop buttons (Slice J).
     public enum Size: Sendable {
         case standard
+        case compact
         case hero
 
         var minHeight: CGFloat {
             switch self {
             case .standard: return 44
+            case .compact: return 28
             case .hero: return 80
             }
         }
@@ -65,6 +68,7 @@ public struct PrimaryButton: View {
         var labelFont: Font {
             switch self {
             case .standard: return .headline
+            case .compact: return .subheadline.weight(.semibold)
             case .hero: return .title2.weight(.semibold)
             }
         }
@@ -72,6 +76,7 @@ public struct PrimaryButton: View {
         var iconFont: Font {
             switch self {
             case .standard: return .body
+            case .compact: return .footnote
             case .hero: return .system(size: 28, weight: .semibold)
             }
         }
@@ -79,6 +84,7 @@ public struct PrimaryButton: View {
         var hSpacing: CGFloat {
             switch self {
             case .standard: return Spacing.sm
+            case .compact: return Spacing.xs
             case .hero: return Spacing.md
             }
         }

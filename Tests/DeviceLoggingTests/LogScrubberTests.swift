@@ -92,7 +92,8 @@ struct LogScrubberTests {
         )
         LogScrubber.scrub(&record)
         guard case .object(let context) = record.attributes["context"] else {
-            Issue.record("context should remain an object"); return
+            Issue.record("context should remain an object")
+            return
         }
         if case .string(let user) = context["user"] {
             #expect(user == "<email>")

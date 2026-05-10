@@ -98,8 +98,16 @@ public struct ChargerListEntry: Codable, Identifiable, Hashable, Sendable {
 
         /// User-facing label for the row's online pill.
         public var displayLabel: String {
+            displayLabel(isUnmanaged: false)
+        }
+
+        /// User-facing label that distinguishes unmanaged chargers
+        /// (Migration 0043) — these are always free, so "idle" reads
+        /// to the customer as "Free" rather than the OCPP-flavoured
+        /// "Idle".
+        public func displayLabel(isUnmanaged: Bool) -> String {
             switch self {
-            case .idle: return "Idle"
+            case .idle: return isUnmanaged ? "Free" : "Idle"
             case .preparing: return "Plugged in"
             case .charging: return "Charging"
             case .reserved: return "Reserved"

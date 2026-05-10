@@ -160,7 +160,8 @@ public final class ManagedLocationCache: NSObject, CLLocationManagerDelegate {
             )
             return nil
         }
-        return await withCheckedContinuation { (continuation: CheckedContinuation<LocationSnapshot?, Never>) in
+        return await withCheckedContinuation {
+            (continuation: CheckedContinuation<LocationSnapshot?, Never>) in
             pendingOneShots.append(continuation)
             // `requestLocation()` produces exactly one
             // `didUpdateLocations` (or `didFailWithError`) callback.

@@ -109,7 +109,7 @@ public enum OTelSeverity: Sendable {
         case .trace: return 1
         case .debug: return 5
         case .info: return 9
-        case .notice: return 9        // OTel maps NOTICE onto INFO bucket.
+        case .notice: return 9  // OTel maps NOTICE onto INFO bucket.
         case .warning: return 13
         case .error: return 17
         case .critical: return 21

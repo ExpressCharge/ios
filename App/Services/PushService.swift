@@ -160,12 +160,40 @@ public final class PushService {
     /// path lands the same effect: PUT with the current token.
     public func refreshIfAuthenticated() {
         UIApplication.shared.registerForRemoteNotifications()
+        scheduleApnsRegistrationWatchdog()
         if let token = pendingToken {
             log.debug(
                 "PushService.refreshIfAuthenticated: draining stashed token",
                 metadata: ["token.len": "\(token.count)"]
             )
             Task { await self.uploadToken(token) }
+        }
+    }
+
+    /// 30-second watchdog: if `registerForRemoteNotifications()` was
+    /// called and *neither* AppDelegate callback fires (no success, no
+    /// failure), the most likely cause is that the signed app bundle is
+    /// missing the `aps-environment` entitlement — iOS just silently
+    /// drops the request. The 2026-04-27 entitlement regression shipped
+    /// this exact failure mode for ~13 days before anyone noticed,
+    /// because the Settings UI only flips to "failed" if the failure
+    /// callback fires. This watchdog makes the silent path loud.
+    private func scheduleApnsRegistrationWatchdog() {
+        let snapshotToken = lastUploadedToken
+        let snapshotFailed = lastApnsRegistrationFailed
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            guard let self else { return }
+            // If neither path landed (no new token uploaded, no failure
+            // flag set), iOS swallowed the registration silently.
+            if self.lastUploadedToken == snapshotToken,
+                self.lastApnsRegistrationFailed == snapshotFailed,
+                self.pendingToken == nil
+            {
+                log.error(
+                    "APNs registration watchdog: 30s elapsed with no callback — likely missing aps-environment entitlement"
+                )
+            }
         }
     }
 

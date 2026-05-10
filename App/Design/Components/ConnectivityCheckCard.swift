@@ -170,12 +170,21 @@ public final class ConnectivityCheckViewModel {
             return
         }
 
-        // Step 4: sync round-trip.
+        // Step 4: sync round-trip. Sync is independent of APNs
+        // registration — see DeviceStateCoordinator.syncOnce() for the
+        // structured failure logs that explain *why* sync failed when
+        // this step reports failure.
         statuses[.sync] = .running
-        let syncOK = await Self.canSync(coordinator: deviceState)
-        if syncOK {
+        let result = await Self.canSync(coordinator: deviceState)
+        switch result {
+        case .ok:
             statuses[.sync] = .ok
-        } else {
+        case .coordinatorUnavailable:
+            statuses[.sync] = .fail(
+                reason: "Device not ready. Reopen the app and try again.")
+            overall = .hasFailure
+            return
+        case .failed:
             statuses[.sync] = .fail(
                 reason: "Sync didn't finish. Try again in a moment.")
             overall = .hasFailure
@@ -248,9 +257,15 @@ public final class ConnectivityCheckViewModel {
         }
     }
 
-    private static func canSync(coordinator: DeviceStateCoordinator?) async -> Bool {
-        guard let coordinator else { return false }
-        return await coordinator.syncOnce()
+    private enum SyncCheckResult {
+        case ok
+        case coordinatorUnavailable
+        case failed
+    }
+
+    private static func canSync(coordinator: DeviceStateCoordinator?) async -> SyncCheckResult {
+        guard let coordinator else { return .coordinatorUnavailable }
+        return await coordinator.syncOnce() ? .ok : .failed
     }
 }
 

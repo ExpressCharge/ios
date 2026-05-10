@@ -206,7 +206,11 @@ struct ChargerListRow: View {
             bits.append(connector)
         }
         if let kw = entry.maxKw {
-            bits.append(String(format: "%.0f kW", kw))
+            if let amps = derivedAmps(fromKW: kw) {
+                bits.append("\(amps)A · \(formatKW(kw)) kW")
+            } else {
+                bits.append("\(formatKW(kw)) kW")
+            }
         }
         return bits.isEmpty ? nil : bits.joined(separator: " · ")
     }
@@ -215,7 +219,7 @@ struct ChargerListRow: View {
         // Unmanaged chargers (Migration 0043) ship without a state on
         // the wire; fall back to `.idle` so the line still reads as a
         // usable charger.
-        let label = (entry.state ?? .idle).displayLabel
+        let label = (entry.state ?? .idle).displayLabel(isUnmanaged: isUnmanaged)
         if let lastSeen = entry.lastSeenAt {
             let rel = Self.relative.localizedString(for: lastSeen, relativeTo: Date())
             return "\(label) · \(rel)"

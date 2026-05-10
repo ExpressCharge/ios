@@ -97,9 +97,12 @@ public struct OSLogHandler: LogHandler {
         return merged
     }
 
-    private func render(message: Logging.Logger.Message, metadata: Logging.Logger.Metadata) -> String {
+    private func render(message: Logging.Logger.Message, metadata: Logging.Logger.Metadata)
+        -> String
+    {
         if metadata.isEmpty { return "\(message)" }
-        let pairs = metadata
+        let pairs =
+            metadata
             .sorted { $0.key < $1.key }
             .map { "\($0.key)=\($0.value)" }
             .joined(separator: " ")

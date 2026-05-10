@@ -171,9 +171,10 @@ struct ChargerHero: View {
         chargerBottom: CGPoint,
         connectorBottom: CGPoint
     ) -> Path {
-        // Run the horizontal segment beneath both glyphs so the
-        // turns sit clear of the artwork.
-        let runY = max(chargerBottom.y, connectorBottom.y) + Spacing.lg
+        // Run the horizontal segment just beneath both glyphs so the
+        // turns sit clear of the artwork without dropping a tall
+        // vertical leg on the charger side.
+        let runY = max(chargerBottom.y, connectorBottom.y) + Spacing.xs
         let chargerCorner = CGPoint(x: chargerBottom.x, y: runY)
         let connectorCorner = CGPoint(x: connectorBottom.x, y: runY)
         let radius = Self.cableBendRadius
@@ -275,7 +276,7 @@ struct ChargerHero: View {
 
     private func kWLabel(for connector: ChargerDetailViewModel.ConnectorDescriptor) -> String {
         guard let kw = connector.maxKw else { return "—" }
-        return String(format: "%.0f kW", kw)
+        return "\(formatKW(kw)) kW"
     }
 
     private func typeLabel(for connector: ChargerDetailViewModel.ConnectorDescriptor) -> String {

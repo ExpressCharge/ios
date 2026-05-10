@@ -135,6 +135,15 @@ targets:
           # Customer surface — carries charger sticker links
           # (`/c/<id>`). Migration 0043 (ExpresSync).
           - applinks:example.com
+        # APNs entitlement. Defaults to `development` for the
+        # source-of-truth file; the per-config pre-build script
+        # rewrites this to `production` for Release builds. This
+        # entry MUST live here (not just in the entitlements file
+        # directly) because xcodegen rewrites the file on regen and
+        # strips any keys not declared in `properties`. That's how
+        # commit 85b7c61 silently removed aps-environment in
+        # 2026-04-27.
+        aps-environment: development
         # TODO(provisioning): `com.apple.developer.device-information.user-assigned-device-name`
         # requires Apple's manual approval (request via
         # https://developer.apple.com/contact/request/personalized-name/).
@@ -156,6 +165,12 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "12"
+        # The pre-build phase below writes back to the entitlements
+        # file (PlistBuddy Set/Add). Xcode 15+ defaults user-script
+        # sandboxing to YES, which blocks writes to source files
+        # (Operation not permitted). Disabling for this target only —
+        # the script's only side effect is stamping aps-environment.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
       configs:
         Debug:
           # Sandbox APNs + dev backend. The aps-environment is folded into
@@ -190,17 +205,24 @@ targets:
     preBuildScripts:
       - name: "Stamp aps-environment into entitlements"
         # The entitlements file ships with `aps-environment = development`
-        # by default. Release builds rewrite it via PlistBuddy. We do this
-        # in a pre-build script (rather than two separate entitlement
-        # files) so the file lives in source control once.
+        # by default. Release builds rewrite it via PlistBuddy. We use
+        # Set first (when the key already exists) and fall back to Add
+        # so the build always produces a valid entitlements file. We
+        # then verify the key is present and FAIL the build if not —
+        # silently swallowing this error is what shipped 13 days of
+        # builds without aps-environment in 2026-04/05.
         script: |
           set -euo pipefail
           ENT="${PROJECT_DIR}/App/Resources/ExpresScan.entitlements"
+          APS_ENV="development"
           if [ "${CONFIGURATION}" = "Release" ]; then
-            /usr/libexec/PlistBuddy -c "Set :aps-environment production" "$ENT" 2>/dev/null || true
-          else
-            /usr/libexec/PlistBuddy -c "Set :aps-environment development" "$ENT" 2>/dev/null || true
+            APS_ENV="production"
           fi
+          echo "Stamping aps-environment=${APS_ENV} into ${ENT}"
+          if ! /usr/libexec/PlistBuddy -c "Set :aps-environment ${APS_ENV}" "$ENT" 2>/dev/null; then
+            /usr/libexec/PlistBuddy -c "Add :aps-environment string ${APS_ENV}" "$ENT"
+          fi
+          /usr/libexec/PlistBuddy -c "Print :aps-environment" "$ENT"
         basedOnDependencyAnalysis: false
 
   ExpresScanTests:

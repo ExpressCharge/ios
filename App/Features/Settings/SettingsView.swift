@@ -163,10 +163,10 @@ public struct SettingsView: View {
     /// the most actionable state to the user without exposing the
     /// underlying token.
     fileprivate enum ApnsRegistrationStatus: Equatable {
-        case pending          // Notifications authorised, waiting for APNs
-        case registered       // Token uploaded to server
-        case unauthorized     // Notifications denied/notDetermined
-        case failed           // APNs returned an error
+        case pending  // Notifications authorised, waiting for APNs
+        case registered  // Token uploaded to server
+        case unauthorized  // Notifications denied/notDetermined
+        case failed  // APNs returned an error
     }
 
     fileprivate static func deriveApnsStatus(
@@ -207,11 +207,6 @@ private struct AccountIdentityCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(displayName)
                         .font(.headline)
-                    if let secondary {
-                        Text(secondary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                     PlanBadge(
                         ownerRole: vm.me?.ownerRole,
                         planCode: vm.me?.planCode,
@@ -219,6 +214,9 @@ private struct AccountIdentityCard: View {
                     )
                 }
                 Spacer(minLength: 0)
+                if let pid = vm.me?.ownerPublicId, !pid.isEmpty {
+                    PublicIdView(publicId: pid, size: .regular)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -230,11 +228,6 @@ private struct AccountIdentityCard: View {
             ?? vm.me?.ownerName
             ?? vm.me?.ownerEmail
             ?? "Signed in"
-    }
-
-    private var secondary: String? {
-        guard let email = vm.me?.ownerEmail, email != displayName else { return nil }
-        return email
     }
 }
 
@@ -333,7 +326,7 @@ private struct PermissionsCard: View {
             // server. Surface that distinction so the user can see
             // when registration is the actual blocker.
             HStack {
-                Label("Push token", systemImage: "antenna.radiowaves.left.and.right")
+                Label("Push registration", systemImage: "antenna.radiowaves.left.and.right")
                     .labelStyle(.titleAndIcon)
                 Spacer()
                 StatusPill(
@@ -346,16 +339,18 @@ private struct PermissionsCard: View {
                 PrimaryButton(
                     "Open iOS Settings",
                     systemImage: "gear",
+                    size: .compact,
                     action: onOpenSystemSettings
                 )
-                .padding(.top, Spacing.sm)
+                .padding(.top, Spacing.lg)
             } else if apnsStatus == .failed {
                 PrimaryButton(
                     "Retry Registration",
                     systemImage: "arrow.clockwise",
+                    size: .compact,
                     action: onRetryRegister
                 )
-                .padding(.top, Spacing.sm)
+                .padding(.top, Spacing.lg)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -504,6 +499,7 @@ private struct SignOutCard: View {
                 systemImage: "rectangle.portrait.and.arrow.right",
                 variant: .destructive,
                 state: vm.isSigningOut ? .loading : .default,
+                size: .compact,
                 action: { confirm = true }
             )
             if let err = vm.signOutError {

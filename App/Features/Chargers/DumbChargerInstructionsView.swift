@@ -20,7 +20,7 @@ struct DumbChargerInstructionsView: View {
     private let steps: [String] = [
         "Plug in your cable.",
         "Your car negotiates power automatically.",
-        "Unplug when you're done — no tap required.",
+        "Unplug when you're done.",
     ]
 
     var body: some View {
@@ -29,7 +29,7 @@ struct DumbChargerInstructionsView: View {
                 Image(systemName: "powerplug.fill")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(ColorPalette.info)
-                Text("Just plug in and charge")
+                Text("Plug in. Charge. Free.")
                     .font(.headline)
             }
 
@@ -55,7 +55,7 @@ struct DumbChargerInstructionsView: View {
                 Spacer(minLength: 0)
                 Link(
                     "Need help?",
-                    destination: URL(string: "mailto:support@expresscharge.app")!
+                    destination: URL(string: "mailto:support@example.com")!
                 )
                 .font(.caption)
             }

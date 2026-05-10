@@ -189,7 +189,8 @@ public struct RegistrationView: View {
         case .network:
             return "Network problem. Check your connection and try again."
         case .keychain:
-            return "Couldn't set up this device. Try again, or contact support if the problem persists."
+            return
+                "Couldn't set up this device. Try again, or contact support if the problem persists."
         case .server:
             return "Something went wrong on our end. Please try again."
         case .invalidCapabilities:

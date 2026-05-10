@@ -59,8 +59,14 @@ struct ChargerPrimaryCard: View {
                     }
                 }
                 Spacer(minLength: 0)
-                if let pid = entry.publicId {
-                    PublicIdView(publicId: pid, size: .regular)
+                VStack(alignment: .trailing, spacing: Spacing.sm) {
+                    Image(systemName: "arrow.up.right")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    if let pid = entry.publicId {
+                        PublicIdView(publicId: pid, size: .large)
+                    }
                 }
             }
             HStack(spacing: Spacing.sm) {
@@ -87,7 +93,8 @@ struct ChargerPrimaryCard: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(Spacing.lg)
+        .padding(.horizontal, Spacing.lg)
+        .padding(.vertical, Spacing.lg + 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -100,7 +107,7 @@ struct ChargerPrimaryCard: View {
                         for: ChargerStatusVisuals.status(
                             from: entry.state ?? .idle
                         )
-                    ).opacity(0.5),
+                    ),
                     lineWidth: 2
                 )
         )

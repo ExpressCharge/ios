@@ -32,11 +32,19 @@ import CoreNFC
 import DeviceLogging
 import DeviceSync
 import Foundation
+import Logging
 import Models
 import Networking
 import Observation
 import UIKit
 import UserNotifications
+
+/// `swift-log` channel for the sync round-trip. Failures used to be
+/// silent (every `return false` branch in `syncOnce()` had no log),
+/// which is why the in-app diagnostics view shows only "APNs
+/// registration failed" when sync also fails — APNs has its own
+/// logger but the sync path was blank. Phase 3a continuation.
+private let syncLog = Logger(label: "sync")
 
 @MainActor
 @Observable
@@ -327,6 +335,11 @@ public final class DeviceStateCoordinator {
 
     /// Single iteration: pull pending settings + diagnostics, POST the
     /// sync, apply the merged response.
+    ///
+    /// Sync is fully independent of APNs registration — a sync that
+    /// reaches the server returns `true` even if `pushToken` is null on
+    /// the device row. The server may set `needsPushToken=true` in the
+    /// envelope as a self-healing hint, but that's not a failure.
     @discardableResult
     public func syncOnce() async -> Bool {
         let pending: [SyncRequest.PendingSetting]
@@ -335,6 +348,14 @@ public final class DeviceStateCoordinator {
         } catch {
             // SettingsStore IO failure — skip this tick. The next tick
             // retries.
+            syncLog.error(
+                "sync skipped: pendingSettings IO failed",
+                metadata: [
+                    "error.message": "\(error.localizedDescription)",
+                    "error.type": "\(type(of: error))",
+                    "stage": "pendingSettings",
+                ]
+            )
             return false
         }
         var diagnostics = await diagnosticsProvider()
@@ -385,15 +406,31 @@ public final class DeviceStateCoordinator {
         } catch APIError.gone {
             // Soft-deleted / revoked device — server returned 410. Hand
             // off to the same revocation path the SSE event uses.
+            syncLog.error(
+                "sync failed: device gone (410), routing revocation",
+                metadata: ["stage": "POST /sync", "status": "410"]
+            )
             await logDrain?.release()
             await routeRevocation()
             return false
         } catch APIError.unauthorized {
+            syncLog.error(
+                "sync failed: unauthorized (401), routing revocation",
+                metadata: ["stage": "POST /sync", "status": "401"]
+            )
             await logDrain?.release()
             await routeRevocation()
             return false
         } catch {
             // Transient — surface as offline + try again next tick.
+            syncLog.error(
+                "sync failed: transient error, going offline",
+                metadata: [
+                    "error.message": "\(error.localizedDescription)",
+                    "error.type": "\(type(of: error))",
+                    "stage": "POST /sync",
+                ]
+            )
             await logDrain?.release()
             connectionStatus = .offline
             return false

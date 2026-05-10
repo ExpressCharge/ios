@@ -25,7 +25,7 @@ public struct PublicIdView: View {
             switch self {
             case .small: return 11
             case .regular: return 14
-            case .large: return 22
+            case .large: return 28
             }
         }
 
@@ -33,7 +33,7 @@ public struct PublicIdView: View {
             switch self {
             case .small: return 1
             case .regular: return 2
-            case .large: return 4
+            case .large: return 5
             }
         }
 
@@ -41,7 +41,7 @@ public struct PublicIdView: View {
             switch self {
             case .small: return 1.5
             case .regular: return 2.5
-            case .large: return 4
+            case .large: return 5
             }
         }
     }

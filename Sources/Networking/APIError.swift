@@ -58,7 +58,7 @@ extension APIError: Equatable {
             // Same: `detail` carries DecodingError description for admin
             // surfacing only.
             return true
-        case let (.server(lc, le), .server(rc, re)):
+        case (.server(let lc, let le), .server(let rc, let re)):
             return lc == rc && le == re
         default:
             return false
