@@ -90,7 +90,7 @@ targets:
       properties:
         CFBundleDisplayName: ExpressCharge
         CFBundleShortVersionString: "1.0.0"
-        CFBundleVersion: "7"
+        CFBundleVersion: "8"
         UILaunchScreen:
           UIColorName: Background
         UIRequiredDeviceCapabilities:
@@ -155,7 +155,7 @@ targets:
         SWIFT_EMIT_LOC_STRINGS: YES
         GENERATE_INFOPLIST_FILE: NO
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "7"
+        CURRENT_PROJECT_VERSION: "8"
       configs:
         Debug:
           # Sandbox APNs + dev backend. The aps-environment is folded into
