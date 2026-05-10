@@ -12,7 +12,9 @@
 //  inventory grows.
 //
 
+import DeviceLogging
 import Foundation
+import Models
 
 public struct SyncRequest: Sendable, Equatable, Codable {
 
@@ -22,9 +24,28 @@ public struct SyncRequest: Sendable, Equatable, Codable {
     public var pendingSettings: [PendingSetting]
     public var diagnostics: Diagnostics
 
-    public init(pendingSettings: [PendingSetting], diagnostics: Diagnostics) {
+    /// OpenTelemetry-shaped log records drained from the device's local
+    /// ring buffer. Capped at 100 records per sync (Phase 3c). Older
+    /// servers ignore the field; newer servers bulk-insert with
+    /// `INSERT … ON CONFLICT (device_id, seq) DO NOTHING`.
+    public var logs: [OTelLogRecord]?
+
+    /// Highest `expresscharge.seq` (UInt64-as-string) included in `logs`.
+    /// Server's response `logs.ackedSeq` confirms the high-water mark
+    /// the client should advance past. Encoded as string to avoid JS
+    /// Number precision loss; `LogDrain.acknowledge` parses it back.
+    public var logCursor: String?
+
+    public init(
+        pendingSettings: [PendingSetting],
+        diagnostics: Diagnostics,
+        logs: [OTelLogRecord]? = nil,
+        logCursor: String? = nil
+    ) {
         self.pendingSettings = pendingSettings
         self.diagnostics = diagnostics
+        self.logs = logs
+        self.logCursor = logCursor
     }
 
     public struct PendingSetting: Sendable, Equatable, Codable {

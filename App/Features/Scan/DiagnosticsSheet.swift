@@ -16,6 +16,7 @@
 //
 
 import AuthCore
+import DeviceLogging
 import Networking
 import SwiftUI
 import UIKit
@@ -34,6 +35,7 @@ public struct DiagnosticsSheet: View {
     @State private var accountInfo: AccountInfo? = nil
     @State private var accountLoading: Bool = false
     @State private var accountError: String? = nil
+    @State private var recentLogs: [OTelLogRecord] = []
 
     /// Trimmed view-model for the Account section. Mirrors the
     /// `DeviceMeResponse` shape returned by `GET /api/devices/me`.
@@ -64,6 +66,27 @@ public struct DiagnosticsSheet: View {
                         error: accountError,
                         onRetry: { Task { await loadAccount() } }
                     )
+                    // Phase 3a — admin-only recent-logs view drained
+                    // from the on-device JSONL ring buffer. Sheet is
+                    // already admin-gated at its callsite
+                    // (DiagnosticsLinkCard is hidden in customer mode);
+                    // the card is here only when the drain is wired.
+                    if !recentLogs.isEmpty {
+                        DiagnosticsRecentLogsCard(
+                            records: recentLogs,
+                            onCopyAll: {
+                                let text = Self.formatLogsForClipboard(recentLogs)
+                                UIPasteboard.general.string = text
+                                showToast("Logs copied")
+                            },
+                            onForceFlush: {
+                                Task {
+                                    await coordinator.deviceState?.syncOnce()
+                                    await refreshRecentLogs()
+                                }
+                            }
+                        )
+                    }
                     DiagnosticsTestCard(
                         inFlight: testScanInFlight,
                         onRun: { Task { await runTestScan() } }
@@ -84,8 +107,44 @@ public struct DiagnosticsSheet: View {
             .task {
                 await loadDiagnostics()
                 await loadAccount()
+                await refreshRecentLogs()
+            }
+            .refreshable {
+                await loadDiagnostics()
+                await loadAccount()
+                await refreshRecentLogs()
             }
         }
+    }
+
+    // MARK: - Recent logs
+
+    private func refreshRecentLogs() async {
+        guard let drain = app.logDrain else { return }
+        let records = await drain.recent(limit: 20)
+        await MainActor.run { self.recentLogs = records }
+    }
+
+    /// Tab-separated lines suitable for pasting into a bug report.
+    private static func formatLogsForClipboard(_ records: [OTelLogRecord]) -> String {
+        records.map { record in
+            let timestampSec = TimeInterval(record.timestamp) / 1_000_000_000.0
+            let date = Date(timeIntervalSince1970: timestampSec)
+            let iso = makeISO8601MillisFormatter().string(from: date)
+            let category = stringAttribute(record, key: "category")
+            return "\(iso)\t\(record.severityText)\t\(category)\t\(record.body)"
+        }
+        .joined(separator: "\n")
+    }
+
+    /// Pull a string-valued attribute, falling back to empty string.
+    /// `attributes` is heterogeneous JSON (`AnyCodableJSON`), so we
+    /// can't subscript-and-cast — pattern-match the case explicitly.
+    fileprivate static func stringAttribute(
+        _ record: OTelLogRecord, key: String
+    ) -> String {
+        if case .string(let s) = record.attributes[key] { return s }
+        return ""
     }
 
     // MARK: - Helpers
@@ -135,6 +194,103 @@ public struct DiagnosticsSheet: View {
         let ok = await dsc.syncOnce()
         showToast(ok ? "Sync OK" : "Sync failed")
     }
+}
+
+// MARK: - DiagnosticsRecentLogsCard
+
+private struct DiagnosticsRecentLogsCard: View {
+
+    let records: [OTelLogRecord]
+    let onCopyAll: () -> Void
+    let onForceFlush: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack(spacing: Spacing.sm) {
+                SectionHeader("Recent logs")
+                Spacer(minLength: 0)
+                Button(action: onForceFlush) {
+                    Image(systemName: "arrow.up.circle")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Force flush now")
+                Button(action: onCopyAll) {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Copy logs")
+            }
+            ScrollView(.vertical) {
+                LazyVStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(records.enumerated()), id: \.offset) { _, record in
+                        DiagnosticsLogRow(record: record)
+                    }
+                }
+            }
+            .frame(maxHeight: 320)
+        }
+        .cardSurface()
+    }
+}
+
+private struct DiagnosticsLogRow: View {
+
+    let record: OTelLogRecord
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(timeText)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(ColorPalette.mutedForeground)
+                Text(record.severityText)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(severityColor)
+                let category = DiagnosticsSheet.stringAttribute(record, key: "category")
+                if !category.isEmpty {
+                    Text(category)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(ColorPalette.mutedForeground)
+                }
+            }
+            Text(record.body)
+                .font(.caption.monospaced())
+                .foregroundStyle(ColorPalette.foreground)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var timeText: String {
+        let timestampSec = TimeInterval(record.timestamp) / 1_000_000_000.0
+        let date = Date(timeIntervalSince1970: timestampSec)
+        return DiagnosticsLogRow.timeFormatter.string(from: date)
+    }
+
+    private var severityColor: Color {
+        switch LogLevel.from(severityText: record.severityText) {
+        case .trace, .debug: return ColorPalette.mutedForeground
+        case .info, .notice: return ColorPalette.info
+        case .warning: return ColorPalette.warningAmber
+        case .error, .critical: return ColorPalette.destructiveRose
+        }
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss.SSS"
+        return f
+    }()
+}
+
+/// Build a fresh ISO-8601-with-ms formatter. `ISO8601DateFormatter`
+/// isn't `Sendable`, so a `static let` cache violates Swift 6 strict
+/// concurrency; the formatter is cheap to construct (microseconds), so
+/// we just build one per call. Callers are off the hot path.
+private func makeISO8601MillisFormatter() -> ISO8601DateFormatter {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f
 }
 
 // MARK: - Cards

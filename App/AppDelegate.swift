@@ -14,8 +14,16 @@
 //  surface stable so the wire-in is purely additive.
 //
 
+import Logging
 import UIKit
 import UserNotifications
+
+/// Phase 3a.1 — first migration target for the swift-log façade. Push
+/// lifecycle is small, well-isolated, and exercises every code path
+/// (success, failure, foreground delivery, tap). The existing `os.Logger`
+/// declarations in `AppEnvironment.swift` stay as a compat shim until
+/// the final 3a.4 sweep.
+private let pushLog = Logger(label: "push.lifecycle")
 
 /// Notifications posted by the AppDelegate so view-models can observe
 /// without depending on UIKit. Names live here (single owner) and are
@@ -114,8 +122,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // base64 because it's shorter and the contract documents it as
         // "<base64>".)
         let token = deviceToken.base64EncodedString()
-        authLog.debug(
-            "AppDelegate.didRegisterForRemoteNotifications: token.len=\(token.count) bytes=\(deviceToken.count)"
+        pushLog.debug(
+            "APNs token received",
+            metadata: [
+                "token.length": "\(token.count)",
+                "token.bytes": "\(deviceToken.count)",
+            ]
         )
         // RegistrationViewModel still observes this notification so it
         // can stash the token for the in-flight register call.
@@ -130,8 +142,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             if let push = AppEnvironment.shared.pushService {
                 await push.uploadToken(token)
             } else {
-                authLog.error(
-                    "AppDelegate.didRegisterForRemoteNotifications: pushService nil, token NOT uploaded — RootCoordinator.bootstrap will retry via refreshIfAuthenticated()"
+                pushLog.error(
+                    "APNs token NOT uploaded — pushService nil; bootstrap will retry"
                 )
             }
         }
@@ -141,8 +153,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
-        authLog.error(
-            "AppDelegate.didFailToRegisterForRemoteNotifications: \(error.localizedDescription, privacy: .public)"
+        pushLog.error(
+            "APNs registration failed",
+            metadata: [
+                "error.message": "\(error.localizedDescription)",
+                "error.type": "\(type(of: error))",
+            ]
         )
         NotificationCenter.default.post(
             name: AppNotifications.apnsRegistrationFailed,

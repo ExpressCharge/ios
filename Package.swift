@@ -25,7 +25,15 @@ let package = Package(
         .library(name: "Networking", targets: ["Networking"]),
         .library(name: "AuthCore", targets: ["AuthCore"]),
         .library(name: "Capabilities", targets: ["Capabilities"]),
+        .library(name: "DeviceLogging", targets: ["DeviceLogging"]),
         .library(name: "DeviceSync", targets: ["DeviceSync"]),
+    ],
+    dependencies: [
+        // swift-log is the standard façade for Swift logging. We back it
+        // with a multiplex of (a) Apple's `os.Logger` (Console.app +
+        // Instruments) and (b) a JSONL ring buffer drained on every
+        // sync. See Phase 3 of `~/.claude/plans/i-m-having-trouble-loading-sleepy-crescent.md`.
+        .package(url: "https://github.com/apple/swift-log", from: "1.6.0"),
     ],
     targets: [
         // MARK: - Library targets
@@ -59,8 +67,16 @@ let package = Package(
             path: "Sources/Capabilities"
         ),
         .target(
+            name: "DeviceLogging",
+            dependencies: [
+                "Models",
+                .product(name: "Logging", package: "swift-log"),
+            ],
+            path: "Sources/DeviceLogging"
+        ),
+        .target(
             name: "DeviceSync",
-            dependencies: ["Models", "Networking", "AuthCore"],
+            dependencies: ["Models", "Networking", "AuthCore", "DeviceLogging"],
             path: "Sources/DeviceSync"
         ),
 
@@ -183,6 +199,28 @@ let package = Package(
             name: "DeviceSyncTests",
             dependencies: ["DeviceSync", "Models", "Networking", "AuthCore"],
             path: "Tests/DeviceSyncTests",
+            swiftSettings: [
+                .unsafeFlags([
+                    "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                    "-Xfrontend", "-disable-cross-import-overlays",
+                ]),
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                ]),
+            ]
+        ),
+        .testTarget(
+            name: "DeviceLoggingTests",
+            dependencies: [
+                "DeviceLogging",
+                "Models",
+                .product(name: "Logging", package: "swift-log"),
+            ],
+            path: "Tests/DeviceLoggingTests",
             swiftSettings: [
                 .unsafeFlags([
                     "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",

@@ -29,6 +29,7 @@
 import AuthCore
 import Capabilities
 import CoreNFC
+import DeviceLogging
 import DeviceSync
 import Foundation
 import Models
@@ -108,6 +109,13 @@ public final class DeviceStateCoordinator {
     @ObservationIgnored
     private let diagnosticsProvider: @MainActor () async -> SyncRequest.Diagnostics
 
+    /// Optional drain for the device-log pipeline (Phase 3a). When `nil`
+    /// the sync envelope omits the `logs` field — older servers ignore
+    /// it; newer servers see an empty payload. Set by `AppEnvironment`
+    /// at bootstrap.
+    @ObservationIgnored
+    private let logDrain: LogDrain?
+
     @ObservationIgnored
     private weak var router: RootCoordinator?
 
@@ -139,7 +147,8 @@ public final class DeviceStateCoordinator {
         cache: CapabilityCache = CapabilityCache(),
         service: DeviceStateService? = nil,
         now: @escaping @Sendable () -> Date = { Date() },
-        diagnosticsProvider: (@MainActor () async -> SyncRequest.Diagnostics)? = nil
+        diagnosticsProvider: (@MainActor () async -> SyncRequest.Diagnostics)? = nil,
+        logDrain: LogDrain? = nil
     ) {
         self.api = api
         self.settingsStore = settingsStore
@@ -150,6 +159,7 @@ public final class DeviceStateCoordinator {
             diagnosticsProvider ?? { @MainActor in
                 await Self.defaultDiagnostics()
             }
+        self.logDrain = logDrain
         self.featureFlagReader = FeatureFlagReader()
         self.settingsReader = SettingsReader(store: settingsStore)
 
@@ -251,6 +261,11 @@ public final class DeviceStateCoordinator {
         cache.clear()
         state = nil
         cachedCapabilities = nil
+        // Phase 3a — logs are owner-scoped PII; drop the buffer so the
+        // next user's cold launch starts clean.
+        if let drain = logDrain {
+            Task { await drain.purge() }
+        }
         stop()
     }
 
@@ -314,22 +329,44 @@ public final class DeviceStateCoordinator {
         if state?.ownerUser.role != .admin {
             diagnostics = diagnostics.scrubbedForCustomerAccount()
         }
-        let body = SyncRequest(pendingSettings: pending, diagnostics: diagnostics)
+
+        // Phase 3a — drain up to 100 OTel log records into the sync
+        // envelope. Drain is non-destructive; we ack only on 200 OK and
+        // release on any failure so the next tick retries the same
+        // range. Skipped entirely when the drain isn't wired
+        // (compat-shim path for tests + early app bootstrap).
+        let drained = await logDrain?.pending(maxRecords: 100)
+        let logsForRequest: [OTelLogRecord]? =
+            (drained?.records).flatMap { $0.isEmpty ? nil : $0 }
+        let cursorForRequest: String? = drained?.cursor.map { "\($0)" }
+
+        let body = SyncRequest(
+            pendingSettings: pending,
+            diagnostics: diagnostics,
+            logs: logsForRequest,
+            logCursor: cursorForRequest
+        )
 
         do {
             let envelope = try await service.sync(body)
             await applyEnvelope(envelope)
+            if let drained, let cursor = drained.cursor {
+                await logDrain?.acknowledge(throughSeq: cursor)
+            }
             return true
         } catch APIError.gone {
             // Soft-deleted / revoked device — server returned 410. Hand
             // off to the same revocation path the SSE event uses.
+            await logDrain?.release()
             await routeRevocation()
             return false
         } catch APIError.unauthorized {
+            await logDrain?.release()
             await routeRevocation()
             return false
         } catch {
             // Transient — surface as offline + try again next tick.
+            await logDrain?.release()
             connectionStatus = .offline
             return false
         }

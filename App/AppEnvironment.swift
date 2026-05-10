@@ -16,6 +16,7 @@
 //
 
 import AuthCore
+import DeviceLogging
 import Foundation
 import Networking
 import SwiftUI
@@ -147,6 +148,27 @@ public final class AppEnvironment: @unchecked Sendable {
     /// hierarchy is up. The `AppDelegate` then forwards APNs payloads
     /// + token uploads through this reference.
     @MainActor public weak var pushService: PushService?
+
+    /// Phase 3a — handles installed by `LoggingBootstrap.bootstrap(...)`
+    /// once `RootCoordinator.bootstrap(...)` has the device id from the
+    /// keychain. `nil` until then; the swift-log façade still emits to
+    /// Console.app via `OSLogHandler` immediately on first use, but the
+    /// durable JSONL ring buffer only starts capturing once this is set.
+    @MainActor public private(set) var loggingHandles: LoggingBootstrap.Handles?
+
+    /// Phase 3a — drain handed to `DeviceStateCoordinator` so each sync
+    /// flushes up to 100 OTel log records server-side. `nil` until
+    /// logging bootstraps.
+    @MainActor public private(set) var logDrain: LogDrain?
+
+    /// Install logging handles after the async bootstrap has resolved.
+    /// Idempotent — second-call behaviour replaces the previous drain
+    /// (the underlying store is the same actor instance).
+    @MainActor
+    public func setLoggingHandles(_ handles: LoggingBootstrap.Handles) {
+        self.loggingHandles = handles
+        self.logDrain = LogDrain(store: handles.store)
+    }
 
     /// Test-only initialiser. Allows unit tests to inject a stubbed
     /// `APIClient` (and a fresh `AuthStore`) without touching the

@@ -26,6 +26,7 @@
 //
 
 import Foundation
+import Models
 
 public actor SettingsStore {
 

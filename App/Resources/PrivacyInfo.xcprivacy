@@ -72,6 +72,26 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
+        <!-- Phase 3 — diagnostic logs shipped via the device-state sync
+             envelope. Severity, category, scrubbed message body, ISO
+             timestamps, app version, device id. PII (emails, JWTs,
+             bearer tokens, card identifiers, phone numbers) is removed
+             on-device by `LogScrubber` before either disk persistence
+             OR network transmission. Linked to the device account so
+             admins can correlate per-device traces; not used for
+             tracking. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
     </array>
 </dict>
 </plist>

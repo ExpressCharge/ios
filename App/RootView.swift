@@ -15,6 +15,7 @@
 
 import AuthCore
 import Capabilities
+import DeviceLogging
 import DeviceSync
 import Models
 import SwiftUI
@@ -139,6 +140,31 @@ public final class RootCoordinator {
             environment.pushService = service
         }
 
+        // Phase 3a — install the swift-log multiplex (Console.app +
+        // durable JSONL ring buffer). Done before
+        // `ensureDeviceStateCoordinator(...)` so the coordinator picks
+        // up the drain on first construction.
+        if environment.loggingHandles == nil {
+            let deviceId: String = (try? await environment.authStore.loadDeviceID()) ?? ""
+            do {
+                let handles = try await DeviceLogging.LoggingBootstrap.bootstrap(
+                    deviceId: deviceId,
+                    serviceVersion: BuildConfig.shortVersion,
+                    osName: UIDevice.current.systemName,
+                    osVersion: UIDevice.current.systemVersion
+                )
+                environment.setLoggingHandles(handles)
+            } catch {
+                // Logging bootstrap is best-effort. The
+                // `OSLogHandler` half of the multiplex still works
+                // because swift-log fell back to its default
+                // `StreamLogHandler`; we just lose durable capture.
+                scanLog.error(
+                    "LoggingBootstrap failed: \(String(describing: error), privacy: .public)"
+                )
+            }
+        }
+
         let hasCreds = await environment.authStore.hasValidCredentials()
         if hasCreds {
             ensureScanCoordinator(environment: environment)
@@ -201,7 +227,8 @@ public final class RootCoordinator {
         }
         let coordinator = DeviceStateCoordinator(
             api: environment.api,
-            settingsStore: store
+            settingsStore: store,
+            logDrain: environment.logDrain
         )
         coordinator.attach(router: self)
         deviceState = coordinator
