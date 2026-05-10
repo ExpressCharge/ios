@@ -113,6 +113,28 @@ public final class SettingsViewModel {
     /// Setting key for the device's user-visible label. Mirrors the
     /// backend registry in `expresscharge/src/lib/devices/settings-keys.ts`.
     private static let labelSettingKey = "device.label"
+    /// Setting key for the "scanning request notifications" toggle.
+    /// Mirrors the admin AppConfigurationForm's `notifications.scanRequest`
+    /// row. When `false`, scan-arm pushes are suppressed (the device only
+    /// sees scan-arm events while in foreground).
+    private static let scanRequestSettingKey = "notifications.scanRequest"
+
+    /// Read-through view of the `notifications.scanRequest` setting,
+    /// defaulting to `true` to match the server's default behaviour.
+    public var scanRequestNotificationsEnabled: Bool {
+        settingsReader.bool(Self.scanRequestSettingKey, default: true)
+    }
+
+    /// Local toggle for `notifications.scanRequest`. Writes through the
+    /// settings store so the next sync POSTs the change to the server.
+    public func setScanRequestNotifications(_ enabled: Bool) {
+        Task { [settingsReader] in
+            try? await settingsReader.setLocal(
+                key: Self.scanRequestSettingKey,
+                value: .bool(enabled)
+            )
+        }
+    }
 
     public init(
         environment: AppEnvironment,

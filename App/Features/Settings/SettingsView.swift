@@ -19,7 +19,9 @@
 //
 
 import AuthCore
+import Capabilities
 import DeviceSync
+import Models
 import Networking
 import SwiftUI
 import UIKit
@@ -87,8 +89,13 @@ public struct SettingsView: View {
                 )
 
                 PermissionsCard(
+                    capabilities: coordinator.deviceState?.capabilities ?? [],
                     notificationStatus: notificationStatus,
                     apnsStatus: apnsStatus,
+                    scanRequestNotificationsEnabled: vm
+                        .scanRequestNotificationsEnabled,
+                    onSetScanRequestNotifications: vm
+                        .setScanRequestNotifications,
                     onOpenSystemSettings: openSystemSettings,
                     onRetryRegister: retryApnsRegistration
                 )
@@ -302,10 +309,20 @@ private struct ConnectivityCard: View {
 }
 
 private struct PermissionsCard: View {
+    let capabilities: Set<DeviceCapability>
     let notificationStatus: UNAuthorizationStatus
     let apnsStatus: SettingsView.ApnsRegistrationStatus
+    let scanRequestNotificationsEnabled: Bool
+    let onSetScanRequestNotifications: (Bool) -> Void
     let onOpenSystemSettings: () -> Void
     let onRetryRegister: () -> Void
+
+    /// Mirrors the admin AppConfigurationForm — the "Scanning request
+    /// notifications" row exists only on devices that can actually scan.
+    /// Hide cleanly when absent (per the agreed empty-state behaviour).
+    private var hasScannerCapability: Bool {
+        capabilities.contains(.scanner)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
@@ -335,6 +352,15 @@ private struct PermissionsCard: View {
                     tone: apnsStatus.tone
                 )
             }
+
+            if hasScannerCapability {
+                ScanRequestNotificationsRow(
+                    enabled: scanRequestNotificationsEnabled,
+                    apnsRegistered: apnsStatus == .registered,
+                    onChange: onSetScanRequestNotifications
+                )
+            }
+
             if notificationStatus == .denied || notificationStatus == .notDetermined {
                 PrimaryButton(
                     "Open iOS Settings",
@@ -355,6 +381,65 @@ private struct PermissionsCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
+    }
+}
+
+/// Per-device toggle for scan-request push notifications. Mirrors the
+/// admin AppConfigurationForm's `notifications.scanRequest` row, with
+/// the same gating rule: the toggle is forced off and disabled when
+/// the device hasn't registered a push token, since there's no useful
+/// behaviour to enable.
+private struct ScanRequestNotificationsRow: View {
+    let enabled: Bool
+    let apnsRegistered: Bool
+    let onChange: (Bool) -> Void
+
+    @State private var localValue: Bool
+
+    init(
+        enabled: Bool,
+        apnsRegistered: Bool,
+        onChange: @escaping (Bool) -> Void
+    ) {
+        self.enabled = enabled
+        self.apnsRegistered = apnsRegistered
+        self.onChange = onChange
+        _localValue = State(initialValue: apnsRegistered ? enabled : false)
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Spacing.md) {
+            Image(systemName: "wave.3.right.circle.fill")
+                .font(.title3)
+                .foregroundStyle(
+                    apnsRegistered ? ColorPalette.primaryCyan : .secondary
+                )
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Scan request notifications")
+                    .font(.subheadline.weight(.medium))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Toggle("", isOn: $localValue)
+                .labelsHidden()
+                .disabled(!apnsRegistered)
+                .onChange(of: localValue) { _, newValue in
+                    onChange(newValue)
+                }
+        }
+        .opacity(apnsRegistered ? 1 : 0.6)
+    }
+
+    private var subtitle: String {
+        if !apnsRegistered {
+            return
+                "Disabled — this iPhone hasn't registered a push token, so there's nothing to deliver."
+        }
+        return "When off, this iPhone only sees scan-arm events while in the foreground."
     }
 }
 
