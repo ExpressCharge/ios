@@ -32,17 +32,20 @@ public struct CustomerSignInProgressView: View {
 
     public var body: some View {
         ScrollView {
-            LazyVStack(spacing: Spacing.xl) {
+            // Tightened per 2026-05 UX feedback — the prior xl-on-xl
+            // padding made the screen feel like a sticker peeled onto
+            // the device. Native sign-in flows use ~16pt margins +
+            // tighter inter-element spacing.
+            LazyVStack(spacing: Spacing.lg) {
                 hero
                 stepRows
                 if case .failure = phase {
                     PrimaryButton("Try again", action: onTryAgain)
-                        .padding(.horizontal, Spacing.lg)
                 }
             }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.top, Spacing.xl)
-            .padding(.bottom, Spacing.xl)
+            .padding(.horizontal, Spacing.base)
+            .padding(.top, Spacing.lg)
+            .padding(.bottom, Spacing.lg)
         }
         .expressBackground()
         .animation(.easeInOut(duration: 0.25), value: stepIndex)

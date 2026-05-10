@@ -57,6 +57,32 @@ public final class PushService {
     /// cold-launch.
     private var lastUploadedToken: String?
 
+    /// `true` if the most recent
+    /// `application(_:didFailToRegisterForRemoteNotificationsWithError:)`
+    /// callback fired and we haven't seen a successful token since.
+    /// Surfaced in Settings → Permissions so the user can see APNs
+    /// failures without scrolling Console.app.
+    public private(set) var lastApnsRegistrationFailed: Bool = false
+
+    /// Read-only snapshot of `lastUploadedToken` for the Settings UI.
+    /// Returns `nil` until at least one PUT /push-token has succeeded
+    /// in this process.
+    public var lastUploadedTokenSnapshot: String? { lastUploadedToken }
+
+    /// Called by AppDelegate from
+    /// `didRegisterForRemoteNotificationsWithDeviceToken` to clear any
+    /// previous failure state so the UI stops showing "failed" the
+    /// moment a fresh token arrives.
+    public func noteApnsRegistrationSucceeded() {
+        lastApnsRegistrationFailed = false
+    }
+
+    /// Called by AppDelegate from
+    /// `didFailToRegisterForRemoteNotificationsWithError`.
+    public func noteApnsRegistrationFailed() {
+        lastApnsRegistrationFailed = true
+    }
+
     public init(environment: AppEnvironment) {
         self.environment = environment
     }

@@ -33,7 +33,11 @@ public struct SectionHeader<Trailing: View>: View {
             Spacer(minLength: 0)
             trailing
         }
-        .padding(.horizontal, Spacing.base)
+        // No horizontal padding — every consumer is already inside a
+        // padded card surface (`.cardSurface()` applies Spacing.lg).
+        // Per 2026-05 UX feedback, the prior horizontal padding here
+        // produced a visible offset that didn't align with the rest of
+        // the card body.
     }
 }
 

@@ -34,6 +34,7 @@ public struct SettingsView: View {
 
     @State private var viewModel: SettingsViewModel?
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var apnsStatus: ApnsRegistrationStatus = .pending
     @State private var isShowingSignOutConfirm: Bool = false
     @State private var copyToast: String?
     @State private var connectivityCheck = ConnectivityCheckViewModel()
@@ -87,7 +88,9 @@ public struct SettingsView: View {
 
                 PermissionsCard(
                     notificationStatus: notificationStatus,
-                    onOpenSystemSettings: openSystemSettings
+                    apnsStatus: apnsStatus,
+                    onOpenSystemSettings: openSystemSettings,
+                    onRetryRegister: retryApnsRegistration
                 )
 
                 DeviceInfoCard(
@@ -136,11 +139,50 @@ public struct SettingsView: View {
         UIApplication.shared.open(url)
     }
 
+    /// Re-arm the APNs registration handshake. Asks UIApplication to
+    /// re-register; the AppDelegate's
+    /// `didRegisterForRemoteNotificationsWithDeviceToken` /
+    /// `didFailToRegister...` callbacks then notify back.
+    private func retryApnsRegistration() {
+        UIApplication.shared.registerForRemoteNotifications()
+    }
+
     private func refreshNotificationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         await MainActor.run {
             self.notificationStatus = settings.authorizationStatus
+            self.apnsStatus = Self.deriveApnsStatus(
+                notificationAuth: settings.authorizationStatus,
+                push: app.pushService
+            )
         }
+    }
+
+    /// Coarse-grained APNs registration state for the Settings UI.
+    /// Sourced from a few synchronous reads on `PushService`; surfaces
+    /// the most actionable state to the user without exposing the
+    /// underlying token.
+    fileprivate enum ApnsRegistrationStatus: Equatable {
+        case pending          // Notifications authorised, waiting for APNs
+        case registered       // Token uploaded to server
+        case unauthorized     // Notifications denied/notDetermined
+        case failed           // APNs returned an error
+    }
+
+    fileprivate static func deriveApnsStatus(
+        notificationAuth: UNAuthorizationStatus,
+        push: PushService?
+    ) -> ApnsRegistrationStatus {
+        switch notificationAuth {
+        case .denied, .notDetermined:
+            return .unauthorized
+        default:
+            break
+        }
+        guard let push else { return .pending }
+        if push.lastApnsRegistrationFailed { return .failed }
+        if push.lastUploadedTokenSnapshot != nil { return .registered }
+        return .pending
     }
 }
 
@@ -162,7 +204,7 @@ private struct AccountIdentityCard: View {
                     .frame(width: 44, height: 44)
                     .foregroundStyle(ColorPalette.primaryCyan)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(displayName)
                         .font(.headline)
                     if let secondary {
@@ -170,13 +212,13 @@ private struct AccountIdentityCard: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    PlanBadge(
+                        ownerRole: vm.me?.ownerRole,
+                        planCode: vm.me?.planCode,
+                        planName: vm.me?.planName
+                    )
                 }
                 Spacer(minLength: 0)
-            }
-
-            if !isCustomerAccount, let registered = vm.me?.registeredAtIso {
-                Divider()
-                LabeledContent("Registered", value: Self.formattedRegistered(registered))
             }
         }
         .padding(Spacing.base)
@@ -194,17 +236,6 @@ private struct AccountIdentityCard: View {
     private var secondary: String? {
         guard let email = vm.me?.ownerEmail, email != displayName else { return nil }
         return email
-    }
-
-    private static func formattedRegistered(_ iso: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let date = formatter.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
-        guard let date else { return iso }
-        let display = DateFormatter()
-        display.dateStyle = .medium
-        display.timeStyle = .short
-        return display.string(from: date)
     }
 }
 
@@ -281,7 +312,9 @@ private struct ConnectivityCard: View {
 
 private struct PermissionsCard: View {
     let notificationStatus: UNAuthorizationStatus
+    let apnsStatus: SettingsView.ApnsRegistrationStatus
     let onOpenSystemSettings: () -> Void
+    let onRetryRegister: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
@@ -296,17 +329,65 @@ private struct PermissionsCard: View {
                     tone: notificationStatus.tone
                 )
             }
+            // Phase 2 polish — APNs registration row. Notifications
+            // permission is necessary but not sufficient: iOS needs to
+            // hand back a push token AND we need to PUT it to the
+            // server. Surface that distinction so the user can see
+            // when registration is the actual blocker.
+            HStack {
+                Label("Push token", systemImage: "antenna.radiowaves.left.and.right")
+                    .labelStyle(.titleAndIcon)
+                Spacer()
+                StatusPill(
+                    label: apnsStatus.label,
+                    systemImage: apnsStatus.icon,
+                    tone: apnsStatus.tone
+                )
+            }
             if notificationStatus == .denied || notificationStatus == .notDetermined {
                 PrimaryButton(
                     "Open iOS Settings",
                     systemImage: "gear",
                     action: onOpenSystemSettings
                 )
+            } else if apnsStatus == .failed {
+                PrimaryButton(
+                    "Retry registration",
+                    systemImage: "arrow.clockwise",
+                    action: onRetryRegister
+                )
             }
         }
         .padding(Spacing.base)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
+    }
+}
+
+extension SettingsView.ApnsRegistrationStatus {
+    fileprivate var label: String {
+        switch self {
+        case .registered: return "Registered"
+        case .pending: return "Waiting"
+        case .unauthorized: return "Not authorised"
+        case .failed: return "Failed"
+        }
+    }
+    fileprivate var icon: String {
+        switch self {
+        case .registered: return "checkmark.circle.fill"
+        case .pending: return "ellipsis.circle"
+        case .unauthorized: return "lock.slash"
+        case .failed: return "exclamationmark.triangle.fill"
+        }
+    }
+    fileprivate var tone: StatusPill.Tone {
+        switch self {
+        case .registered: return .positive
+        case .pending: return .info
+        case .unauthorized: return .neutral
+        case .failed: return .negative
+        }
     }
 }
 

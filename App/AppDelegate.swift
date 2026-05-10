@@ -140,6 +140,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // the backend so existing registrations stay reachable.
         Task { @MainActor in
             if let push = AppEnvironment.shared.pushService {
+                push.noteApnsRegistrationSucceeded()
                 await push.uploadToken(token)
             } else {
                 pushLog.error(
@@ -160,6 +161,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                 "error.type": "\(type(of: error))",
             ]
         )
+        AppEnvironment.shared.pushService?.noteApnsRegistrationFailed()
         NotificationCenter.default.post(
             name: AppNotifications.apnsRegistrationFailed,
             object: nil,
