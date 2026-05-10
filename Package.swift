@@ -54,7 +54,10 @@ let package = Package(
         ),
         .target(
             name: "Networking",
-            dependencies: ["Models"],
+            dependencies: [
+                "Models",
+                .product(name: "Logging", package: "swift-log"),
+            ],
             path: "Sources/Networking"
         ),
         .target(

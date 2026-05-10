@@ -17,8 +17,11 @@ import AuthCore
 import Capabilities
 import DeviceLogging
 import DeviceSync
+import Logging
 import Models
 import SwiftUI
+
+private let bootLog = Logger(label: "boot")
 
 /// Environment key carrying the live `isCustomerAccount` flag derived
 /// from `RootCoordinator.deviceState?.state?.ownerUser.role`. Defaults
@@ -159,8 +162,9 @@ public final class RootCoordinator {
                 // `OSLogHandler` half of the multiplex still works
                 // because swift-log fell back to its default
                 // `StreamLogHandler`; we just lose durable capture.
-                scanLog.error(
-                    "LoggingBootstrap failed: \(String(describing: error), privacy: .public)"
+                bootLog.error(
+                    "LoggingBootstrap failed",
+                    metadata: ["error": "\(String(describing: error))"]
                 )
             }
         }

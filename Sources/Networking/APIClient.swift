@@ -16,17 +16,19 @@
 //
 
 import Foundation
+import Logging
 import Models
-import os
 
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
 
-/// Module-private logger. Mirrors the App target's `netLog` subsystem so
-/// requests + responses land in the same Console.app stream as the app's
-/// own networking events.
-private let netLog = Logger(subsystem: "com.example.expresscharge.ios", category: "network")
+/// Module-private logger. swift-log façade — backed by the
+/// `MultiplexLogHandler([OSLogHandler, RingBufferJSONLogHandler])`
+/// installed by `LoggingBootstrap.bootstrap(...)` at app launch, so
+/// records land in Console.app AND ride the sync envelope to the
+/// server's `device_logs` table.
+private let netLog = Logger(label: "network")
 
 // MARK: - HTTP transport abstraction
 
@@ -115,7 +117,11 @@ public actor APIClient {
             // invisible to anyone reading the console.
             let detail = String(describing: error)
             netLog.error(
-                "APIClient.request: decode failed for \(endpoint.path, privacy: .public): \(detail, privacy: .public)"
+                "APIClient.request: decode failed",
+                metadata: [
+                    "path": "\(endpoint.path)",
+                    "detail": "\(detail)",
+                ]
             )
             throw APIError.decode(detail: detail)
         }
@@ -145,7 +151,12 @@ public actor APIClient {
                 detail = String(describing: error)
             }
             netLog.error(
-                "APIClient.rawRequest: transport failed for \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public): \(detail, privacy: .public)"
+                "APIClient.rawRequest: transport failed",
+                metadata: [
+                    "method": "\(endpoint.method.rawValue)",
+                    "path": "\(endpoint.path)",
+                    "detail": "\(detail)",
+                ]
             )
             failureReporter?()
             throw APIError.network(detail: detail)
@@ -153,13 +164,20 @@ public actor APIClient {
 
         guard let http = response as? HTTPURLResponse else {
             netLog.error(
-                "APIClient.rawRequest: non-HTTP response for \(endpoint.path, privacy: .public)")
+                "APIClient.rawRequest: non-HTTP response",
+                metadata: ["path": "\(endpoint.path)"]
+            )
             failureReporter?()
             throw APIError.network(detail: "non-HTTP response")
         }
 
         netLog.debug(
-            "APIClient.rawRequest: \(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .public) → \(http.statusCode, privacy: .public)"
+            "APIClient.rawRequest: response",
+            metadata: [
+                "method": "\(endpoint.method.rawValue)",
+                "path": "\(endpoint.path)",
+                "status": "\(http.statusCode)",
+            ]
         )
 
         switch http.statusCode {

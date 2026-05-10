@@ -20,16 +20,13 @@ import DeviceLogging
 import Foundation
 import Networking
 import SwiftUI
-import os
 
-/// App-wide loggers, scoped by category. Use these instead of `print`
-/// for any state transition or failure path. The `subsystem` matches
-/// our App ID so OSLogStore queries (and the QA Console.app filter)
-/// pick up everything in one place.
-public let scanLog = Logger(subsystem: "com.example.expresscharge.ios", category: "scan")
-public let netLog = Logger(subsystem: "com.example.expresscharge.ios", category: "network")
-public let nfcLog = Logger(subsystem: "com.example.expresscharge.ios", category: "nfc")
-public let authLog = Logger(subsystem: "com.example.expresscharge.ios", category: "auth")
+// Phase 3a.4 — the four `os.Logger` globals (`scanLog`/`netLog`/
+// `nfcLog`/`authLog`) that lived here as a compat shim during the
+// swift-log migration have been removed. New call sites use a private
+// `Logger(label: "<category>")` from swift-log; the multiplex handler
+// installed by `LoggingBootstrap.bootstrap(...)` re-emits to
+// `os.Logger` AND captures durable JSONL on disk for sync upload.
 
 /// Per-build constants that can't be discovered at runtime. Single
 /// source of truth for the API base URL and APNs environment. The

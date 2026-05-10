@@ -16,11 +16,11 @@
 //
 
 import Foundation
+import Logging
 import Network
 import Observation
-import os
 
-private let reachLog = Logger(subsystem: "com.example.expresscharge.ios", category: "reachability")
+private let reachLog = Logger(label: "reachability")
 
 /// Source of truth for whether the app can talk to the backend. Pulls
 /// from two probes — device path and server health — and exposes a
@@ -190,7 +190,12 @@ public final class ReachabilityMonitor {
     private func transition(to next: State, reason: String) {
         if state == next { return }
         reachLog.info(
-            "reachability \(self.state.label, privacy: .public) → \(next.label, privacy: .public) [\(reason, privacy: .public)]"
+            "reachability transition",
+            metadata: [
+                "from": "\(self.state.label)",
+                "to": "\(next.label)",
+                "reason": "\(reason)",
+            ]
         )
         state = next
     }

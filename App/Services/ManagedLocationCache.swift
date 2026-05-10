@@ -30,8 +30,8 @@
 import CoreLocation
 import DeviceSync
 import Foundation
+import Logging
 import Observation
-import os
 
 /// Reasons a one-shot fix may be requested. Used for log breadcrumbs;
 /// no functional difference between cases today.
@@ -65,10 +65,7 @@ public final class ManagedLocationCache: NSObject, CLLocationManagerDelegate {
     @ObservationIgnored
     private let now: @Sendable () -> Date
     @ObservationIgnored
-    private let log = Logger(
-        subsystem: "com.example.expresscharge.ios",
-        category: "managed-location"
-    )
+    private let log = Logger(label: "managed-location")
 
     // MARK: - Internal state
 
@@ -114,7 +111,8 @@ public final class ManagedLocationCache: NSObject, CLLocationManagerDelegate {
         let status = manager.authorizationStatus
         guard status == .authorizedWhenInUse || status == .authorizedAlways else {
             log.debug(
-                "ManagedLocationCache: sig-change skipped, authorization=\(String(describing: status), privacy: .public)"
+                "ManagedLocationCache: sig-change skipped",
+                metadata: ["authorization": "\(String(describing: status))"]
             )
             return
         }
@@ -154,7 +152,11 @@ public final class ManagedLocationCache: NSObject, CLLocationManagerDelegate {
         let status = manager.authorizationStatus
         guard status == .authorizedWhenInUse || status == .authorizedAlways else {
             log.debug(
-                "ManagedLocationCache: one-shot skipped, authorization=\(String(describing: status), privacy: .public), reason=\(reason.rawValue, privacy: .public)"
+                "ManagedLocationCache: one-shot skipped",
+                metadata: [
+                    "authorization": "\(String(describing: status))",
+                    "reason": "\(reason.rawValue)",
+                ]
             )
             return nil
         }

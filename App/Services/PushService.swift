@@ -22,9 +22,12 @@
 
 import AuthCore
 import Foundation
+import Logging
 import Models
 import Networking
 import UIKit
+
+private let log = Logger(label: "push")
 
 /// Errors emitted by the push service. All non-fatal — the token-upload
 /// path retries opportunistically, payload decode failures are
@@ -93,12 +96,12 @@ public final class PushService {
     /// device. Idempotent; safe to call multiple times.
     public func uploadToken(_ base64Token: String) async {
         guard !base64Token.isEmpty else {
-            authLog.error("PushService.uploadToken: empty token, refusing to upload")
+            log.error("PushService.uploadToken: empty token, refusing to upload")
             return
         }
         pendingToken = base64Token
         if base64Token == lastUploadedToken {
-            authLog.debug("PushService.uploadToken: token unchanged, skip PUT")
+            log.debug("PushService.uploadToken: token unchanged, skip PUT")
             return
         }
         do {
@@ -106,14 +109,20 @@ public final class PushService {
                 // Pre-registration token receipt: stashed in
                 // `pendingToken`; `refreshIfAuthenticated()` drains it
                 // after credentials land.
-                authLog.debug(
-                    "PushService.uploadToken: deferred — no deviceId yet (token.len=\(base64Token.count))"
+                log.debug(
+                    "PushService.uploadToken: deferred — no deviceId yet",
+                    metadata: ["token.len": "\(base64Token.count)"]
                 )
                 return
             }
             let env = BuildConfig.apnsEnvironment == "production" ? "production" : "sandbox"
-            authLog.debug(
-                "PushService.uploadToken: PUT /api/devices/\(deviceId, privacy: .public)/push-token env=\(env, privacy: .public) token.len=\(base64Token.count)"
+            log.debug(
+                "PushService.uploadToken: PUT push-token",
+                metadata: [
+                    "deviceId": "\(deviceId)",
+                    "env": "\(env)",
+                    "token.len": "\(base64Token.count)",
+                ]
             )
             let body = PushTokenUpdateRequest(
                 pushToken: base64Token,
@@ -128,15 +137,17 @@ public final class PushService {
             )
             try await environment.api.send(endpoint)
             lastUploadedToken = base64Token
-            authLog.debug(
-                "PushService.uploadToken: PUT succeeded (deviceId=\(deviceId, privacy: .public))"
+            log.debug(
+                "PushService.uploadToken: PUT succeeded",
+                metadata: ["deviceId": "\(deviceId)"]
             )
         } catch {
             // Soft-fail: we'll retry on the next
             // `didRegisterForRemoteNotificationsWithDeviceToken` call
             // or the next `refreshIfAuthenticated()` from bootstrap.
-            authLog.error(
-                "PushService.uploadToken: PUT failed: \(String(describing: error), privacy: .public)"
+            log.error(
+                "PushService.uploadToken: PUT failed",
+                metadata: ["error": "\(String(describing: error))"]
             )
         }
     }
@@ -150,8 +161,9 @@ public final class PushService {
     public func refreshIfAuthenticated() {
         UIApplication.shared.registerForRemoteNotifications()
         if let token = pendingToken {
-            authLog.debug(
-                "PushService.refreshIfAuthenticated: draining stashed token (len=\(token.count))"
+            log.debug(
+                "PushService.refreshIfAuthenticated: draining stashed token",
+                metadata: ["token.len": "\(token.count)"]
             )
             Task { await self.uploadToken(token) }
         }
@@ -188,8 +200,9 @@ public final class PushService {
         default:
             // Unknown type — log once but don't crash. Newer servers
             // may send types older clients haven't learned yet.
-            authLog.debug(
-                "PushService.handleRemoteNotification: unknown type '\(type, privacy: .public)' — ignored"
+            log.debug(
+                "PushService.handleRemoteNotification: unknown type — ignored",
+                metadata: ["type": "\(type)"]
             )
         }
     }
@@ -205,8 +218,9 @@ public final class PushService {
     /// in case we add an `expresscharge.locate.completed` SSE later.
     private func handleLocatePush(userInfo: [AnyHashable: Any]) {
         let correlationId = userInfo["correlationId"] as? String ?? "<unknown>"
-        authLog.debug(
-            "PushService: device.locate received (correlationId=\(correlationId, privacy: .public))"
+        log.debug(
+            "PushService: device.locate received",
+            metadata: ["correlationId": "\(correlationId)"]
         )
         let cache = environment.managedLocationCache
         let coordinator = deviceState

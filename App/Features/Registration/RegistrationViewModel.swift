@@ -21,10 +21,13 @@
 import AuthCore
 import Capabilities
 import Foundation
+import Logging
 import Models
 import Networking
 import Observation
 import UIKit
+
+private let log = Logger(label: "auth.registration")
 
 @MainActor
 @Observable
@@ -112,7 +115,7 @@ public final class RegistrationViewModel {
 
     public func submit() async {
         guard !isSubmitting else {
-            authLog.debug("RegistrationViewModel.submit: ignored, already in flight")
+            log.debug("RegistrationViewModel.submit: ignored, already in flight")
             return
         }
         isSubmitting = true
@@ -126,8 +129,10 @@ public final class RegistrationViewModel {
             DeviceCapability.isLegalSet(selectedCapabilities)
         else {
             let capList = self.selectedCapabilities.map(\.rawValue).joined(separator: ",")
-            authLog.error(
-                "RegistrationViewModel.submit: illegal capability set \(capList, privacy: .public)")
+            log.error(
+                "RegistrationViewModel.submit: illegal capability set",
+                metadata: ["capabilities": "\(capList)"]
+            )
             self.error = .invalidCapabilities
             return
         }
@@ -138,8 +143,12 @@ public final class RegistrationViewModel {
         // already in `pendingApnsToken`. The bounded wait keeps the
         // submit responsive on declined-permission paths.
         let pushToken = await waitForApnsToken(timeout: 5.0) ?? ""
-        authLog.debug(
-            "RegistrationViewModel.submit: posting /api/devices/register, label.len=\(self.label.count, privacy: .public), pushToken.empty=\(pushToken.isEmpty, privacy: .public)"
+        log.debug(
+            "RegistrationViewModel.submit: posting /api/devices/register",
+            metadata: [
+                "label.len": "\(self.label.count)",
+                "pushToken.empty": "\(pushToken.isEmpty)",
+            ]
         )
 
         let request = DeviceRegistrationRequest(
@@ -164,8 +173,9 @@ public final class RegistrationViewModel {
 
         do {
             let response: DeviceRegistrationResponse = try await environment.api.request(endpoint)
-            authLog.debug(
-                "RegistrationViewModel.submit: registration succeeded, deviceId=\(response.deviceId, privacy: .public)"
+            log.debug(
+                "RegistrationViewModel.submit: registration succeeded",
+                metadata: ["deviceId": "\(response.deviceId)"]
             )
 
             // Persist the three secrets. `storeCredentials` applies
@@ -183,18 +193,21 @@ public final class RegistrationViewModel {
 
             didSucceed = true
         } catch let api as APIError {
-            authLog.error(
-                "RegistrationViewModel.submit: API error \(String(describing: api), privacy: .public)"
+            log.error(
+                "RegistrationViewModel.submit: API error",
+                metadata: ["error": "\(String(describing: api))"]
             )
             error = mapAPIError(api)
         } catch let kc as KeychainError {
-            authLog.error(
-                "RegistrationViewModel.submit: keychain error \(String(describing: kc), privacy: .public)"
+            log.error(
+                "RegistrationViewModel.submit: keychain error",
+                metadata: ["error": "\(String(describing: kc))"]
             )
             self.error = .keychain
         } catch {
-            authLog.error(
-                "RegistrationViewModel.submit: unexpected error \(String(describing: error), privacy: .public)"
+            log.error(
+                "RegistrationViewModel.submit: unexpected error",
+                metadata: ["error": "\(String(describing: error))"]
             )
             self.error = .other
         }

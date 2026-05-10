@@ -39,8 +39,11 @@ import AuthenticationServices
 import Crypto
 import CryptoKit
 import Foundation
+import Logging
 import Observation
 import UIKit
+
+private let log = Logger(label: "auth.login")
 
 @MainActor
 @Observable
@@ -84,7 +87,7 @@ public final class LoginViewModel: NSObject {
     /// while the session is up does nothing.
     public func start(deviceLabel: String = UIDevice.current.name) {
         guard !isPresenting else {
-            authLog.debug("LoginViewModel.start: ignored, session already presenting")
+            log.debug("LoginViewModel.start: ignored, session already presenting")
             return
         }
         error = nil
@@ -93,8 +96,12 @@ public final class LoginViewModel: NSObject {
         let verifier = Self.generateCodeVerifier()
         let challenge = Self.computeChallenge(verifier: verifier)
         self.lastVerifier = verifier
-        authLog.debug(
-            "LoginViewModel.start: opening auth session, label.len=\(deviceLabel.count, privacy: .public), verifier.len=\(verifier.count, privacy: .public)"
+        log.debug(
+            "LoginViewModel.start: opening auth session",
+            metadata: [
+                "label.len": "\(deviceLabel.count)",
+                "verifier.len": "\(verifier.count)",
+            ]
         )
         // The verifier is read by `WelcomeView.onChange(of:deliveredCode)`
         // and handed to the `RootCoordinator.didReceiveOneTimeCode(_,
@@ -144,7 +151,7 @@ public final class LoginViewModel: NSObject {
         self.isPresenting = true
 
         if !session.start() {
-            authLog.error("LoginViewModel.start: session.start() returned false")
+            log.error("LoginViewModel.start: session.start() returned false")
             self.isPresenting = false
             self.session = nil
             self.error = .sessionStartFailed
@@ -173,7 +180,7 @@ public final class LoginViewModel: NSObject {
 
         // Successful HTTPS-callback match — extract the one-time code.
         if let callbackURL, error == nil {
-            authLog.debug("LoginViewModel: session completed with callback URL")
+            log.debug("LoginViewModel: session completed with callback URL")
             extractCode(from: callbackURL)
             return
         }
@@ -185,23 +192,27 @@ public final class LoginViewModel: NSObject {
         if let authErr = error as? ASWebAuthenticationSessionError {
             switch authErr.code {
             case .canceledLogin:
-                authLog.debug("LoginViewModel: session canceled by user")
+                log.debug("LoginViewModel: session canceled by user")
                 self.error = .canceled
             case .presentationContextNotProvided,
                 .presentationContextInvalid:
-                authLog.error(
-                    "LoginViewModel: presentation-context error \(authErr.code.rawValue, privacy: .public)"
+                log.error(
+                    "LoginViewModel: presentation-context error",
+                    metadata: ["code": "\(authErr.code.rawValue)"]
                 )
                 self.error = .presentation
             @unknown default:
-                authLog.error(
-                    "LoginViewModel: unknown ASWebAuthenticationSessionError code \(authErr.code.rawValue, privacy: .public)"
+                log.error(
+                    "LoginViewModel: unknown ASWebAuthenticationSessionError code",
+                    metadata: ["code": "\(authErr.code.rawValue)"]
                 )
                 self.error = .unknown
             }
         } else {
-            authLog.error(
-                "LoginViewModel: session error \(String(describing: error), privacy: .public)")
+            log.error(
+                "LoginViewModel: session error",
+                metadata: ["error": "\(String(describing: error))"]
+            )
             self.error = .unknown
         }
     }
@@ -214,7 +225,7 @@ public final class LoginViewModel: NSObject {
     /// URL was delivered.
     private func extractCode(from url: URL) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            authLog.error("LoginViewModel.extractCode: failed to parse URL")
+            log.error("LoginViewModel.extractCode: failed to parse URL")
             self.error = .unknown
             return
         }
@@ -233,8 +244,9 @@ public final class LoginViewModel: NSObject {
             && components.host == BuildConfig.universalLinkHost
             && components.path == BuildConfig.registrationCallbackPath
         guard isCustomScheme || isUniversalLink else {
-            authLog.error(
-                "LoginViewModel.extractCode: callback URL did not match expected pattern (scheme=\(components.scheme ?? "nil", privacy: .public))"
+            log.error(
+                "LoginViewModel.extractCode: callback URL did not match expected pattern",
+                metadata: ["scheme": "\(components.scheme ?? "nil")"]
             )
             self.error = .unknown
             return
@@ -244,13 +256,14 @@ public final class LoginViewModel: NSObject {
             let code = components.queryItems?.first(where: { $0.name == "code" })?.value,
             !code.isEmpty
         else {
-            authLog.error("LoginViewModel.extractCode: callback URL missing code query item")
+            log.error("LoginViewModel.extractCode: callback URL missing code query item")
             self.error = .unknown
             return
         }
 
-        authLog.debug(
-            "LoginViewModel.extractCode: received one-time code, len=\(code.count, privacy: .public)"
+        log.debug(
+            "LoginViewModel.extractCode: received one-time code",
+            metadata: ["code.len": "\(code.count)"]
         )
         self.deliveredCode = code
     }

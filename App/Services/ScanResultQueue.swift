@@ -21,8 +21,11 @@
 //
 
 import Foundation
+import Logging
 import Models
 import Networking
+
+private let log = Logger(label: "scan.queue")
 
 public actor ScanResultQueue {
 
@@ -76,8 +79,9 @@ public actor ScanResultQueue {
             // Disk write failed — the user's offline scan is lost.
             // Surfacing this on screen would be alarming; the diagnostics
             // sheet picks it up via the queue count instead.
-            scanLog.error(
-                "Failed to enqueue offline scan result: \(error.localizedDescription, privacy: .public)"
+            log.error(
+                "Failed to enqueue offline scan result",
+                metadata: ["error": "\(error.localizedDescription)"]
             )
         }
     }
