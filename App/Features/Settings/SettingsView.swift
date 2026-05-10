@@ -73,7 +73,7 @@ public struct SettingsView: View {
     private func content(_ vm: SettingsViewModel) -> some View {
         @Bindable var vm = vm
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: Spacing.lg) {
+            LazyVStack(alignment: .leading, spacing: Spacing.md) {
                 AccountIdentityCard(
                     vm: vm,
                     isCustomerAccount: isCustomerAccount,
@@ -111,11 +111,11 @@ public struct SettingsView: View {
             .padding(.vertical, Spacing.lg)
         }
         .confirmationDialog(
-            "Sign out and deregister this device?",
+            "Sign Out of ExpressCharge?",
             isPresented: $isShowingSignOutConfirm,
             titleVisibility: .visible
         ) {
-            Button("Sign out", role: .destructive) {
+            Button("Sign Out", role: .destructive) {
                 Task {
                     await vm.signOut()
                 }
@@ -221,7 +221,6 @@ private struct AccountIdentityCard: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(Spacing.base)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
     }
@@ -298,7 +297,6 @@ private struct ConnectivityCard: View {
                 .padding(.vertical, Spacing.xs)
             ConnectivityCheckCard(viewModel: connectivityCheck, inline: true)
         }
-        .padding(Spacing.base)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface(.tinted(status.settingsTone))
     }
@@ -320,7 +318,7 @@ private struct PermissionsCard: View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             SectionHeader("Permissions")
             HStack {
-                Label("Notifications", systemImage: "bell.fill")
+                Label("Notifications", systemImage: "bell")
                     .labelStyle(.titleAndIcon)
                 Spacer()
                 StatusPill(
@@ -350,15 +348,16 @@ private struct PermissionsCard: View {
                     systemImage: "gear",
                     action: onOpenSystemSettings
                 )
+                .padding(.top, Spacing.sm)
             } else if apnsStatus == .failed {
                 PrimaryButton(
-                    "Retry registration",
+                    "Retry Registration",
                     systemImage: "arrow.clockwise",
                     action: onRetryRegister
                 )
+                .padding(.top, Spacing.sm)
             }
         }
-        .padding(Spacing.base)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
     }
@@ -437,7 +436,6 @@ private struct DeviceInfoCard: View {
                 )
             }
         }
-        .padding(Spacing.base)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
     }
@@ -453,7 +451,7 @@ private struct AboutCard: View {
                 destination: URL(string: "https://manage.example.com/privacy")!
             ) {
                 HStack {
-                    Label("Privacy policy", systemImage: "hand.raised")
+                    Label("Privacy Policy", systemImage: "hand.raised")
                     Spacer()
                     Image(systemName: "arrow.up.right.square")
                         .foregroundStyle(.tertiary)
@@ -463,14 +461,13 @@ private struct AboutCard: View {
                 destination: URL(string: "https://manage.example.com/terms")!
             ) {
                 HStack {
-                    Label("Terms of service", systemImage: "doc.text")
+                    Label("Terms of Service", systemImage: "doc.text")
                     Spacer()
                     Image(systemName: "arrow.up.right.square")
                         .foregroundStyle(.tertiary)
                 }
             }
         }
-        .padding(Spacing.base)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
     }
@@ -486,10 +483,9 @@ private struct DiagnosticsLinkCard: View {
             HStack {
                 Label("Diagnostics", systemImage: "wrench.and.screwdriver")
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(.tertiary)
+                Image(systemName: "chevron.forward")
+                    .foregroundStyle(.secondary)
             }
-            .padding(Spacing.base)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
@@ -504,7 +500,7 @@ private struct SignOutCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             PrimaryButton(
-                vm.isSigningOut ? "Signing out…" : "Sign out",
+                vm.isSigningOut ? "Signing Out…" : "Sign Out",
                 systemImage: "rectangle.portrait.and.arrow.right",
                 variant: .destructive,
                 state: vm.isSigningOut ? .loading : .default,
@@ -513,10 +509,11 @@ private struct SignOutCard: View {
             if let err = vm.signOutError {
                 Text(err)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .padding(.top, Spacing.base)
     }
 }
 

@@ -78,7 +78,7 @@ extension View {
     public func cardSurface(
         _ style: CardSurfaceStyle = .neutral,
         radius: CGFloat = Radius.lg,
-        padding: CGFloat = Spacing.lg
+        padding: CGFloat = Spacing.base
     ) -> some View {
         modifier(CardSurfaceModifier(style: style, radius: radius, padding: padding))
     }

@@ -28,28 +28,36 @@ struct PlanBadge: View {
     let planName: String?
 
     var body: some View {
-        Text(label)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(background)
-            .clipShape(Capsule())
-            .accessibilityLabel(accessibilityLabel)
+        if let variant = resolvedVariant {
+            Text(label(for: variant))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(background(for: variant))
+                .clipShape(Capsule())
+                .accessibilityLabel("Plan: \(label(for: variant))")
+        }
     }
 
     // MARK: - Variants
 
-    private var resolvedVariant: Variant {
+    /// Returns `nil` when we have no concrete plan signal. Hiding the
+    /// badge in that case avoids showing a misleading "ExpressCharge"
+    /// pill to admin accounts (whose role hasn't decoded yet) or to
+    /// users on a server build that doesn't return plan fields.
+    private var resolvedVariant: Variant? {
         if ownerRole == "admin" { return .admin }
-        let code = (planCode ?? "expresscharge").lowercased()
+        guard let code = planCode?.lowercased(), !code.isEmpty else {
+            return nil
+        }
         if code.contains("plus") || code.contains("+") { return .plus }
         if code.contains("ac") { return .ac }
         return .standard
     }
 
-    private var label: String {
-        switch resolvedVariant {
+    private func label(for variant: Variant) -> String {
+        switch variant {
         case .admin: return "Admin"
         case .plus: return planName ?? "ExpressCharge+"
         case .ac: return planName ?? "ExpressChargeAC"
@@ -57,23 +65,17 @@ struct PlanBadge: View {
         }
     }
 
-    private var accessibilityLabel: String {
-        switch resolvedVariant {
-        case .admin: return "Plan: Admin"
-        case let other:
-            return "Plan: \(label) (\(String(describing: other)))"
-        }
-    }
-
     @ViewBuilder
-    private var background: some View {
-        switch resolvedVariant {
+    private func background(for variant: Variant) -> some View {
+        switch variant {
         case .admin:
-            // Admin: brand gradient (cyan → volt green)
+            // Admin: brand gradient on the diagonal so it reads as
+            // distinct from `.plus` (which uses the same colours on a
+            // horizontal sweep).
             LinearGradient(
                 colors: [ColorPalette.primaryCyan, ColorPalette.voltGreen],
-                startPoint: .leading,
-                endPoint: .trailing
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
         case .plus:
             // Plus: brand gradient (cyan → volt green) — premium tier.
