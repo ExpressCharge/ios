@@ -94,6 +94,18 @@ public final class PushService {
 
     /// Persists the raw APNs token (base64) against the registered
     /// device. Idempotent; safe to call multiple times.
+    ///
+    /// Retry/backoff: on transient failure (network, 5xx, transport
+    /// error) we retry with a short exponential schedule — 1s, 3s, 8s
+    /// — before giving up. iOS will redeliver the token via
+    /// `didRegisterForRemoteNotificationsWithDeviceToken` on the next
+    /// foreground / re-launch and `refreshIfAuthenticated()` drains
+    /// the pending token after credentials land, so the worst
+    /// long-tail outcome is a delayed badge — not a permanently
+    /// unregistered device. We deliberately do NOT retry on
+    /// `.unauthorized` / `.gone` / 4xx-shaped errors: those mean the
+    /// device row is gone (revoked or deleted) and the right move is
+    /// to bail and let the next sign-in flow re-register.
     public func uploadToken(_ base64Token: String) async {
         guard !base64Token.isEmpty else {
             log.error("PushService.uploadToken: empty token, refusing to upload")
@@ -116,14 +128,6 @@ public final class PushService {
                 return
             }
             let env = BuildConfig.apnsEnvironment == "production" ? "production" : "sandbox"
-            log.debug(
-                "PushService.uploadToken: PUT push-token",
-                metadata: [
-                    "deviceId": "\(deviceId)",
-                    "env": "\(env)",
-                    "token.len": "\(base64Token.count)",
-                ]
-            )
             let body = PushTokenUpdateRequest(
                 pushToken: base64Token,
                 apnsEnvironment: BuildConfig.apnsEnvironment == "production"
@@ -135,20 +139,99 @@ public final class PushService {
                 requiresAuth: true,
                 body: body
             )
-            try await environment.api.send(endpoint)
+            try await sendWithRetry(
+                endpoint: endpoint,
+                deviceId: deviceId,
+                env: env,
+                tokenLen: base64Token.count
+            )
             lastUploadedToken = base64Token
             log.debug(
                 "PushService.uploadToken: PUT succeeded",
                 metadata: ["deviceId": "\(deviceId)"]
             )
         } catch {
-            // Soft-fail: we'll retry on the next
-            // `didRegisterForRemoteNotificationsWithDeviceToken` call
-            // or the next `refreshIfAuthenticated()` from bootstrap.
+            // Soft-fail: AppDelegate redelivery + bootstrap drain are
+            // the long-tail safety nets.
             log.error(
-                "PushService.uploadToken: PUT failed",
+                "PushService.uploadToken: gave up after retries",
                 metadata: ["error": "\(String(describing: error))"]
             )
+        }
+    }
+
+    /// Send the push-token PUT with a short retry schedule (1s, 3s, 8s).
+    /// Bails immediately on `APIError.unauthorized` / `.gone` since
+    /// those mean the device row is gone — retrying won't help.
+    private func sendWithRetry(
+        endpoint: Endpoint,
+        deviceId: String,
+        env: String,
+        tokenLen: Int
+    ) async throws {
+        let delaysNs: [UInt64] = [
+            1_000_000_000,   // 1s
+            3_000_000_000,   // 3s
+            8_000_000_000,   // 8s
+        ]
+        var attempt = 0
+        while true {
+            do {
+                log.debug(
+                    "PushService.uploadToken: PUT push-token",
+                    metadata: [
+                        "deviceId": "\(deviceId)",
+                        "env": "\(env)",
+                        "token.len": "\(tokenLen)",
+                        "attempt": "\(attempt + 1)",
+                    ]
+                )
+                try await environment.api.send(endpoint)
+                return
+            } catch let error as APIError where Self.isTerminalAPIError(error) {
+                log.warning(
+                    "PushService.uploadToken: terminal error, not retrying",
+                    metadata: [
+                        "error": "\(String(describing: error))",
+                        "attempt": "\(attempt + 1)",
+                    ]
+                )
+                throw error
+            } catch {
+                if attempt >= delaysNs.count {
+                    throw error
+                }
+                let delay = delaysNs[attempt]
+                log.warning(
+                    "PushService.uploadToken: transient error, will retry",
+                    metadata: [
+                        "error": "\(String(describing: error))",
+                        "attempt": "\(attempt + 1)",
+                        "next_delay_ms": "\(delay / 1_000_000)",
+                    ]
+                )
+                try? await Task.sleep(nanoseconds: delay)
+                attempt += 1
+            }
+        }
+    }
+
+    /// Errors where retrying won't help: device row is revoked
+    /// (`.gone`), session is invalid (`.unauthorized`), or the request
+    /// itself is shaped wrong (`.badRequest`-ish 4xx). Anything else —
+    /// timeouts, transport errors, 5xx — we retry.
+    private static func isTerminalAPIError(_ error: APIError) -> Bool {
+        switch error {
+        case .unauthorized, .forbidden, .gone, .notFound:
+            // 401/403 → bearer-vs-path mismatch or revoked; 410/404 →
+            // device row is gone. None of these get better with retry.
+            return true
+        case .server(let statusCode, _) where (400 ..< 500).contains(statusCode):
+            // Other client-shaped errors (e.g. 422 from a validation
+            // failure on the body shape) are also terminal.
+            return true
+        default:
+            return false
         }
     }
 

@@ -107,8 +107,25 @@ public final class LoginViewModel: NSObject {
         // and handed to the `RootCoordinator.didReceiveOneTimeCode(_,
         // codeVerifier:)` transition — explicit DI, no globals.
 
-        var components = URLComponents(
-            url: BuildConfig.registrationStartURL, resolvingAgainstBaseURL: false)!
+        guard
+            var components = URLComponents(
+                url: BuildConfig.registrationStartURL,
+                resolvingAgainstBaseURL: false
+            )
+        else {
+            // BuildConfig.registrationStartURL is a baked-in constant URL
+            // so this branch is unreachable in practice — but a malformed
+            // build-time string shouldn't take down the launch.
+            log.error(
+                "LoginViewModel.start: URLComponents init returned nil",
+                metadata: [
+                    "url.string":
+                        "\(BuildConfig.registrationStartURL.absoluteString)"
+                ]
+            )
+            error = .urlConstruction
+            return
+        }
         var items = components.queryItems ?? []
         items.append(URLQueryItem(name: "codeChallenge", value: challenge))
         items.append(URLQueryItem(name: "codeChallengeMethod", value: "S256"))

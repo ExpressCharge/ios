@@ -124,11 +124,28 @@ public final class RootCoordinator {
     @ObservationIgnored
     private static let emptySettingsReader: SettingsReader = {
         // Process-wide fallback store rooted in tmp; only used for the
-        // unauthenticated shell so writes here are inert.
-        let store =
-            (try? SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
-            ?? (try! SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
-        return SettingsReader(store: store)
+        // unauthenticated shell so writes here are inert. If even tmp
+        // is unwritable the device storage is genuinely broken — log
+        // loudly and crash with a clear message instead of an opaque
+        // `try!` abort. The previous `(try? X) ?? (try! X)` form was
+        // pointless: both attempts used identical args, so on failure
+        // both branches threw and we crashed with the second error.
+        do {
+            let store = try SettingsStore(
+                directoryURL: FileManager.default.temporaryDirectory
+            )
+            return SettingsReader(store: store)
+        } catch {
+            bootLog.critical(
+                "emptySettingsReader: tmp directory not writable",
+                metadata: ["error": "\(error)"]
+            )
+            fatalError(
+                "emptySettingsReader: SettingsStore init failed in " +
+                "FileManager.default.temporaryDirectory; device storage " +
+                "is unwritable. Underlying error: \(error)"
+            )
+        }
     }()
 
     /// Loads credentials and transitions to `.ready` or `.welcome`.
@@ -229,11 +246,30 @@ public final class RootCoordinator {
         do {
             store = try SettingsStore()
         } catch {
-            // Persistence failure is rare (sandbox dir not writable);
-            // fall back to an in-memory store rooted in a temp dir.
-            store =
-                (try? SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
-                ?? (try! SettingsStore(directoryURL: FileManager.default.temporaryDirectory))
+            // Sandbox dir not writable. Fall back to tmp; if tmp also
+            // fails the device storage is broken and there's nothing
+            // useful we can do other than crash with a clear cause.
+            bootLog.warning(
+                "SettingsStore default init failed; falling back to tmp",
+                metadata: ["error": "\(error)"]
+            )
+            do {
+                store = try SettingsStore(
+                    directoryURL: FileManager.default.temporaryDirectory
+                )
+            } catch let tmpError {
+                bootLog.critical(
+                    "SettingsStore tmp fallback also failed",
+                    metadata: [
+                        "default_error": "\(error)",
+                        "tmp_error": "\(tmpError)",
+                    ]
+                )
+                fatalError(
+                    "SettingsStore init failed for both default and tmp " +
+                    "directories. Default: \(error). Tmp: \(tmpError)."
+                )
+            }
         }
         let coordinator = DeviceStateCoordinator(
             api: environment.api,
