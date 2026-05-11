@@ -141,8 +141,11 @@ struct CapabilitiesTests {
 
     @Test func managedCopyMatchesSpec() {
         let m = CapabilityMetadata.metadata(for: .managed)
-        #expect(m.displayName == "Managed device")
-        #expect(m.description == "Allows admins to locate this device")
+        #expect(m.displayName == "Managed")
+        #expect(
+            m.description
+                == "Admin-fleet posture; allows admins to read this device's location"
+        )
         #expect(!m.sfSymbol.isEmpty)
     }
 
