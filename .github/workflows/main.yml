@@ -314,7 +314,7 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
       - name: Download build products
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-products
           path: DerivedData/Build/Products
@@ -395,7 +395,7 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
       - name: Download build products
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-products
           path: DerivedData/Build/Products
