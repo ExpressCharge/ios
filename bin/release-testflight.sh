@@ -32,17 +32,27 @@
 set -euo pipefail
 
 # --- Config -----------------------------------------------------------------
-TEAM_ID="ABC1234XYZ"
-BUNDLE_ID="com.example.expresscharge.ios"
-PROFILE_NAME="express polaris ios App Store (claude)"
+# Real values are loaded from bin/.release-config (gitignored, local only)
+# or from environment (CI). See bin/release-config.example for the schema.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/.release-config" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/.release-config"
+fi
 
-ASC_API_KEY_PATH="$HOME/.secrets/expresscharge/AuthKey_XXXXXXXXXX.p8"
-ASC_API_KEY_ID="XXXXXXXXXX"
-ASC_API_ISSUER_ID="00000000-0000-0000-0000-000000000000"
-ASC_APP_ID="0000000000"
+: "${APPLE_TEAM_ID:?APPLE_TEAM_ID required (source bin/.release-config or set in env)}"
+: "${ASC_API_KEY_ID:?ASC_API_KEY_ID required}"
+: "${ASC_API_ISSUER_ID:?ASC_API_ISSUER_ID required}"
+: "${ASC_APP_ID:?ASC_APP_ID required}"
+
+TEAM_ID="$APPLE_TEAM_ID"
+BUNDLE_ID="${RELEASE_BUNDLE_ID:-com.example.expresscharge.ios}"
+PROFILE_NAME="${RELEASE_PROFILE_NAME:-ExpressCharge iOS App Store}"
+
+ASC_API_KEY_PATH="${ASC_API_KEY_PATH:-$HOME/.secrets/expresscharge/AuthKey_${ASC_API_KEY_ID}.p8}"
 
 DEVELOPER_DIR_OVERRIDE="${DEVELOPER_DIR_OVERRIDE:-/Applications/Xcode-beta.app/Contents/Developer}"
-DEVICE_ID="00000000-0000-0000-0000-000000000000"   # Vladosaurus
+DEVICE_ID="${RELEASE_DEVICE_ID:-}"
 
 # --- Args -------------------------------------------------------------------
 SKIP_BUMP=0

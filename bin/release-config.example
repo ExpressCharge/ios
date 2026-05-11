@@ -1,0 +1,14 @@
+# Copy to bin/.release-config and fill in real values from your Apple Developer
+# account + App Store Connect. The .release-config file is gitignored. Do not
+# commit it. See README.md / CLAUDE.md for where to find each value.
+export APPLE_TEAM_ID="ABC1234XYZ"
+export ASC_API_KEY_ID="XXXXXXXXXX"
+export ASC_API_ISSUER_ID="00000000-0000-0000-0000-000000000000"
+export ASC_APP_ID="0000000000"
+# ASC_API_KEY_PATH defaults to ~/.secrets/expresscharge/AuthKey_${ASC_API_KEY_ID}.p8
+# export ASC_API_KEY_PATH="$HOME/.secrets/expresscharge/AuthKey_${ASC_API_KEY_ID}.p8"
+# RELEASE_DEVICE_ID is the UDID of the iPhone used for --skip-device=false (optional).
+# export RELEASE_DEVICE_ID="00000000-0000-0000-0000-000000000000"
+# Optional overrides:
+# export RELEASE_BUNDLE_ID="com.example.expresscharge.ios"
+# export RELEASE_PROFILE_NAME="ExpressCharge iOS App Store"

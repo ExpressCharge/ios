@@ -44,8 +44,42 @@ unless the user has named `main` as the target.
 use the `DEVELOPER_DIR_OVERRIDE` default (Xcode-beta); CI overrides it via
 the env var. Don't hardcode the path further.
 
-Required local prerequisites are documented at the top of the script. The
-ASC API key lives at `~/.secrets/expresscharge/AuthKey_XXXXXXXXXX.p8`.
+### Release config split
+
+Real Apple Developer + App Store Connect identifiers live in
+`bin/.release-config` (gitignored). Copy `bin/release-config.example` and
+fill in:
+
+- `APPLE_TEAM_ID` — from developer.apple.com (Account → Membership)
+- `ASC_API_KEY_ID` — App Store Connect → Users & Access → Integrations → API Keys
+- `ASC_API_ISSUER_ID` — same page
+- `ASC_APP_ID` — App Store Connect → App → App Information → Apple ID
+- `RELEASE_DEVICE_ID` (optional) — UDID of the test iPhone for `--skip-device=false`
+
+The ASC API key `.p8` file lives at
+`~/.secrets/expresscharge/AuthKey_${ASC_API_KEY_ID}.p8`.
+
+CI does NOT use `.release-config`; it gets the same values from repo Variables
+(`vars.APPLE_TEAM_ID`, `vars.ASC_API_KEY_ID`, etc.) injected as env vars on
+the release job.
+
+## Local CI fallback
+
+When GitHub Actions is unavailable, `bin/precommit.sh` reproduces most of CI
+locally. Per workflow job:
+
+| CI job        | Local equivalent                                              |
+|---------------|---------------------------------------------------------------|
+| `lint`        | `xcrun swift-format lint --recursive --strict App Sources Tests ExpresScanTests ExpresScanUITests` |
+| `format`      | `xcrun swift-format format --recursive -i …` then `git diff --exit-code` |
+| `build`       | `xcodegen generate && xcodebuild -scheme ExpresScan-Release build-for-testing -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest'` |
+| `test-unit`   | `xcodebuild test -scheme ExpresScan-Debug -only-testing:ExpresScanTests` |
+| `test-ui`     | `xcodebuild test -scheme ExpresScan-Debug -only-testing:ExpresScanUITests` |
+| `release`     | `bin/release-testflight.sh` (requires bin/.release-config + ASC key) |
+| `secrets-scan`| `gitleaks detect --no-banner`                                 |
+
+The `release` job is the only one that requires the ASC API key on the local
+machine. All others run fully offline against the simulator.
 
 ## Build & test
 

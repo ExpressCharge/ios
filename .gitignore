@@ -62,6 +62,10 @@ fastlane/test_output
 .env.*
 !.env.example
 
+# Local release-time config (real Apple Developer + ASC identifiers).
+# See bin/release-config.example for the schema.
+bin/.release-config
+
 # Editor
 .idea/
 .vscode/

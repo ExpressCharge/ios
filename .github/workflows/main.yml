@@ -430,6 +430,11 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: write
+    env:
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      ASC_API_KEY_ID: ${{ vars.ASC_API_KEY_ID }}
+      ASC_API_ISSUER_ID: ${{ vars.ASC_API_ISSUER_ID }}
+      ASC_APP_ID: ${{ vars.ASC_APP_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -517,15 +522,16 @@ jobs:
           PROFILE_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
           echo "$PROFILE_BASE64" | base64 --decode \
-            --output "$PROFILE_DIR/express-polaris-ios-app-store.mobileprovision"
+            --output "$PROFILE_DIR/expresscharge-ios-app-store.mobileprovision"
 
       - name: Install ASC API key
         env:
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
         run: |
           mkdir -p "$HOME/.secrets/expresscharge"
-          printf '%s' "$ASC_API_KEY_P8" > "$HOME/.secrets/expresscharge/AuthKey_XXXXXXXXXX.p8"
-          chmod 600 "$HOME/.secrets/expresscharge/AuthKey_XXXXXXXXXX.p8"
+          KEY_PATH="$HOME/.secrets/expresscharge/AuthKey_${ASC_API_KEY_ID}.p8"
+          printf '%s' "$ASC_API_KEY_P8" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
 
       - name: Configure git for build-bump commit
         run: |
