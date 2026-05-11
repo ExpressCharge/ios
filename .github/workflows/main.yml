@@ -425,7 +425,7 @@ jobs:
   release:
     name: Release to TestFlight
     needs: [lint, format, build, test-unit, test-ui]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.MIGRATION_DONE == 'true'
     runs-on: macos-26
     timeout-minutes: 45
     permissions:
