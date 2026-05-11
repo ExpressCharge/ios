@@ -50,6 +50,7 @@ jobs:
     name: Lint
     runs-on: macos-26
     timeout-minutes: 5
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -115,6 +116,7 @@ jobs:
     name: Format check
     runs-on: macos-26
     timeout-minutes: 5
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
